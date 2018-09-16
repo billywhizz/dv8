@@ -19,8 +19,4 @@
 
 ## Results
 Binary Size = 17M
-RSS without JS = 7.9MiB
-RSS with JS = 14.7MiB
-
-nodejs build is 26.3M on alpine docker
-takes up 23M RSS when run
+RSS with JS = 12.8MiB

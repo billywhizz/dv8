@@ -2,8 +2,10 @@ export NODE_HOME=/source/node-v$NODE_VERSION
 export V8_INCLUDE=$NODE_HOME/deps/v8/include
 export UV_INCLUDE=$NODE_HOME/deps/uv/include
 export NODE_DEPS=$NODE_HOME/out/Release/obj.target/deps
-rm -f *.o
-# compile the dv8 core library
+export PWD=$(pwd)
+export MODULE_NAME=os
+export MODULE_DIR=$(pwd)/modules/$MODULE_NAME
+# compile the binding
 g++ \
     '-DV8_DEPRECATION_WARNINGS=0' \
     '-DHAVE_INSPECTOR=0' \
@@ -14,6 +16,8 @@ g++ \
     -I$V8_INCLUDE \
     -I$UV_INCLUDE \
     -I./ \
+    -I$MODULE_DIR \
+    -fPIC \
     -pthread \
     -Wall \
     -Wextra \
@@ -25,54 +29,45 @@ g++ \
     -fno-exceptions \
     -std=gnu++1y \
     -c \
-    -o dv8.o \
-    dv8.cc
+    -o $MODULE_NAME.binding.o \
+    $MODULE_DIR/binding.cc
+# compile the class
+g++ \
+    '-DV8_DEPRECATION_WARNINGS=0' \
+    '-DHAVE_INSPECTOR=0' \
+    '-D__POSIX__' \
+    '-D_LARGEFILE_SOURCE' \
+    '-D_FILE_OFFSET_BITS=64' \
+    '-D_POSIX_C_SOURCE=200112' \
+    -I$V8_INCLUDE \
+    -I$UV_INCLUDE \
+    -I./ \
+    -I$MODULE_DIR \
+    -fPIC \
+    -pthread \
+    -Wall \
+    -Wextra \
+    -Wno-unused-parameter \
+    -m64 \
+    -O3 \
+    -fno-omit-frame-pointer \
+    -fno-rtti \
+    -fno-exceptions \
+    -std=gnu++1y \
+    -c \
+    -o $MODULE_NAME.o \
+    $MODULE_DIR/$MODULE_NAME.cc
 # create the lib
-ar crsT dv8.a dv8.o
-# compile the main executable
+#ar crsT $MODULE_NAME.a $MODULE_NAME.binding.o $MODULE_NAME.o
+# link library
 g++ \
-    '-DV8_DEPRECATION_WARNINGS=0' \
-    '-DHAVE_INSPECTOR=0' \
-    '-D__POSIX__' \
-    '-D_LARGEFILE_SOURCE' \
-    '-D_FILE_OFFSET_BITS=64' \
-    '-D_POSIX_C_SOURCE=200112' \
-    -I$V8_INCLUDE \
-    -I$UV_INCLUDE \
-    -I./ \
-    -pthread \
-    -Wall \
-    -Wextra \
-    -Wno-unused-parameter \
-    -m64 \
-    -O3 \
-    -fno-omit-frame-pointer \
-    -fno-rtti \
-    -fno-exceptions \
-    -std=gnu++1y \
-    -c \
-    -o dv8main.o \
-    dv8_main.cc
-# link main executable
-g++ \
+    -shared \
     -pthread \
     -rdynamic \
     -m64 \
-    -Wl,--whole-archive,$NODE_DEPS/uv/libuv.a \
-    -Wl,--no-whole-archive \
-    -Wl,-z,noexecstack \
-    -Wl,--whole-archive $NODE_DEPS/v8/gypfiles/libv8_base.a \
-    -Wl,--no-whole-archive \
-    -pthread \
-    -o ./dv8 \
+    -Wl,-soname=$MODULE_NAME.so \
+    -o ./$MODULE_NAME.so \
     -Wl,--start-group \
-    ./dv8main.o \
-    ./dv8.a \
-    $NODE_DEPS/v8/gypfiles/libv8_libplatform.a \
-    $NODE_DEPS/v8/gypfiles/libv8_libbase.a \
-    $NODE_DEPS/v8/gypfiles/libv8_libsampler.a \
-    $NODE_DEPS/v8/gypfiles/libv8_snapshot.a \
-    -ldl \
-    -lrt \
-    -lm \
+    ./$MODULE_NAME.o \
+    ./$MODULE_NAME.binding.o \
     -Wl,--end-group

@@ -1,11 +1,14 @@
+const { OS } = module({})
+
 async function run() {
-    print(`Version: ${version()}`)
     const seconds = 5
-    print(`sleeping for ${seconds} seconds`)
-    sleep(seconds)
-    print('done sleeping')
-    const now = new Date()
-    print(`Date: ${now}`)
+    const os = new OS()
+    print(`Version: ${version()}`)
+    print(`Date: ${new Date()}`)
+    print(`sleep for ${seconds} seconds`)
+    os.sleep(seconds)
+    print(`Date: ${new Date()}`)
+
 }
 
 run().catch(console.error)

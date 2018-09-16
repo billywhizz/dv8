@@ -1,3 +1,8 @@
 .vscode
 scratch
 src/dv8
+app/.ash_history
+app/core
+*.o
+*.so
+*.a
