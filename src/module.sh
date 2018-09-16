@@ -1,9 +1,9 @@
+echo building module $MODULE_NAME
 export NODE_HOME=/source/node-v$NODE_VERSION
 export V8_INCLUDE=$NODE_HOME/deps/v8/include
 export UV_INCLUDE=$NODE_HOME/deps/uv/include
 export NODE_DEPS=$NODE_HOME/out/Release/obj.target/deps
 export PWD=$(pwd)
-export MODULE_NAME=os
 export MODULE_DIR=$(pwd)/modules/$MODULE_NAME
 # compile the binding
 g++ \
@@ -71,3 +71,5 @@ g++ \
     ./$MODULE_NAME.o \
     ./$MODULE_NAME.binding.o \
     -Wl,--end-group
+strip ./$MODULE_NAME.so
+rm -f *.o

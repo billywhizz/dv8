@@ -14,9 +14,11 @@
 ## Instructions
 ```
 ./build-docker.sh
+./build-module.sh {{modulename - default is "os" module}}
 ./run.sh app.js
 ```
 
 ## Results
+On Alpine Docker:
 Binary Size = 17M
-RSS with JS = 12.8MiB
+RSS with JS = 13MiB

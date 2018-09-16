@@ -76,3 +76,5 @@ g++ \
     -lrt \
     -lm \
     -Wl,--end-group
+strip ./dv8
+rm -f *.o

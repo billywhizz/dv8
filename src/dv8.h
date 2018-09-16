@@ -49,8 +49,8 @@ class ObjectWrap {
     virtual ~ObjectWrap() {
         if (persistent().IsEmpty()) return;
         assert(persistent().IsNearDeath());
-        //persistent().ClearWeak();
-        //persistent().Reset();
+        persistent().ClearWeak();
+        persistent().Reset();
     }
 
     template <class T> static inline T *Unwrap(v8::Local<v8::Object> handle) {
@@ -78,8 +78,8 @@ class ObjectWrap {
         assert(persistent().IsEmpty());
         assert(handle->InternalFieldCount() > 0);
         handle->SetAlignedPointerInInternalField(0, this);
-        //persistent().Reset(v8::Isolate::GetCurrent(), handle);
-        //MakeWeak();
+        persistent().Reset(v8::Isolate::GetCurrent(), handle);
+        MakeWeak();
     }
 
     inline void MakeWeak(void) {
@@ -115,7 +115,6 @@ class ObjectWrap {
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
     v8::HandleScope handle_scope(isolate);
     v8::Local<v8::FunctionTemplate> t = v8::FunctionTemplate::New(isolate, callback);
-    fprintf(stderr, "Function: %s\n", name);
     v8::Local<v8::String> fn_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
     t->SetClassName(fn_name);
     recv->Set(fn_name, t);
@@ -125,7 +124,6 @@ inline void DV8_SET_PROTOTYPE_METHOD(v8::Isolate *isolate, v8::Local<v8::Functio
     v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Signature> s = v8::Signature::New(isolate, recv);
     v8::Local<v8::FunctionTemplate> t = v8::FunctionTemplate::New(isolate, callback, v8::Local<v8::Value>(), s);
-    fprintf(stderr, "  Method: %s\n", name);
     v8::Local<v8::String> fn_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
     t->SetClassName(fn_name);
     recv->PrototypeTemplate()->Set(fn_name, t);
@@ -133,7 +131,6 @@ inline void DV8_SET_PROTOTYPE_METHOD(v8::Isolate *isolate, v8::Local<v8::Functio
 
 inline void DV8_SET_EXPORT(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate> recv, const char *name, v8::Local<v8::Object> exports) {
     v8::Local<v8::String> export_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
-    fprintf(stderr, "Export: %s\n", name);
     exports->Set(export_name, recv->GetFunction());
 }
 
