@@ -16,6 +16,8 @@ namespace process {
   using v8::String;
   using v8::Value;
   using v8::Array;
+  using v8::HeapStatistics;
+  using v8::Float64Array;
 
   Persistent<Function> Process::constructor;
 
@@ -27,6 +29,7 @@ namespace process {
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pid", Process::PID);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "memoryUsage", Process::MemoryUsage);
 
     constructor.Reset(isolate, tpl->GetFunction());
     DV8_SET_EXPORT(isolate, tpl, "Process", exports);
@@ -62,6 +65,27 @@ namespace process {
     Isolate* isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     args.GetReturnValue().Set(Integer::New(isolate, uv_os_getpid()));
+  }
+
+  void Process::MemoryUsage(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    size_t rss;
+    int err = uv_resident_set_memory(&rss);
+    if (err) {
+      fprintf(stderr, "uv_error: %i", err);
+      return;
+    }
+    HeapStatistics v8_heap_stats;
+    isolate->GetHeapStatistics(&v8_heap_stats);
+    //CHECK(args[0]->IsFloat64Array());
+    Local<Float64Array> array = args[0].As<Float64Array>();
+    //CHECK_EQ(array->Length(), 4);
+    Local<ArrayBuffer> ab = array->Buffer();
+    double* fields = static_cast<double*>(ab->GetContents().Data());
+    fields[0] = rss;
+    fields[1] = v8_heap_stats.total_heap_size();
+    fields[2] = v8_heap_stats.used_heap_size();
+    fields[3] = isolate->AdjustAmountOfExternalAllocatedMemory(0);
   }
 
 }

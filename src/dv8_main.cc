@@ -26,9 +26,21 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Error reading '%s'\n", str);
       return 1;
     }
+    uv_run(uv_default_loop(), UV_RUN_ONCE);
     bool success = dv8::ExecuteString(isolate, source, file_name, true);
     if (!success) isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Error executing file", v8::NewStringType::kNormal).ToLocalChecked());
     while (v8::platform::PumpMessageLoop(platform.get(), isolate)) continue;
+    fprintf(stderr, "hello\n");
+    bool more;
+    do {
+      uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+      more = uv_loop_alive(uv_default_loop());
+      fprintf(stderr, "more: %i\n", more);
+      if (more)
+        continue;
+      more = uv_loop_alive(uv_default_loop());
+      fprintf(stderr, "more: %i\n", more);
+    } while (more == true);
     isolate->Exit();
     isolate->Dispose();
     delete create_params.array_buffer_allocator;

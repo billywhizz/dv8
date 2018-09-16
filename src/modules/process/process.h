@@ -19,6 +19,7 @@ class Process : public dv8::ObjectWrap {
 
   static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void PID(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void MemoryUsage(const v8::FunctionCallbackInfo<v8::Value>& args);
 
   static v8::Persistent<v8::Function> constructor;
 
