@@ -1,0 +1,10 @@
+node-v*
+scratch
+dv8
+*.cc
+*.o
+node
+*.tar.gz
+*.md
+*.sh
+*.js
