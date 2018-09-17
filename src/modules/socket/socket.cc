@@ -1,4 +1,4 @@
-#include "socket.h"
+#include <socket.h>
 
 namespace dv8 {
 
@@ -16,6 +16,7 @@ namespace socket {
   using v8::String;
   using v8::Value;
   using v8::Array;
+  using dv8::builtins::Buffer;
 
   Persistent<Function> Socket::constructor;
   static int contextid = 0; // incrementing counter for context ids
@@ -26,7 +27,7 @@ namespace socket {
     v8::HandleScope handleScope(isolate);
     _context* ctx;
     if(contexts.empty()) {
-      ctx = (_context*)calloc(sizeof(_context), 1);
+      ctx = (_context*)calloc(1, sizeof(_context));
       ctx->fd = contextid++;
       contextMap[ctx->fd] = ctx;
     }
@@ -331,17 +332,14 @@ namespace socket {
     Local<Context> context = isolate->GetCurrentContext();
     int fd = args[0]->Int32Value(context).ToChecked();
     _context* ctx = contextMap[fd];
-/*    
-    size_t len = dv8::Buffer::Length(args[1]);
-    ctx->in = uv_buf_init(dv8::Buffer::Data(args[1]), len);
+    Buffer* b = ObjectWrap::Unwrap<Buffer>(args[1]->ToObject());
+    size_t len = b->_length;
+    ctx->in = uv_buf_init((char*)b->_data, len);
     ctx->readBufferLength = len;
-    len = dv8::Buffer::Length(args[2]);
-    ctx->out = uv_buf_init(dv8::Buffer::Data(args[2]), len);
-    if(args.Length() > 3) {
-      s->headers[fd].Reset(isolate, args[3].As<Array>());
-      ctx->request->setHeaders = 1;
-    }
-*/
+    b = ObjectWrap::Unwrap<Buffer>(args[2]->ToObject());
+    len = b->_length;
+    ctx->out = uv_buf_init((char*)b->_data, len);
+    ctx->readBufferLength = len;
     args.GetReturnValue().Set(Integer::New(isolate, 0));
   }
 

@@ -9,7 +9,6 @@
 #include <map>
 #include <queue>
 
-#include <uv.h>
 #include <dv8.h>
 
 // size of work buffer for reading. this should be user configurable and be same size as in buffer

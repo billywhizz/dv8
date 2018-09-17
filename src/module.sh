@@ -4,6 +4,7 @@ export V8_INCLUDE=$NODE_HOME/deps/v8/include
 export UV_INCLUDE=$NODE_HOME/deps/uv/include
 export NODE_DEPS=$NODE_HOME/out/Release/obj.target/deps
 export PWD=$(pwd)
+export BUILTIN_DIR=$(pwd)/builtins
 export MODULE_DIR=$(pwd)/modules/$MODULE_NAME
 # compile the binding
 g++ \
@@ -16,6 +17,7 @@ g++ \
     -I$V8_INCLUDE \
     -I$UV_INCLUDE \
     -I./ \
+    -I$BUILTIN_DIR \
     -I$MODULE_DIR \
     -fPIC \
     -pthread \
@@ -42,6 +44,7 @@ g++ \
     -I$V8_INCLUDE \
     -I$UV_INCLUDE \
     -I./ \
+    -I$BUILTIN_DIR \
     -I$MODULE_DIR \
     -fPIC \
     -pthread \

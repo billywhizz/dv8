@@ -2,11 +2,12 @@
 #define DV8_H
 
 #include <assert.h>
-#include <libplatform/libplatform.h>
-#include <v8.h>
 #include <unistd.h>
+#include <v8.h>
+#include <libplatform/libplatform.h>
 #include <uv.h>
-
+#include <common.h>
+#include <buffer.h>
 namespace dv8 {
 
 using v8::ArrayBuffer;
@@ -39,78 +40,6 @@ Local<Context> CreateContext(Isolate *isolate);
 void Print(const FunctionCallbackInfo<Value> &args);
 void Version(const FunctionCallbackInfo<Value> &args);
 void LoadModule(const FunctionCallbackInfo<Value>& args);
-
-class ObjectWrap {
-  public:
-    ObjectWrap() {
-        refs_ = 0;
-    }
-
-    virtual ~ObjectWrap() {
-        if (persistent().IsEmpty()) return;
-        assert(persistent().IsNearDeath());
-        persistent().ClearWeak();
-        persistent().Reset();
-    }
-
-    template <class T> static inline T *Unwrap(v8::Local<v8::Object> handle) {
-        assert(!handle.IsEmpty());
-        assert(handle->InternalFieldCount() > 0);
-        void *ptr = handle->GetAlignedPointerFromInternalField(0);
-        ObjectWrap *wrap = static_cast<ObjectWrap *>(ptr);
-        return static_cast<T *>(wrap);
-    }
-
-    inline v8::Local<v8::Object> handle() {
-        return handle(v8::Isolate::GetCurrent());
-    }
-
-    inline v8::Local<v8::Object> handle(v8::Isolate *isolate) {
-        return v8::Local<v8::Object>::New(isolate, persistent());
-    }
-
-    inline v8::Persistent<v8::Object> &persistent() {
-        return handle_;
-    }
-
-  protected:
-    inline void Wrap(v8::Local<v8::Object> handle) {
-        assert(persistent().IsEmpty());
-        assert(handle->InternalFieldCount() > 0);
-        handle->SetAlignedPointerInInternalField(0, this);
-        persistent().Reset(v8::Isolate::GetCurrent(), handle);
-        MakeWeak();
-    }
-
-    inline void MakeWeak(void) {
-        persistent().SetWeak(this, WeakCallback, v8::WeakCallbackType::kParameter);
-    }
-
-    virtual void Ref() {
-        assert(!persistent().IsEmpty());
-        persistent().ClearWeak();
-        refs_++;
-    }
-
-    virtual void Unref() {
-        assert(!persistent().IsEmpty());
-        assert(!persistent().IsWeak());
-        assert(refs_ > 0);
-        if (--refs_ == 0) MakeWeak();
-    }
-
-    int refs_;
-
-  private:
-    static void WeakCallback(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-        ObjectWrap *wrap = data.GetParameter();
-        assert(wrap->refs_ == 0);
-        wrap->handle_.Reset();
-        delete wrap;
-    }
-
-    v8::Persistent<v8::Object> handle_;
-};
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
     v8::HandleScope handle_scope(isolate);

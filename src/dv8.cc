@@ -10,6 +10,7 @@ const char *ToCString(const String::Utf8Value &value) {
 
 void ReportException(Isolate *isolate, TryCatch *try_catch) {
   HandleScope handle_scope(isolate);
+fprintf(stderr, "exception\n");
   String::Utf8Value exception(isolate, try_catch->Exception());
   const char *exception_string = ToCString(exception);
   Local<Message> message = try_catch->Message();
@@ -144,9 +145,9 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
 
 Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
-  global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(),FunctionTemplate::New(isolate, Version));
-  global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(),FunctionTemplate::New(isolate, Print));
-  global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(),FunctionTemplate::New(isolate, LoadModule));
+  global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
+  global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
+  global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   return Context::New(isolate, NULL, global);
 }
 
