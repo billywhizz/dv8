@@ -1,23 +1,28 @@
 #include <dv8.h>
 
-namespace dv8 {
+namespace dv8
+{
 
 using InitializerCallback = void (*)(Local<Object> exports);
 
-const char *ToCString(const String::Utf8Value &value) {
+const char *ToCString(const String::Utf8Value &value)
+{
   return *value ? *value : "<string conversion failed>";
 }
 
-void ReportException(Isolate *isolate, TryCatch *try_catch) {
+void ReportException(Isolate *isolate, TryCatch *try_catch)
+{
   HandleScope handle_scope(isolate);
-fprintf(stderr, "exception\n");
+  fprintf(stderr, "exception\n");
   String::Utf8Value exception(isolate, try_catch->Exception());
   const char *exception_string = ToCString(exception);
   Local<Message> message = try_catch->Message();
-  if (message.IsEmpty()) {
+  if (message.IsEmpty())
+  {
     fprintf(stderr, "%s\n", exception_string);
   }
-  else {
+  else
+  {
     String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
     Local<Context> context(isolate->GetCurrentContext());
     const char *filename_string = ToCString(filename);
@@ -27,16 +32,19 @@ fprintf(stderr, "exception\n");
     const char *sourceline_string = ToCString(sourceline);
     fprintf(stderr, "%s\n", sourceline_string);
     int start = message->GetStartColumn(context).FromJust();
-    for (int i = 0; i < start; i++) {
+    for (int i = 0; i < start; i++)
+    {
       fprintf(stderr, " ");
     }
     int end = message->GetEndColumn(context).FromJust();
-    for (int i = start; i < end; i++) {
+    for (int i = start; i < end; i++)
+    {
       fprintf(stderr, "^");
     }
     fprintf(stderr, "\n");
     Local<Value> stack_trace_string;
-    if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0) {
+    if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0)
+    {
       String::Utf8Value stack_trace(isolate, stack_trace_string);
       const char *stack_trace_string = ToCString(stack_trace);
       fprintf(stderr, "%s\n", stack_trace_string);
@@ -44,7 +52,8 @@ fprintf(stderr, "exception\n");
   }
 }
 
-bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bool report_exceptions) {
+bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bool report_exceptions)
+{
   HandleScope handle_scope(isolate);
   TryCatch try_catch(isolate);
   ScriptOrigin origin(name);
@@ -52,7 +61,8 @@ bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bo
   Local<Script> script;
   if (!Script::Compile(context, source, &origin).ToLocal(&script))
   {
-    if (report_exceptions) ReportException(isolate, &try_catch);
+    if (report_exceptions)
+      ReportException(isolate, &try_catch);
     return false;
   }
   else
@@ -61,7 +71,8 @@ bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bo
     if (!script->Run(context).ToLocal(&result))
     {
       assert(try_catch.HasCaught());
-      if (report_exceptions) ReportException(isolate, &try_catch);
+      if (report_exceptions)
+        ReportException(isolate, &try_catch);
       return false;
     }
     else
@@ -72,13 +83,16 @@ bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bo
   }
 }
 
-void Version(const FunctionCallbackInfo<Value> &args) {
+void Version(const FunctionCallbackInfo<Value> &args)
+{
   args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), v8::V8::GetVersion(), NewStringType::kNormal).ToLocalChecked());
 }
 
-MaybeLocal<String> ReadFile(Isolate *isolate, const char *name) {
+MaybeLocal<String> ReadFile(Isolate *isolate, const char *name)
+{
   FILE *file = fopen(name, "rb");
-  if (file == NULL) return MaybeLocal<String>();
+  if (file == NULL)
+    return MaybeLocal<String>();
   fseek(file, 0, SEEK_END);
   size_t size = ftell(file);
   rewind(file);
@@ -99,7 +113,8 @@ MaybeLocal<String> ReadFile(Isolate *isolate, const char *name) {
   return result;
 }
 
-void Print(const FunctionCallbackInfo<Value> &args) {
+void Print(const FunctionCallbackInfo<Value> &args)
+{
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   bool first = true;
@@ -121,7 +136,8 @@ void Print(const FunctionCallbackInfo<Value> &args) {
   fflush(stdout);
 }
 
-void LoadModule(const FunctionCallbackInfo<Value> &args) {
+void LoadModule(const FunctionCallbackInfo<Value> &args)
+{
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
@@ -141,13 +157,67 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
   args.GetReturnValue().Set(exports);
+  uv_dlclose(&lib);
 }
 
-Local<Context> CreateContext(Isolate *isolate) {
+MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer) {
+  HandleScope handle_scope(context->GetIsolate());
+  return MaybeLocal<Module>();
+}
+
+void Require(const FunctionCallbackInfo<Value> &args)
+{
+  HandleScope handle_scope(args.GetIsolate());
+  String::Utf8Value str(args.GetIsolate(), args[0]);
+  const char *cstr = ToCString(str);
+  Local<String> source_text;
+  if (!ReadFile(args.GetIsolate(), cstr).ToLocal(&source_text))
+  {
+    fprintf(stderr, "Error reading '%s'\n", cstr);
+    return;
+  }
+  Local<String> fname =
+      String::NewFromUtf8(args.GetIsolate(), cstr, NewStringType::kNormal)
+          .ToLocalChecked();
+  Local<Object> that = args.Holder();
+  TryCatch try_catch(args.GetIsolate());
+  Local<Integer> line_offset;
+  Local<Integer> column_offset;
+  line_offset = Integer::New(args.GetIsolate(), 0);
+  column_offset = Integer::New(args.GetIsolate(), 0);
+  ScriptOrigin origin(fname,
+                      line_offset,              // line offset
+                      column_offset,            // column offset
+                      False(args.GetIsolate()), // is cross origin
+                      Local<Integer>(),         // script id
+                      Local<Value>(),           // source map URL
+                      False(args.GetIsolate()), // is opaque (?)
+                      False(args.GetIsolate()), // is WASM
+                      True(args.GetIsolate())); // is ES6 module
+  Local<Context> context(args.GetIsolate()->GetCurrentContext());
+  Local<Module> module;
+  ScriptCompiler::Source source(source_text, origin);
+  if (!ScriptCompiler::CompileModule(args.GetIsolate(), &source).ToLocal(&module))
+  {
+    ReportException(args.GetIsolate(), &try_catch);
+    args.GetReturnValue().Set(Null(args.GetIsolate()));
+  }
+  else
+  {
+    String::Utf8Value utf8string(args.GetIsolate(), source_text);
+    Maybe<bool> ok = module->InstantiateModule(context, OnModuleInstantiate);
+    MaybeLocal<Value> result = module->Evaluate(context);
+    args.GetReturnValue().Set(result.ToLocalChecked());
+  }
+}
+
+Local<Context> CreateContext(Isolate *isolate)
+{
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
   global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
   global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
   global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
+  global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   return Context::New(isolate, NULL, global);
 }
 

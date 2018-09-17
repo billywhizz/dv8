@@ -28,6 +28,10 @@ using v8::String;
 using v8::TryCatch;
 using v8::V8;
 using v8::Value;
+using v8::Integer;
+using v8::Module;
+using v8::ScriptCompiler;
+using v8::Maybe;
 
 typedef void* (*register_plugin)();
 
@@ -40,6 +44,8 @@ Local<Context> CreateContext(Isolate *isolate);
 void Print(const FunctionCallbackInfo<Value> &args);
 void Version(const FunctionCallbackInfo<Value> &args);
 void LoadModule(const FunctionCallbackInfo<Value>& args);
+MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
+void Require(const FunctionCallbackInfo<Value> &args);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
     v8::HandleScope handle_scope(isolate);
