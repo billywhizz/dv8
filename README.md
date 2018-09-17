@@ -22,3 +22,24 @@
 On Alpine Docker:
 Binary Size = 17M
 RSS with JS = 13MiB
+
+## parts
+1. initial build
+2. adding module support
+3. deep dive on libraries/linking etc.
+4. handling exceptions and core dumps
+
+*. metrics/tracing
+*. standard library
+*. third party modules
+*. std.os
+*. std.process
+*. std.network
+*. std.io
+*. std.fs
+*. crypto - options - openssl
+*. mtls - indentity and auth
+*. futures - DPDK/Persistent RAM
+*. importance of standards
+*. openssl
+*. dns

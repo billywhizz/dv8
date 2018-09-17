@@ -6,3 +6,4 @@ app/core
 *.o
 *.so
 *.a
+src/node-*

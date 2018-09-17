@@ -5,9 +5,41 @@ namespace dv8
 
 using InitializerCallback = void (*)(Local<Object> exports);
 
+void SingnalHandler() {
+  signalHandle = new uv_signal_t;
+  int r = uv_signal_init(uv_default_loop(), signalHandle);
+  fprintf(stderr, "uv_signal_init: %i\n", r);
+  r = uv_signal_start(signalHandle, OnSignal, 15 | 2);
+  fprintf(stderr, "uv_signal_start: %i\n", r);
+}
+
+void OnSignal(uv_signal_t* handle, int signum) {
+  fprintf(stderr, "signal: %i\n", signum);
+  int r = uv_signal_stop(handle);
+  fprintf(stderr, "uv_signal_stop: %i\n", r);
+  uv_stop(uv_default_loop());
+}
+
+void on_signal_close(uv_handle_t* h) {
+  free(h);
+}
+
 const char *ToCString(const String::Utf8Value &value)
 {
   return *value ? *value : "<string conversion failed>";
+}
+
+void shutdown() {
+  uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
+    fprintf(stderr, "closing [%p] %s\n", handle, uv_handle_type_name(handle->type));
+    uv_close(handle, on_signal_close);
+    void* close_cb = reinterpret_cast<void*>(handle->close_cb);
+  }, NULL);
+}
+
+void Shutdown(const FunctionCallbackInfo<Value> &args)
+{
+  shutdown();
 }
 
 void ReportException(Isolate *isolate, TryCatch *try_catch)
@@ -218,6 +250,7 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
   global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
+  global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
   return Context::New(isolate, NULL, global);
 }
 

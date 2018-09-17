@@ -1,26 +1,5 @@
 #include <dv8.h>
 
-uv_signal_t* signalHandle;
-
-static void OnSignal(uv_signal_t* handle, int signum) {
-  fprintf(stderr, "signal: %i\n", signum);
-  int r = uv_signal_stop(handle);
-  fprintf(stderr, "uv_signal_stop: %i\n", r);
-  uv_stop(uv_default_loop());
-}
-
-void on_signal_close(uv_handle_t* h) {
-  free(h);
-}
-
-static void Shutdown() {
-  uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
-    fprintf(stderr, "closing [%p] %s\n", handle, uv_handle_type_name(handle->type));
-    uv_close(handle, on_signal_close);
-    void* close_cb = reinterpret_cast<void*>(handle->close_cb);
-  }, NULL);
-}
-
 int main(int argc, char *argv[]) {
   v8::V8::InitializeICUDefaultLocation(argv[0]);
   v8::V8::InitializeExternalStartupData(argv[0]);
@@ -28,11 +7,7 @@ int main(int argc, char *argv[]) {
   v8::V8::InitializePlatform(platform.get());
   v8::V8::Initialize();
   v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
-  signalHandle = new uv_signal_t;
-  int r = uv_signal_init(uv_default_loop(), signalHandle);
-  fprintf(stderr, "uv_signal_init: %i\n", r);
-  r = uv_signal_start(signalHandle, OnSignal, 15 | 2);
-  fprintf(stderr, "uv_signal_start: %i\n", r);
+  dv8::SingnalHandler();
   if (argc > 1) {
     v8::Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
@@ -63,13 +38,13 @@ int main(int argc, char *argv[]) {
       uv_run(uv_default_loop(), UV_RUN_DEFAULT);
       more = uv_loop_alive(uv_default_loop());
       fprintf(stderr, "more: %i\n", more);
-      Shutdown();
+      dv8::shutdown();
       if (more)
         continue;
       more = uv_loop_alive(uv_default_loop());
       fprintf(stderr, "more: %i\n", more);
     } while (more == true);
-    r = uv_loop_close(uv_default_loop());
+    int r = uv_loop_close(uv_default_loop());
     fprintf(stderr, "uv_loop_close: %i\n", r);
     isolate->Exit();
     isolate->Dispose();

@@ -33,6 +33,9 @@ using v8::Module;
 using v8::ScriptCompiler;
 using v8::Maybe;
 
+
+static uv_signal_t* signalHandle;
+
 typedef void* (*register_plugin)();
 
 const char *ToCString(const String::Utf8Value &value);
@@ -46,6 +49,11 @@ void Version(const FunctionCallbackInfo<Value> &args);
 void LoadModule(const FunctionCallbackInfo<Value>& args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
 void Require(const FunctionCallbackInfo<Value> &args);
+void SingnalHandler();
+void OnSignal(uv_signal_t* handle, int signum);
+void on_signal_close(uv_handle_t* h);
+void shutdown();
+void Shutdown(const FunctionCallbackInfo<Value> &args);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
     v8::HandleScope handle_scope(isolate);
