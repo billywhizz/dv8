@@ -8,3 +8,6 @@ node
 *.md
 *.sh
 *.js
+src/node-*
+*.md
+app/*
