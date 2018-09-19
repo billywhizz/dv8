@@ -1,4 +1,5 @@
 node-v*
+app/core
 scratch
 dv8
 *.cc
@@ -11,3 +12,6 @@ node
 src/node-*
 *.md
 app/*
+scratch
+tmp
+deps
