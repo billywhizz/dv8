@@ -80,7 +80,8 @@ g++ \
     -o dv8.o \
     dv8.cc
 # create the lib
-ar crsT dv8.a buffer.o timer.o dv8.o
+rm -f dv8.a
+ar crsT dv8.a buffer.o dv8.o
 # compile the main executable
 g++ \
     '-DV8_DEPRECATION_WARNINGS=0' \
@@ -111,11 +112,6 @@ g++ \
     -pthread \
     -rdynamic \
     -m64 \
-    -Wl,--whole-archive,$NODE_DEPS/uv/libuv.a \
-    -Wl,--no-whole-archive \
-    -Wl,-z,noexecstack \
-    -Wl,--whole-archive $NODE_DEPS/v8/gypfiles/libv8_base.a \
-    -Wl,--no-whole-archive \
     -pthread \
     -o ./dv8 \
     -Wl,--start-group \
@@ -125,6 +121,8 @@ g++ \
     $NODE_DEPS/v8/gypfiles/libv8_libbase.a \
     $NODE_DEPS/v8/gypfiles/libv8_libsampler.a \
     $NODE_DEPS/v8/gypfiles/libv8_snapshot.a \
+    $NODE_DEPS/v8/gypfiles/libv8_base.a \
+    $NODE_DEPS/uv/libuv.a \
     -ldl \
     -lrt \
     -lm \

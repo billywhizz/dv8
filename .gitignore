@@ -7,3 +7,5 @@ app/core
 *.so
 *.a
 src/node-*
+deps
+tmp
