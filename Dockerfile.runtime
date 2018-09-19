@@ -1,10 +1,5 @@
 FROM alpine:3.8
-RUN addgroup -g 1000 dv8 \
-    && adduser -u 1000 -G dv8 -s /bin/sh -D dv8 \
-    && apk add --no-cache \
-        libstdc++
+RUN apk add --no-cache libstdc++
+WORKDIR /app
 COPY src/dv8 /usr/local/bin/dv8
-RUN chown dv8:dv8 /usr/local/bin/dv8
-USER dv8
-WORKDIR /home/dv8
 CMD [ "/usr/local/bin/dv8" ]

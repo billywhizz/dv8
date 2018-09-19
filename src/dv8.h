@@ -32,6 +32,7 @@ using v8::Integer;
 using v8::Module;
 using v8::ScriptCompiler;
 using v8::Maybe;
+using v8::Function;
 
 
 static uv_signal_t* signalHandle;

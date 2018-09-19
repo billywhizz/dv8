@@ -251,6 +251,7 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
+  //global->Set(String::NewFromUtf8(isolate, "setTimeout", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, SetTimeout));
   return Context::New(isolate, NULL, global);
 }
 
