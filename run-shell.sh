@@ -1,0 +1,1 @@
+docker run -it --rm -v $(pwd)/app:/app dv8-runtime /bin/sh
