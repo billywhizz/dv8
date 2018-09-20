@@ -8,6 +8,8 @@
 #include <uv.h>
 #include <common.h>
 #include <buffer.h>
+#include <timer.h>
+
 namespace dv8 {
 
 using v8::ArrayBuffer;

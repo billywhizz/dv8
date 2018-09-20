@@ -1,3 +1,4 @@
+require('./base.js')
 const { Socket } = module('socket', {})
 const { HTTPParser } = require('./http-parser.js')
 
@@ -19,9 +20,9 @@ sock.onConnect(fd => {
 			in: new Buffer(),
 			out: new Buffer()
         }
-        context.in.alloc(READ_BUFFER_SIZE)
-        context.out.alloc(READ_BUFFER_SIZE)
-		contexts[fd] = context
+        context.in.ab = new Uint8Array(context.in.alloc(READ_BUFFER_SIZE))
+        context.out.ab = new Uint8Array(context.out.alloc(READ_BUFFER_SIZE))
+        contexts[fd] = context
         context.parser = new HTTPParser(HTTPParser.REQUEST)
         context.parser[HTTPParser.kOnMessageComplete] = () => {
             sock.write(fd, 0, size200)
@@ -47,10 +48,10 @@ sock.onClose(fd => {
 	conn--
 })
 
-/*
 setInterval(() => {
-	console.log(conn)
+	print(JSON.stringify({
+        connections: conn
+    }, null, '  '))
 }, 1000)
-*/
 
 print(`listen: ${sock.listen('0.0.0.0', 3000)}`)

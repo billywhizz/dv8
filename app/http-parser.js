@@ -1,4 +1,3 @@
-exports.HTTPParser = HTTPParser;
 function HTTPParser(type) {
   if (!(type === HTTPParser.REQUEST || type === HTTPParser.RESPONSE)) {
     throw new Error('Unsupported Message Type');
@@ -42,7 +41,7 @@ Object.defineProperty(HTTPParser, 'kOnExecute', {
     }
   });
 
-var methods = exports.methods = HTTPParser.methods = [
+var methods = HTTPParser.methods = [
   'DELETE',
   'GET',
   'HEAD',
@@ -172,8 +171,8 @@ HTTPParser.prototype.consumeLine = function () {
   var end = this.end,
       chunk = this.chunk;
   for (var i = this.offset; i < end; i++) {
-    if (chunk[i] === 0x0a) { // \n
-      var line = this.line + chunk.toString(HTTPParser.encoding, this.offset, i);
+    if (chunk.ab[i] === 0x0a) { // \n
+      var line = this.line + chunk.pull(this.offset, i - this.offset);
       if (line.charAt(line.length - 1) === '\r') {
         line = line.substr(0, line.length - 1);
       }
@@ -183,7 +182,7 @@ HTTPParser.prototype.consumeLine = function () {
     }
   }
   //line split over multiple chunks
-  this.line += chunk.toString(HTTPParser.encoding, this.offset, this.end);
+  this.line += chunk.pull(this.offset, this.end - this.offset);
   this.offset = this.end;
 };
 
@@ -438,3 +437,5 @@ function parseErrorCode(code) {
   err.code = code;
   return err;
 }
+
+module.exports = { HTTPParser, methods }

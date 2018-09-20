@@ -81,7 +81,7 @@ g++ \
     dv8.cc
 # create the lib
 rm -f dv8.a
-ar crsT dv8.a buffer.o dv8.o
+ar crsT dv8.a buffer.o timer.o dv8.o
 # compile the main executable
 g++ \
     '-DV8_DEPRECATION_WARNINGS=0' \
