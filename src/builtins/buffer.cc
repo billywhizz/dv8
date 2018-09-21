@@ -44,7 +44,6 @@ namespace builtins {
     Isolate* isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall()) {
-      Local<Context> context = isolate->GetCurrentContext();
       Buffer* obj = new Buffer();
       obj->Wrap(args.This());
       args.GetReturnValue().Set(args.This());
@@ -105,8 +104,9 @@ namespace builtins {
     int length = str->Length();
     int32_t off = args[1]->Int32Value(context).ToChecked();
     Buffer* b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+    char* data = b->_data + off;
     int written;
-    str->WriteUtf8(isolate, b->_data, length, &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+    str->WriteUtf8(isolate, data, length, &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
     args.GetReturnValue().Set(Integer::New(isolate, written));
   }
 

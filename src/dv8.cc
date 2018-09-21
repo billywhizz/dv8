@@ -33,7 +33,7 @@ void shutdown() {
   uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
     fprintf(stderr, "closing [%p] %s\n", handle, uv_handle_type_name(handle->type));
     uv_close(handle, on_signal_close);
-    void* close_cb = reinterpret_cast<void*>(handle->close_cb);
+    //void* close_cb = reinterpret_cast<void*>(handle->close_cb);
   }, NULL);
 }
 
@@ -123,8 +123,10 @@ void Version(const FunctionCallbackInfo<Value> &args)
 MaybeLocal<String> ReadFile(Isolate *isolate, const char *name)
 {
   FILE *file = fopen(name, "rb");
-  if (file == NULL)
-    return MaybeLocal<String>();
+  if (file == NULL) {
+    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Bad File", v8::NewStringType::kNormal).ToLocalChecked()));
+    return v8::MaybeLocal<v8::String>();
+  }
   fseek(file, 0, SEEK_END);
   size_t size = ftell(file);
   rewind(file);
@@ -136,11 +138,12 @@ MaybeLocal<String> ReadFile(Isolate *isolate, const char *name)
     if (ferror(file))
     {
       fclose(file);
-      return MaybeLocal<String>();
+      isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Read Error", v8::NewStringType::kNormal).ToLocalChecked()));
+      return v8::MaybeLocal<v8::String>();
     }
   }
   fclose(file);
-  MaybeLocal<String> result = String::NewFromUtf8(isolate, chars, NewStringType::kNormal, static_cast<int>(size));
+  v8::MaybeLocal<v8::String> result = v8::String::NewFromUtf8(isolate, chars, v8::NewStringType::kNormal, static_cast<int>(size));
   delete[] chars;
   return result;
 }

@@ -42,7 +42,6 @@ void Timer::New(const FunctionCallbackInfo<Value> &args)
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall())
     {
-        Local<Context> context = isolate->GetCurrentContext();
         Timer *obj = new Timer();
         obj->handle = (uv_timer_t*)calloc(1, sizeof(uv_timer_t));
         obj->handle->data = obj;
@@ -81,8 +80,7 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
     int r = uv_timer_init(uv_default_loop(), t->handle);
     r = uv_timer_start(t->handle, OnTimeout, timeout, 0);
     if (args.Length() > 2) {
-        int repeat = args[2]->Int32Value(context).ToChecked();
-        uv_timer_set_repeat(t->handle, timeout);
+        uv_timer_set_repeat(t->handle, args[2]->Int32Value(context).ToChecked());
     }
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
@@ -104,7 +102,11 @@ void Timer::OnTimeout(uv_timer_t *handle)
     const unsigned int argc = 0;
     Local<Value> argv[argc] = { };
     Local<Function> foo = Local<Function>::New(isolate, t->onTimeout);
-    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    v8::TryCatch try_catch(isolate);
+    v8::MaybeLocal<v8::Value> ret = foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    if (try_catch.HasCaught()) {
+        DecorateErrorStack(isolate, try_catch);
+    }
 }
 
 } // namespace builtins

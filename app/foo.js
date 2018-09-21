@@ -1,3 +1,4 @@
+require('./base.js')
 const sleep = ms => new Promise(ok => setTimeout(ok, ms))
 
 async function run() {
