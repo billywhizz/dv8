@@ -57,6 +57,7 @@ void OnSignal(uv_signal_t* handle, int signum);
 void on_signal_close(uv_handle_t* h);
 void shutdown();
 void Shutdown(const FunctionCallbackInfo<Value> &args);
+void CollectGarbage(const FunctionCallbackInfo<Value> &args);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
     v8::HandleScope handle_scope(isolate);

@@ -200,6 +200,12 @@ MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> spe
   return MaybeLocal<Module>();
 }
 
+void CollectGarbage(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+}
+
 void Require(const FunctionCallbackInfo<Value> &args)
 {
   HandleScope handle_scope(args.GetIsolate());
@@ -254,7 +260,7 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
-
+  global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
   return Context::New(isolate, NULL, global);
 }
 
