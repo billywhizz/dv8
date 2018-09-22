@@ -7,3 +7,4 @@ app/core
 build/dv8
 deps/v8
 deps/uv
+*.gz

@@ -64,4 +64,3 @@ g++ \
     ./$MODULE_NAME.binding.o \
     -Wl,--end-group
 strip ./$MODULE_NAME.so
-rm -f *.o
