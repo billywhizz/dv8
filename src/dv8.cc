@@ -181,13 +181,17 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   char lib_name[128];
   snprintf(lib_name, 128, "./%s.so", module_name);
   uv_lib_t lib;
+fprintf(stderr, "lib name: %s\n", lib_name);
   int success = uv_dlopen(lib_name, &lib);
+fprintf(stderr, "uv_dlopen: %i\n", success);
   Local<Object> exports;
   bool r = args[1]->ToObject(context).ToLocal(&exports);
   char register_name[128];
   snprintf(register_name, 128, "_register_%s", module_name);
   void *address;
+fprintf(stderr, "module name: %s\n", register_name);
   success = uv_dlsym(&lib, register_name, &address);
+fprintf(stderr, "uv_dlsym: %i\n", success);
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
@@ -204,6 +208,26 @@ void CollectGarbage(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+}
+
+void MemoryUsage(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  size_t rss;
+  int err = uv_resident_set_memory(&rss);
+  if (err) {
+    fprintf(stderr, "uv_error: %i", err);
+    return;
+  }
+  HeapStatistics v8_heap_stats;
+  isolate->GetHeapStatistics(&v8_heap_stats);
+  Local<Float64Array> array = args[0].As<Float64Array>();
+  Local<ArrayBuffer> ab = array->Buffer();
+  double* fields = static_cast<double*>(ab->GetContents().Data());
+  fields[0] = rss;
+  fields[1] = v8_heap_stats.total_heap_size();
+  fields[2] = v8_heap_stats.used_heap_size();
+  fields[3] = isolate->AdjustAmountOfExternalAllocatedMemory(0);
 }
 
 void Require(const FunctionCallbackInfo<Value> &args)
@@ -261,6 +285,7 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
   global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
+  global->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
   return Context::New(isolate, NULL, global);
 }
 

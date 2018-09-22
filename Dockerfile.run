@@ -1,5 +1,5 @@
 FROM alpine:3.8
 RUN apk add --no-cache libstdc++
 WORKDIR /app
-COPY src/dv8 /usr/local/bin/dv8
+COPY build/dv8 /usr/local/bin/dv8
 CMD [ "/usr/local/bin/dv8" ]

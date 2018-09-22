@@ -364,7 +364,7 @@ namespace socket {
     _context* ctx = contextMap[fd];
     char *src = ctx->out.base + off;
     int chars_written;
-    int written = str->WriteUtf8(isolate, src, length, &chars_written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+    int written = str->WriteUtf8(src, length, &chars_written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
     args.GetReturnValue().Set(Integer::New(isolate, written));
   }
 
@@ -378,7 +378,7 @@ namespace socket {
     int len = str->Length();
     char *src = ctx->out.base + off;
     int chars_written;
-    len = str->WriteUtf8(isolate, src, len, &chars_written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+    len = str->WriteUtf8(src, len, &chars_written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
     write_req_t *wr;
     wr = (write_req_t *)malloc(sizeof *wr);
     wr->buf = uv_buf_init(src, len);

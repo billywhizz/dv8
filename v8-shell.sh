@@ -1,1 +1,0 @@
-docker run -it --rm -v $(pwd)/deps/v8:/tmp/v8 v8-builder /bin/sh
