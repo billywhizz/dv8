@@ -92,11 +92,7 @@ g++ \
     -Wl,--start-group \
     ./dv8main.o \
     ./dv8.a \
-    $V8_DEPS/libv8_base.a \
-    $V8_DEPS/libv8_libplatform.a \
-    $V8_DEPS/libv8_libbase.a \
-    $V8_DEPS/libv8_libsampler.a \
-    $V8_DEPS/libv8_snapshot.a \
+    $V8_DEPS/libv8_monolith.a \
     $UV_DEPS/libuv.a \
     -ldl \
     -lrt \
