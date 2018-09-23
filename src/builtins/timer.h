@@ -1,16 +1,19 @@
-#ifndef DV8_BUFFER_H
-#define DV8_BUFFER_H
+#ifndef DV8_TIMER_H
+#define DV8_TIMER_H
 
 #include <dv8.h>
+#include <map>
 
 namespace dv8 {
 
 namespace builtins {
+
 class Timer : public dv8::ObjectWrap {
  public:
   static void Init(v8::Local<v8::Object> exports);
   static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
   uv_timer_t* handle;
+  v8::Persistent<v8::Function> onTimeout;
 
  private:
 

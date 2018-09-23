@@ -1,7 +1,6 @@
 node-v*
 app/core
 scratch
-dv8
 *.cc
 *.o
 node

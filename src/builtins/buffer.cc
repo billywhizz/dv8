@@ -44,7 +44,6 @@ namespace builtins {
     Isolate* isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall()) {
-      Local<Context> context = isolate->GetCurrentContext();
       Buffer* obj = new Buffer();
       obj->Wrap(args.This());
       args.GetReturnValue().Set(args.This());
@@ -74,16 +73,15 @@ namespace builtins {
     Buffer* b = ObjectWrap::Unwrap<Buffer>(args.Holder());
     b->_length = 0;
     if (length > 0) {
-      b->_data = calloc(length, 1);
+      b->_data = (char*)calloc(length, 1);
       if (b->_data == nullptr) {
-        fprintf(stderr, "alloc done\n");
         return;
       }
       Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kInternalized);
-      isolate->AdjustAmountOfExternalAllocatedMemory(length);
+      b->ab.Reset(isolate, ab);
+      //isolate->AdjustAmountOfExternalAllocatedMemory(length);
       args.GetReturnValue().Set(ab);
       b->_length = length;
-      fprintf(stderr, "alloc done\n");
     }
   }
 
@@ -94,7 +92,8 @@ namespace builtins {
     int32_t off = args[0]->Int32Value(context).ToChecked();
     int32_t len = args[1]->Int32Value(context).ToChecked();
     Buffer* b = ObjectWrap::Unwrap<Buffer>(args.Holder());
-    args.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)b->_data, v8::String::kNormalString, len));
+    const char* data = b->_data + off;
+    args.GetReturnValue().Set(String::NewFromUtf8(isolate, data, v8::String::kNormalString, len));
   }
 
   void Buffer::Push(const FunctionCallbackInfo<Value>& args) {
@@ -105,8 +104,9 @@ namespace builtins {
     int length = str->Length();
     int32_t off = args[1]->Int32Value(context).ToChecked();
     Buffer* b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+    char* data = b->_data + off;
     int written;
-    str->WriteUtf8(isolate, (char*)b->_data, length, &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+    str->WriteUtf8(data, length, &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
     args.GetReturnValue().Set(Integer::New(isolate, written));
   }
 

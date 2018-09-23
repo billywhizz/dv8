@@ -10,8 +10,9 @@ class Buffer : public dv8::ObjectWrap {
  public:
   static void Init(v8::Local<v8::Object> exports);
   static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
-  void* _data;
+  char* _data;
   size_t _length;
+  v8::Persistent<v8::ArrayBuffer> ab;
 
  private:
 

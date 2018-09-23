@@ -8,6 +8,8 @@
 #include <uv.h>
 #include <common.h>
 #include <buffer.h>
+#include <timer.h>
+
 namespace dv8 {
 
 using v8::ArrayBuffer;
@@ -33,7 +35,8 @@ using v8::Module;
 using v8::ScriptCompiler;
 using v8::Maybe;
 using v8::Function;
-
+using v8::HeapStatistics;
+using v8::Float64Array;
 
 static uv_signal_t* signalHandle;
 
@@ -55,6 +58,8 @@ void OnSignal(uv_signal_t* handle, int signum);
 void on_signal_close(uv_handle_t* h);
 void shutdown();
 void Shutdown(const FunctionCallbackInfo<Value> &args);
+void CollectGarbage(const FunctionCallbackInfo<Value> &args);
+void MemoryUsage(const FunctionCallbackInfo<Value>& args);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
     v8::HandleScope handle_scope(isolate);

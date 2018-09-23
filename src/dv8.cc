@@ -33,7 +33,7 @@ void shutdown() {
   uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
     fprintf(stderr, "closing [%p] %s\n", handle, uv_handle_type_name(handle->type));
     uv_close(handle, on_signal_close);
-    void* close_cb = reinterpret_cast<void*>(handle->close_cb);
+    //void* close_cb = reinterpret_cast<void*>(handle->close_cb);
   }, NULL);
 }
 
@@ -123,8 +123,10 @@ void Version(const FunctionCallbackInfo<Value> &args)
 MaybeLocal<String> ReadFile(Isolate *isolate, const char *name)
 {
   FILE *file = fopen(name, "rb");
-  if (file == NULL)
-    return MaybeLocal<String>();
+  if (file == NULL) {
+    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Bad File", v8::NewStringType::kNormal).ToLocalChecked()));
+    return v8::MaybeLocal<v8::String>();
+  }
   fseek(file, 0, SEEK_END);
   size_t size = ftell(file);
   rewind(file);
@@ -136,11 +138,12 @@ MaybeLocal<String> ReadFile(Isolate *isolate, const char *name)
     if (ferror(file))
     {
       fclose(file);
-      return MaybeLocal<String>();
+      isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Read Error", v8::NewStringType::kNormal).ToLocalChecked()));
+      return v8::MaybeLocal<v8::String>();
     }
   }
   fclose(file);
-  MaybeLocal<String> result = String::NewFromUtf8(isolate, chars, NewStringType::kNormal, static_cast<int>(size));
+  v8::MaybeLocal<v8::String> result = v8::String::NewFromUtf8(isolate, chars, v8::NewStringType::kNormal, static_cast<int>(size));
   delete[] chars;
   return result;
 }
@@ -197,6 +200,32 @@ MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> spe
   return MaybeLocal<Module>();
 }
 
+void CollectGarbage(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+}
+
+void MemoryUsage(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  size_t rss;
+  int err = uv_resident_set_memory(&rss);
+  if (err) {
+    fprintf(stderr, "uv_error: %i", err);
+    return;
+  }
+  HeapStatistics v8_heap_stats;
+  isolate->GetHeapStatistics(&v8_heap_stats);
+  Local<Float64Array> array = args[0].As<Float64Array>();
+  Local<ArrayBuffer> ab = array->Buffer();
+  double* fields = static_cast<double*>(ab->GetContents().Data());
+  fields[0] = rss;
+  fields[1] = v8_heap_stats.total_heap_size();
+  fields[2] = v8_heap_stats.used_heap_size();
+  fields[3] = isolate->AdjustAmountOfExternalAllocatedMemory(0);
+}
+
 void Require(const FunctionCallbackInfo<Value> &args)
 {
   HandleScope handle_scope(args.GetIsolate());
@@ -251,7 +280,8 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
-  //global->Set(String::NewFromUtf8(isolate, "setTimeout", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, SetTimeout));
+  global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
+  global->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
   return Context::New(isolate, NULL, global);
 }
 

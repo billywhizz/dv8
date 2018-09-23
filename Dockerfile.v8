@@ -72,10 +72,7 @@ RUN set -x \
     libevent \
     libexecinfo \
     libstdc++ \
-  && curl -fSL --connect-timeout 30 ${GN_SOURCE} | tar xmz -C /tmp/v8/buildtools/linux64/ \
-  && : "---------- Build instructions ----------" \
-  && cd /tmp/v8
-
+  && curl -fSL --connect-timeout 30 ${GN_SOURCE} | tar xmz -C /tmp/v8/buildtools/linux64/
 RUN cd /tmp/v8 \
     && ./tools/dev/v8gen.py \
     x64.release \
@@ -84,37 +81,28 @@ RUN cd /tmp/v8 \
       target_os=\"linux\" \
       target_cpu=\"x64\" \
       v8_target_cpu=\"x64\" \
-      v8_monolithic=true \
       v8_use_external_startup_data=false \
       v8_enable_future=true \
       is_official_build=true \
       is_component_build=false \
       is_cfi=false \
+      is_asan=false \
       is_clang=false \
-      strip_debug_info=true \
-      is_desktop_linux=false \
-      use_aura=false \
-      use_dbus=false \
-      use_gio=false \
-      use_glib=false \
-      use_icf=false \
-      use_udev=false \
-      thin_lto_enable_optimizations=false \     
       use_custom_libcxx=false \
       use_sysroot=false \
       use_gold=false \
       use_allocator_shim=false \
       treat_warnings_as_errors=false \
-      symbol_level=0
-CMD ["/bin/sh"]
-#
-#  && : "---------- Build ----------" \
-#  && ninja v8_monolith -C out.gn/x64.release/ -j $(getconf _NPROCESSORS_ONLN) \
-#  && : "---------- Extract shared libraries ----------" \
-#  && mkdir -p ${V8_DIR}/include ${V8_DIR}/lib \
-#  && cp -R /tmp/v8/include/* ${V8_DIR}/include/ \
-#  && (cd /tmp/v8/out.gn/x64.release; \
-#      cp lib*.so icudtl.dat ${V8_DIR}/lib/) \
-#  && : "---------- Removing build dependencies, clean temporary files ----------" \
-#  && apk del .v8-build-dependencies .gn-runtime-dependencies \
-#  && rm -rf /var/cache/apk/* /var/tmp/* /tmp/*
+      strip_debug_info=true \
+      is_desktop_linux=false \
+      v8_enable_i18n_support=false \
+      symbol_level=0 \
+      v8_use_snapshot=true \
+      v8_static_library=true \
+      v8_monolithic=true
+RUN cd /tmp/v8 \
+  && ninja v8_base -C out.gn/x64.release/ -j 2 \
+  && ninja v8_libbase -C out.gn/x64.release/ -j 2 \
+  && ninja v8_libplatform -C out.gn/x64.release/ -j 2 \
+  && ninja v8_snapshot -C out.gn/x64.release/ -j 2 \
+  && ninja v8_libsampler -C out.gn/x64.release/ -j 2

@@ -1,11 +1,10 @@
 .vscode
-scratch
-src/dv8
 app/.ash_history
 app/core
 *.o
 *.so
 *.a
-src/node-*
-deps
-tmp
+build/dv8
+deps/v8
+deps/uv
+*.gz

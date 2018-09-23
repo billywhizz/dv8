@@ -35,6 +35,7 @@ async function run() {
     print(`b:\n${JSON.stringify(Object.getOwnPropertyNames(b))}`)
     const ab = b.alloc(100)
     print(`ArrayBuffer:\n  Byte Length: ${ab.byteLength}`)
+    shutdown()
 }
 
 run().catch(err => print(`error:\n${err.toString()}`))

@@ -1,1 +1,1 @@
-docker run -it --rm -v $(pwd)/src:/source dv8-build /bin/sh
+docker run -it --rm -v $(pwd)/src:/src -v $(pwd)/build:/build -v $(pwd)/deps:/deps dv8-build /bin/sh

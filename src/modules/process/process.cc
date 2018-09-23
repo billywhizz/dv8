@@ -69,6 +69,7 @@ namespace process {
 
   void Process::MemoryUsage(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
+    v8::HandleScope handleScope(isolate);
     size_t rss;
     int err = uv_resident_set_memory(&rss);
     if (err) {
