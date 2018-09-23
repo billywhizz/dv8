@@ -50,8 +50,6 @@ g++ \
     -o $MODULE_NAME.o \
     $MODULE_DIR/$MODULE_NAME.cc
 # create the lib
-#ar crsT $MODULE_NAME.a $MODULE_NAME.binding.o $MODULE_NAME.o
-# link library
 g++ \
     -shared \
     -pthread \

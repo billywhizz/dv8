@@ -89,18 +89,15 @@ g++ \
     -rdynamic \
     -m64 \
     -o ./dv8 \
-    -Wl,--whole-archive,$UV_DEPS/libuv.a \
-    -Wl,--no-whole-archive \
-    -Wl,-z,noexecstack \
-    -Wl,--whole-archive $V8_DEPS/libv8_base.a \
-    -Wl,--no-whole-archive \
     -Wl,--start-group \
     ./dv8main.o \
     ./dv8.a \
+    $V8_DEPS/libv8_base.a \
     $V8_DEPS/libv8_libplatform.a \
     $V8_DEPS/libv8_libbase.a \
     $V8_DEPS/libv8_libsampler.a \
     $V8_DEPS/libv8_snapshot.a \
+    $UV_DEPS/libuv.a \
     -ldl \
     -lrt \
     -lm \
