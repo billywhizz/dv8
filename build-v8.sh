@@ -22,12 +22,10 @@
     symbol_level=0 \
     v8_use_snapshot=true \
     v8_static_library=true \
-    v8_monolithic=true
+    v8_monolithic=true \
+    use_glib=false \
+    use_udev=false \
+    v8_experimental_extra_library_files=[] \
+    v8_extra_library_files=[]
 ## compile
-ninja v8_base -C out.gn/x64.release/ -j 2
-ninja v8_libbase -C out.gn/x64.release/ -j 2
-ninja v8_libplatform -C out.gn/x64.release/ -j 2
-ninja v8_snapshot -C out.gn/x64.release/ -j 2
-ninja v8_libsampler -C out.gn/x64.release/ -j 2
-#ninja v8_init -C out.gn/x64.release/ -j 2
-#ninja v8_initializers -C out.gn/x64.release/ -j 2
+ninja v8_monolith -C out.gn/x64.release/ -j 2

@@ -12,5 +12,3 @@ mkdir -p deps/uv/out
 docker cp uv-build:/source/uv/include deps/uv/include
 docker cp uv-build:/source/uv/out/Release deps/uv/out/Release
 docker kill uv-build
-# dv8 platform builder
-docker build -t dv8-build -f ./Dockerfile.build .
