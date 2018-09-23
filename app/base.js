@@ -2,14 +2,15 @@ const { Process } = module('process', {})
 
 const process = new Process()
 
+const mem = new Float64Array(4)
+
 function getMemoryUsage() {
-    const memValues = new Float64Array(4)
-    process.memoryUsage(memValues)
+    process.memoryUsage(mem)
     return {
-        rss: memValues[0],
-        heapTotal: memValues[1],
-        heapUsed: memValues[2],
-        external: memValues[3]
+        rss: mem[0],
+        heapTotal: mem[1],
+        heapUsed: mem[2],
+        external: mem[3]
     }
 }
 

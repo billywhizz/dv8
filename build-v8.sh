@@ -29,5 +29,5 @@ ninja v8_libbase -C out.gn/x64.release/ -j 2
 ninja v8_libplatform -C out.gn/x64.release/ -j 2
 ninja v8_snapshot -C out.gn/x64.release/ -j 2
 ninja v8_libsampler -C out.gn/x64.release/ -j 2
-ninja v8_init -C out.gn/x64.release/ -j 2
-ninja v8_initializers -C out.gn/x64.release/ -j 2
+#ninja v8_init -C out.gn/x64.release/ -j 2
+#ninja v8_initializers -C out.gn/x64.release/ -j 2

@@ -181,17 +181,13 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   char lib_name[128];
   snprintf(lib_name, 128, "./%s.so", module_name);
   uv_lib_t lib;
-fprintf(stderr, "lib name: %s\n", lib_name);
   int success = uv_dlopen(lib_name, &lib);
-fprintf(stderr, "uv_dlopen: %i\n", success);
   Local<Object> exports;
   bool r = args[1]->ToObject(context).ToLocal(&exports);
   char register_name[128];
   snprintf(register_name, 128, "_register_%s", module_name);
   void *address;
-fprintf(stderr, "module name: %s\n", register_name);
   success = uv_dlsym(&lib, register_name, &address);
-fprintf(stderr, "uv_dlsym: %i\n", success);
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
