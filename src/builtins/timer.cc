@@ -103,7 +103,7 @@ void Timer::OnTimeout(uv_timer_t *handle)
     Local<Value> argv[argc] = { };
     Local<Function> foo = Local<Function>::New(isolate, t->onTimeout);
     v8::TryCatch try_catch(isolate);
-    v8::MaybeLocal<v8::Value> ret = foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     if (try_catch.HasCaught()) {
         DecorateErrorStack(isolate, try_catch);
     }

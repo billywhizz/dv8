@@ -183,11 +183,26 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   Local<Object> exports;
-  bool r = args[1]->ToObject(context).ToLocal(&exports);
+  if (success != 0) {
+    fprintf(stderr, "uv_dlopen failed: %i\n", success);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  bool ok = args[1]->ToObject(context).ToLocal(&exports);
+  if (!ok) {
+    fprintf(stderr, "convert args to local failed\n");
+    args.GetReturnValue().Set(exports);
+    return;
+  }
   char register_name[128];
   snprintf(register_name, 128, "_register_%s", module_name);
   void *address;
   success = uv_dlsym(&lib, register_name, &address);
+  if (success != 0) {
+    fprintf(stderr, "uv_dlsym failed: %i\n", success);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
@@ -240,7 +255,6 @@ void Require(const FunctionCallbackInfo<Value> &args)
   Local<String> fname =
       String::NewFromUtf8(args.GetIsolate(), cstr, NewStringType::kNormal)
           .ToLocalChecked();
-  Local<Object> that = args.Holder();
   TryCatch try_catch(args.GetIsolate());
   Local<Integer> line_offset;
   Local<Integer> column_offset;
@@ -267,6 +281,11 @@ void Require(const FunctionCallbackInfo<Value> &args)
   {
     String::Utf8Value utf8string(args.GetIsolate(), source_text);
     Maybe<bool> ok = module->InstantiateModule(context, OnModuleInstantiate);
+    if (!ok.ToChecked()) {
+      fprintf(stderr, "instantiate module failed\n");
+      args.GetReturnValue().Set(Null(args.GetIsolate()));
+      return;
+    }
     MaybeLocal<Value> result = module->Evaluate(context);
     args.GetReturnValue().Set(result.ToLocalChecked());
   }

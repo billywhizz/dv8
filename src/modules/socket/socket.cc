@@ -666,7 +666,6 @@ namespace socket {
       s->_stream = (uv_stream_t*)sock;
     }
     else if(s->socktype == UNIX) { // use first argument as path to domain socket
-      Local<Context> context = isolate->GetCurrentContext();
       String::Utf8Value str(args.GetIsolate(), args[0]);
       const char* path = ToCString(str);
       uv_pipe_t* sock = (uv_pipe_t*)malloc(sizeof(uv_pipe_t));

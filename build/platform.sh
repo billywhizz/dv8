@@ -15,6 +15,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -33,6 +35,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -52,6 +56,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -74,6 +80,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \

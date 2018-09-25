@@ -1,18 +1,4 @@
 FROM alpine:3.8
-
 WORKDIR /build
-
-RUN apk add --no-cache \
-        libstdc++ \
-    && apk add --no-cache --virtual .build-deps \
-        binutils-gold \
-        curl \
-        g++ \
-        gcc \
-        gnupg \
-        libgcc \
-        linux-headers \
-        make \
-        python
-
+RUN apk add --no-cache g++
 CMD [ "/bin/sh" ]

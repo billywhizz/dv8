@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     v8::V8::InitializePlatform(platform.get());
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
-    //dv8::SingnalHandler();
+    dv8::SingnalHandler();
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
     v8::Isolate::CreateParams create_params;
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
         dv8::DecorateErrorStack(isolate, try_catch);
         return 1;
       }
-      v8::MaybeLocal<v8::Value> result = script.ToLocalChecked()->Run(context);
+      script.ToLocalChecked()->Run(context);
       if (try_catch.HasCaught()) {
         dv8::DecorateErrorStack(isolate, try_catch);
         return 1;

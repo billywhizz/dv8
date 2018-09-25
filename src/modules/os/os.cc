@@ -36,7 +36,6 @@ namespace os {
     Isolate* isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall()) {
-      Local<Context> context = isolate->GetCurrentContext();
       OS* obj = new OS();
       obj->Wrap(args.This());
       args.GetReturnValue().Set(args.This());
