@@ -9,6 +9,7 @@
 #include <common.h>
 #include <buffer.h>
 #include <timer.h>
+#include <tty.h>
 
 namespace dv8 {
 
@@ -42,7 +43,6 @@ static uv_signal_t* signalHandle;
 
 typedef void* (*register_plugin)();
 
-const char *ToCString(const String::Utf8Value &value);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
 bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bool report_exceptions);
 MaybeLocal<String> ReadFile(Isolate *isolate, const char *name);

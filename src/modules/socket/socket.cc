@@ -472,7 +472,7 @@ namespace socket {
     Local<Context> context = isolate->GetCurrentContext();
     if (s->socktype == TCP) {
       String::Utf8Value str(args.GetIsolate(), args[0]);
-      const char* ip_address = dv8::ToCString(str);
+      const char* ip_address = *str;
       const unsigned int port = args[1]->IntegerValue(context).ToChecked();
       struct sockaddr_in address;
       int r = uv_ip4_addr(ip_address, port, &address);
@@ -500,7 +500,7 @@ namespace socket {
       return;
     } else {
       String::Utf8Value str(args.GetIsolate(), args[0]);
-      const char* path = ToCString(str);
+      const char* path = *str;
       uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
       sock->data = s;
       baton_t* baton = (baton_t*)malloc(sizeof(baton_t));
@@ -632,7 +632,7 @@ namespace socket {
       uv_tcp_t* sock = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
       sock->data = s;
       String::Utf8Value str(args.GetIsolate(), args[0]);
-      const char* ip_address = ToCString(str);
+      const char* ip_address = *str;
       const unsigned int port = args[1]->IntegerValue(context).ToChecked();
       struct sockaddr_in addr;
       uv_ip4_addr(ip_address, port, &addr);
@@ -667,7 +667,7 @@ namespace socket {
     }
     else if(s->socktype == UNIX) { // use first argument as path to domain socket
       String::Utf8Value str(args.GetIsolate(), args[0]);
-      const char* path = ToCString(str);
+      const char* path = *str;
       uv_pipe_t* sock = (uv_pipe_t*)malloc(sizeof(uv_pipe_t));
       sock->data = s;
       baton_t* baton = (baton_t*)malloc(sizeof(baton_t));
@@ -707,7 +707,7 @@ namespace socket {
       uv_tcp_t* sock = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
       sock->data = s;
       String::Utf8Value str(args.GetIsolate(), args[0]);
-      const char* ip_address = ToCString(str);
+      const char* ip_address = *str;
       struct sockaddr_in addr;
       uv_ip4_addr(ip_address, port, &addr);
       baton_t* baton = (baton_t*)malloc(sizeof(baton_t));
@@ -731,7 +731,7 @@ namespace socket {
     }
     else if(s->socktype == UNIX) { // it is a domain socket
       String::Utf8Value str(args.GetIsolate(), args[0]);
-      const char* path = ToCString(str);
+      const char* path = *str;
       uv_pipe_t* sock = (uv_pipe_t*)malloc(sizeof(uv_pipe_t));
       sock->data = s;
       baton_t* baton = (baton_t*)malloc(sizeof(baton_t));

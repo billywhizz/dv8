@@ -2,7 +2,6 @@
 #define DV8_TIMER_H
 
 #include <dv8.h>
-#include <map>
 
 namespace dv8 {
 

@@ -24,11 +24,6 @@ void on_signal_close(uv_handle_t* h) {
   free(h);
 }
 
-const char *ToCString(const String::Utf8Value &value)
-{
-  return *value ? *value : "<string conversion failed>";
-}
-
 void shutdown() {
   uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
     fprintf(stderr, "closing [%p] %s\n", handle, uv_handle_type_name(handle->type));
@@ -47,7 +42,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch)
   HandleScope handle_scope(isolate);
   fprintf(stderr, "exception\n");
   String::Utf8Value exception(isolate, try_catch->Exception());
-  const char *exception_string = ToCString(exception);
+  const char *exception_string = *exception;
   Local<Message> message = try_catch->Message();
   if (message.IsEmpty())
   {
@@ -57,11 +52,11 @@ void ReportException(Isolate *isolate, TryCatch *try_catch)
   {
     String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
     Local<Context> context(isolate->GetCurrentContext());
-    const char *filename_string = ToCString(filename);
+    const char *filename_string = *filename;
     int linenum = message->GetLineNumber(context).FromJust();
     fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
     String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
-    const char *sourceline_string = ToCString(sourceline);
+    const char *sourceline_string = *sourceline;
     fprintf(stderr, "%s\n", sourceline_string);
     int start = message->GetStartColumn(context).FromJust();
     for (int i = 0; i < start; i++)
@@ -78,7 +73,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch)
     if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0)
     {
       String::Utf8Value stack_trace(isolate, stack_trace_string);
-      const char *stack_trace_string = ToCString(stack_trace);
+      const char *stack_trace_string = *stack_trace;
       fprintf(stderr, "%s\n", stack_trace_string);
     }
   }
@@ -164,7 +159,7 @@ void Print(const FunctionCallbackInfo<Value> &args)
       printf(" ");
     }
     String::Utf8Value str(args.GetIsolate(), args[i]);
-    const char *cstr = ToCString(str);
+    const char *cstr = *str;
     printf("%s", cstr);
   }
   printf("\n");
@@ -177,7 +172,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
-  const char *module_name = ToCString(str);
+  const char *module_name = *str;
   char lib_name[128];
   snprintf(lib_name, 128, "./%s.so", module_name);
   uv_lib_t lib;
@@ -245,7 +240,7 @@ void Require(const FunctionCallbackInfo<Value> &args)
 {
   HandleScope handle_scope(args.GetIsolate());
   String::Utf8Value str(args.GetIsolate(), args[0]);
-  const char *cstr = ToCString(str);
+  const char *cstr = *str;
   Local<String> source_text;
   if (!ReadFile(args.GetIsolate(), cstr).ToLocal(&source_text))
   {
