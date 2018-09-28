@@ -1,5 +1,6 @@
+const start = Date.now()
 const BUFFER_SIZE = 64 * 1024
-const HIGH_WATER = 1 * 1024 * 1024
+const HIGH_WATER = 64 * 1024
 
 const b = new Buffer()
 b.alloc(BUFFER_SIZE)
@@ -26,20 +27,34 @@ let stats = {
 let stdin
 let stdout
 
+function toGb(bytes) {
+    const rate = bytes * 8 / (1024 * 1024 * 1024)
+    return Math.floor(rate * 100) / 100
+}
 // write stream
 stdout = new TTY(1, () => {
     // onclose
+    const finish = Date.now()
+    const elapsed = finish - start
+    const elapsedSeconds = elapsed / 1000
+    print(`pipe.time: ${elapsed} ms`)
     stats.stdout.close++
     print(`pipe.stdout:\n${JSON.stringify(stats.stdout, null, '  ')}`)
+    const readRate = stats.stdin.read / elapsedSeconds
+    const writeRate = stats.stdout.written / elapsedSeconds
+    print(`pipe.read.rate: ${toGb(readRate)} Gb/sec\npipe.write.rate: ${toGb(writeRate)} Gb/sec`)
 }, () => {
     // ondrain
     stats.stdout.drain++
     const queueSize = stdout.queueSize()
+    stdout.draining = false
     if (queueSize > stats.stdout.maxQueue) stats.stdout.maxQueue = queueSize
+    if (stdout.closing) {
+        stdout.close()
+        return
+    }
     stdin.resume()
     stats.stdin.resume++
-    stdout.draining = false
-    if (stdout.closing) stdout.close()
 })
 stdout.setup(b)
 
@@ -57,7 +72,7 @@ stdin = new TTY(0, len => {
         stats.stdout.written += len
         const queueSize = stdout.queueSize()
         if (queueSize > stats.stdout.maxQueue) stats.stdout.maxQueue = queueSize
-        if (queueSize > HIGH_WATER) {
+        if (queueSize >= HIGH_WATER) {
             stdout.draining = true
             stdin.pause()
             stats.stdin.pause++
@@ -78,12 +93,17 @@ stdin = new TTY(0, len => {
 }, () => {
     // onClose
     stats.stdin.close++
+    print(`pipe.stdin:\n${JSON.stringify(stats.stdin, null, '  ')}`)
     if (stdout.draining) {
         stdout.closing = true
     } else {
-        stdout.close()
+        const queueSize = stdout.queueSize()
+        if (queueSize > 0) {
+            stdout.closing = true
+        } else {
+            stdout.close()
+        }
     }
-    print(`pipe.stdin:\n${JSON.stringify(stats.stdin, null, '  ')}`)
 })
 stdin.setup(b)
 stdin.resume()

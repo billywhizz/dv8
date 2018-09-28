@@ -81,7 +81,11 @@ void TTY::OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf)
 static void alloc_chunk(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
     TTY* t = (TTY*)handle->data;
     buf->base = t->in.base;
-    buf->len = t->in.len;
+    if (size > t->in.len) {
+        buf->len = t->in.len;
+        return;
+    }
+    buf->len = size;
 }
 
 void TTY::New(const FunctionCallbackInfo<Value> &args)
@@ -221,7 +225,7 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
         r = uv_write(&wr->req, (uv_stream_t*)t->handle, &wr->buf, 1, OnWrite);
     } else if (r < 0) {
         //fprintf(stderr, "write.ERROR: %i\n", r);
-    } else if (r < length) {
+    } else if ((uint32_t)r < length) {
         write_req_t *wr;
         wr = (write_req_t *)malloc(sizeof *wr);
         wr->req.data = t;

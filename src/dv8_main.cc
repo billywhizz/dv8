@@ -74,9 +74,9 @@ int main(int argc, char *argv[]) {
       dv8::shutdown();
       uv_tty_reset_mode();
       int r = uv_loop_close(uv_default_loop());
-      //if (r == UV_EBUSY) {
+      if (r != 0) {
         fprintf(stderr, "uv_loop_close: %i\n", r);
-      //}
+      }
     }
     //isolate->Exit();
     isolate->Dispose();

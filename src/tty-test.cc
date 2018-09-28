@@ -7,17 +7,19 @@ static uv_tty_t* _stdin;
 
 static void on_close(uv_handle_t* handle) {
     int r = uv_loop_close(uv_default_loop());
-    fprintf(stderr, "uv_loop_close: %i\n", r);
+    if (r != 0) {
+        fprintf(stderr, "uv_loop_close: %i\n", r);
+    }
 }
 
 static void on_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf) {
     if (nread == UV_EOF) {
-        fprintf(stderr, "bytes: %lu\n", bytes);
+        fprintf(stderr, "%lu\n", bytes);
         uv_close((uv_handle_t*)_stdin, on_close);
     } else if (nread > 0) {
         bytes += nread;
     } else if (nread < 0) {
-        fprintf(stderr, "read_error: %u\n", nread);
+        fprintf(stderr, "read_error: %li\n", nread);
     }
 }
 
