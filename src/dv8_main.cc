@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     v8::V8::InitializePlatform(platform.get());
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
-    dv8::SingnalHandler();
+    //dv8::SingnalHandler();
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
     v8::Isolate::CreateParams create_params;
@@ -62,16 +62,21 @@ int main(int argc, char *argv[]) {
         dv8::DecorateErrorStack(isolate, try_catch);
         return 1;
       }
-      bool more;
+      int alive;
       do {
         uv_run(uv_default_loop(), UV_RUN_DEFAULT);
-        more = uv_loop_alive(uv_default_loop());
-        if (more) {
+        alive = uv_loop_alive(uv_default_loop());
+        if (alive != 0) {
           continue;
         }
-      } while (more == true);
+        alive = uv_loop_alive(uv_default_loop());
+      } while (alive != 0);
+      dv8::shutdown();
+      uv_tty_reset_mode();
       int r = uv_loop_close(uv_default_loop());
-      fprintf(stderr, "uv_loop_close: %i\n", r);
+      //if (r == UV_EBUSY) {
+        fprintf(stderr, "uv_loop_close: %i\n", r);
+      //}
     }
     //isolate->Exit();
     isolate->Dispose();

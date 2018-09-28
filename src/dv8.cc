@@ -20,14 +20,14 @@ void OnSignal(uv_signal_t* handle, int signum) {
   uv_stop(uv_default_loop());
 }
 
-void on_signal_close(uv_handle_t* h) {
+void on_handle_close(uv_handle_t* h) {
   free(h);
 }
 
 void shutdown() {
   uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
-    fprintf(stderr, "closing [%p] %s\n", handle, uv_handle_type_name(handle->type));
-    uv_close(handle, on_signal_close);
+    fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
+    uv_close(handle, on_handle_close);
     //void* close_cb = reinterpret_cast<void*>(handle->close_cb);
   }, NULL);
 }
@@ -160,10 +160,9 @@ void Print(const FunctionCallbackInfo<Value> &args)
     }
     String::Utf8Value str(args.GetIsolate(), args[i]);
     const char *cstr = *str;
-    printf("%s", cstr);
+    fprintf(stderr, "%s\n", cstr);
+    fflush(stderr);
   }
-  printf("\n");
-  fflush(stdout);
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args)

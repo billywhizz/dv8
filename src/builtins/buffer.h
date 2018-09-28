@@ -26,6 +26,7 @@ class Buffer : public dv8::ObjectWrap {
   static void Alloc(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Pull(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Push(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Length(const v8::FunctionCallbackInfo<v8::Value>& args);
 
   static v8::Persistent<v8::Function> constructor;
 
