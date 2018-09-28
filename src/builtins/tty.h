@@ -7,6 +7,30 @@ namespace dv8 {
 
 namespace builtins {
 
+typedef union {
+  struct {
+    uint64_t written;
+    uint32_t incomplete;
+    uint32_t full;
+    uint32_t error;
+    uint32_t drain;
+    uint32_t close;
+    uint32_t maxQueue;
+    uint32_t alloc;
+    uint32_t free;
+    uint32_t eagain;
+  } out;
+  struct {
+    uint64_t read;
+    uint32_t error;
+    uint32_t pause;
+    uint32_t close;
+    uint32_t end;
+    uint32_t data;
+    uint32_t resume;
+  } in;
+} tty_stats;
+
 class TTY : public dv8::ObjectWrap {
  public:
   static void Init(v8::Local<v8::Object> exports);
@@ -18,6 +42,8 @@ class TTY : public dv8::ObjectWrap {
   v8::Persistent<v8::Function> _onDrain;
   v8::Persistent<v8::Function> _onClose;
   unsigned int fd;
+  tty_stats stats;
+  bool paused;
 
  private:
 
@@ -35,6 +61,7 @@ class TTY : public dv8::ObjectWrap {
   static void Pause(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Resume(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void QueueSize(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);
 
   static void OnClose(uv_handle_t* handle);
   static void OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf);

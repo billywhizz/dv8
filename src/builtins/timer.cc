@@ -85,12 +85,18 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
+void Timer::OnClose(uv_handle_t* handle) {
+    free(handle);
+}
+
 void Timer::Stop(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Timer* t = ObjectWrap::Unwrap<Timer>(args.Holder());
     int r = uv_timer_stop(t->handle);
+    uv_handle_t* handle = (uv_handle_t*)t->handle;
+    uv_close(handle, OnClose);
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
