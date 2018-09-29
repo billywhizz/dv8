@@ -233,7 +233,7 @@ void TTY::OnWrite(uv_write_t* req, int status) {
         }
         Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         if (t->closing) {
-            uv_close((uv_handle_t*)t->handle, OnClose);
+            //uv_close((uv_handle_t*)t->handle, OnClose);
         }
     }
     t->stats.out.written += wr->buf.len;
