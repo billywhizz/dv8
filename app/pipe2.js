@@ -6,7 +6,7 @@ const stdin = new TTY(0, len => {
     if (r < 0) return stdout.close()
     if (r < len && stdout.queueSize() >= (64 * 1024)) stdin.pause()
 }, () => stdin.close(), () => stdout.close())
-const stdout = new TTY(1, () => {}, () => stdin.resume())
+const stdout = new TTY(1, () => {}, () => stdin.resume(), e => { print(`write error: ${e}`) })
 stdin.setup(b)
 stdout.setup(b)
 stdin.resume()

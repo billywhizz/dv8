@@ -41,6 +41,7 @@ class TTY : public dv8::ObjectWrap {
   v8::Persistent<v8::Function> _onEnd;
   v8::Persistent<v8::Function> _onDrain;
   v8::Persistent<v8::Function> _onClose;
+  v8::Persistent<v8::Function> _onError;
   unsigned int fd;
   tty_stats stats;
   bool paused;
