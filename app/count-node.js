@@ -1,14 +1,8 @@
 const { TTY } = process.binding('tty_wrap')
-
-const context = {}
-const stdin = new TTY(0, true, context)
+const stdin = new TTY(0, true, {})
 let bytes = 0
-
 stdin.onread = (err, b) => {
-    if (b) {
-        bytes += b.length
-    } else {
-        console.log(bytes)
-    }
+    if (b) return bytes += b.length
+    console.log(bytes)
 }
 stdin.readStart()
