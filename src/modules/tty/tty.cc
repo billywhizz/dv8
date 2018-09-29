@@ -4,7 +4,7 @@
 namespace dv8
 {
 
-namespace builtins
+namespace tty
 {
 using v8::Array;
 using v8::Context;
@@ -20,6 +20,7 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 using dv8::write_req_t;
+using dv8::builtins::Buffer;
 
 Persistent<Function> TTY::constructor;
 
@@ -160,6 +161,12 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
                     obj->_onDrain.Reset(isolate, onDrain);
                 }
             }
+            if (len > 3) {
+                if(args[3]->IsFunction()) {
+                    Local<Function> onError = Local<Function>::Cast(args[3]);
+                    obj->_onError.Reset(isolate, onError);
+                }
+            }
         }
         obj->fd = fd;
         uv_tty_set_mode(obj->handle, UV_TTY_MODE_NORMAL);
@@ -210,12 +217,9 @@ void TTY::OnWrite(uv_write_t* req, int status) {
         free(wr->buf.base);
         free(wr);
         t->stats.out.free++;
-        if (t->paused) {
-            //Local<Value> argv[1] = { Number::New(isolate, status) };
-            //Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
-            //t->stats.out.drain++;
-            //Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
-        }
+        Local<Value> argv[1] = { Number::New(isolate, status) };
+        Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
+        Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         return;
     }
     uv_stream_t* s = (uv_stream_t*)req->handle;
@@ -223,7 +227,7 @@ void TTY::OnWrite(uv_write_t* req, int status) {
     if (t->fd > 0 && queueSize > t->stats.out.maxQueue) {
         t->stats.out.maxQueue = queueSize;
     }
-    if (queueSize == 0 && t->paused) {
+    if (queueSize == 0) {
         // emit a drain event
         Local<Value> argv[0] = { };
         Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
@@ -233,6 +237,7 @@ void TTY::OnWrite(uv_write_t* req, int status) {
         Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         if (t->closing) {
             uv_close((uv_handle_t*)t->handle, OnClose);
+            t->closing = false;
         }
     }
     t->stats.out.written += wr->buf.len;
@@ -297,7 +302,6 @@ void TTY::OnClose(uv_handle_t* handle) {
         t->stats.out.close++;
     }
     free(handle);
-    v8::TryCatch try_catch(isolate);
     Local<Value> argv[0] = { };
     Local<Function> Callback = Local<Function>::New(isolate, t->_onClose);
     Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
@@ -310,7 +314,7 @@ void TTY::Close(const FunctionCallbackInfo<Value> &args)
     TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
     uv_stream_t* s = (uv_stream_t*)t->handle;
     size_t queueSize = s->write_queue_size;
-    if (t->paused && queueSize > 0) {
+    if (queueSize > 0) {
         t->closing = true;
     } else {
         uv_close((uv_handle_t*)t->handle, OnClose);
