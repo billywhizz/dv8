@@ -1,12 +1,8 @@
+const { TTY } = module('tty', {})
 const start = Date.now()
 const BUFFER_SIZE = 64 * 1024
-const HIGH_WATER = 64 * 1024
-
 const b = new Buffer()
 b.alloc(BUFFER_SIZE)
-
-let stdin
-let stdout
 
 function toMib(bytes) {
     return bytes * 8n / (1024n * 1024n)
@@ -108,66 +104,19 @@ function verify() {
     print(`pause = resume : ${stdin.pause === stdin.resume}`)
 }
 
-function onStdoutClose() {
-    try {
-        t.stop()
-        const metrics = getMetrics()
-        dumpStdout()
-        dumpMetrics(metrics)
-        verify()
-    } catch(err) {
-        print(err.stack)
-    }
-}
-
-function onStdoutDrain() {
-    if (stdout.closing) {
-        stdout.close()
-        return
-    }
-    if(stdout.draining) stdin.resume()
-    stdout.draining = false
-}
-
-function onStdinData(len) {
+const stdin = new TTY(0, len => {
     const r = stdout.write(len)
-    if (r < 0) {
-        print(`pipe.stdout.write.error: ${r}`)
-        return
-    }
-    if (r < len) {
-        const queueSize = stdout.queueSize()
-        if (queueSize >= HIGH_WATER) {
-            stdout.draining = true
-            stdin.pause()
-        }
-    }
-}
-
-function onStdinEnd(err) {
-    stdin.pause()
-    stdin.close()
-}
-
-function onStdinClose() {
-    if (stdout.draining) {
-        stdout.closing = true
-    } else {
-        const queueSize = stdout.queueSize()
-        if (queueSize > 0) {
-            stdout.closing = true
-        } else {
-            stdout.close()
-        }
-    }
-    dumpStdin()
-}
-
-stdout = new TTY(1, onStdoutClose, onStdoutDrain)
-stdout.setup(b)
-stdin = new TTY(0, onStdinData, onStdinEnd, onStdinClose)
+    if (r < 0) return stdout.close()
+    if (r < len && stdout.queueSize() >= (64 * 1024)) stdin.pause()
+}, () => stdin.close(), () => stdout.close())
+const stdout = new TTY(1, () => {
+    timer.stop()
+    const metrics = getMetrics()
+    dumpMetrics(metrics)
+    verify()
+}, () => stdin.resume(), e => { print(`write error: ${e}`) })
 stdin.setup(b)
+stdout.setup(b)
 stdin.resume()
-
-const t = new Timer()
-t.start(() => dumpMetrics(getMetrics()), 1000, 1000)
+const timer = new Timer()
+timer.start(() => dumpMetrics(getMetrics()), 1000, 1000)
