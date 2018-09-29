@@ -15,6 +15,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -33,6 +35,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -52,6 +56,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -74,6 +80,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -83,6 +91,24 @@ g++ \
     -c \
     -o dv8main.o \
     /src/dv8_main.cc
+g++ \
+    -I$UV_INCLUDE \
+    -I/src \
+    -pthread \
+    -Wall \
+    -Wextra \
+    -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
+    -m64 \
+    -O3 \
+    -fno-omit-frame-pointer \
+    -fno-rtti \
+    -fno-exceptions \
+    -std=gnu++1y \
+    -c \
+    -o ttyTest.o \
+    /src/tty-test.cc
 # link main executable
 g++ \
     -pthread \
@@ -99,3 +125,16 @@ g++ \
     -lm \
     -Wl,--end-group
 strip ./dv8
+g++ \
+    -pthread \
+    -rdynamic \
+    -m64 \
+    -o ./count \
+    -Wl,--start-group \
+    ./ttyTest.o \
+    $UV_DEPS/libuv.a \
+    -ldl \
+    -lrt \
+    -lm \
+    -Wl,--end-group
+strip ./count

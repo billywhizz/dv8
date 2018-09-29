@@ -1,5 +1,5 @@
+const memValues = new Float64Array(4)
 function getMemoryUsage() {
-    const memValues = new Float64Array(4)
     memoryUsage(memValues)
     return {
         rss: memValues[0],

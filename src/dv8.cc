@@ -20,19 +20,14 @@ void OnSignal(uv_signal_t* handle, int signum) {
   uv_stop(uv_default_loop());
 }
 
-void on_signal_close(uv_handle_t* h) {
+void on_handle_close(uv_handle_t* h) {
   free(h);
-}
-
-const char *ToCString(const String::Utf8Value &value)
-{
-  return *value ? *value : "<string conversion failed>";
 }
 
 void shutdown() {
   uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
-    fprintf(stderr, "closing [%p] %s\n", handle, uv_handle_type_name(handle->type));
-    uv_close(handle, on_signal_close);
+    fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
+    uv_close(handle, on_handle_close);
     //void* close_cb = reinterpret_cast<void*>(handle->close_cb);
   }, NULL);
 }
@@ -47,7 +42,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch)
   HandleScope handle_scope(isolate);
   fprintf(stderr, "exception\n");
   String::Utf8Value exception(isolate, try_catch->Exception());
-  const char *exception_string = ToCString(exception);
+  const char *exception_string = *exception;
   Local<Message> message = try_catch->Message();
   if (message.IsEmpty())
   {
@@ -57,11 +52,11 @@ void ReportException(Isolate *isolate, TryCatch *try_catch)
   {
     String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
     Local<Context> context(isolate->GetCurrentContext());
-    const char *filename_string = ToCString(filename);
+    const char *filename_string = *filename;
     int linenum = message->GetLineNumber(context).FromJust();
     fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
     String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
-    const char *sourceline_string = ToCString(sourceline);
+    const char *sourceline_string = *sourceline;
     fprintf(stderr, "%s\n", sourceline_string);
     int start = message->GetStartColumn(context).FromJust();
     for (int i = 0; i < start; i++)
@@ -78,7 +73,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch)
     if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0)
     {
       String::Utf8Value stack_trace(isolate, stack_trace_string);
-      const char *stack_trace_string = ToCString(stack_trace);
+      const char *stack_trace_string = *stack_trace;
       fprintf(stderr, "%s\n", stack_trace_string);
     }
   }
@@ -164,11 +159,10 @@ void Print(const FunctionCallbackInfo<Value> &args)
       printf(" ");
     }
     String::Utf8Value str(args.GetIsolate(), args[i]);
-    const char *cstr = ToCString(str);
-    printf("%s", cstr);
+    const char *cstr = *str;
+    fprintf(stderr, "%s\n", cstr);
+    fflush(stderr);
   }
-  printf("\n");
-  fflush(stdout);
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args)
@@ -177,17 +171,32 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
-  const char *module_name = ToCString(str);
+  const char *module_name = *str;
   char lib_name[128];
   snprintf(lib_name, 128, "./%s.so", module_name);
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   Local<Object> exports;
-  bool r = args[1]->ToObject(context).ToLocal(&exports);
+  if (success != 0) {
+    fprintf(stderr, "uv_dlopen failed: %i\n", success);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  bool ok = args[1]->ToObject(context).ToLocal(&exports);
+  if (!ok) {
+    fprintf(stderr, "convert args to local failed\n");
+    args.GetReturnValue().Set(exports);
+    return;
+  }
   char register_name[128];
   snprintf(register_name, 128, "_register_%s", module_name);
   void *address;
   success = uv_dlsym(&lib, register_name, &address);
+  if (success != 0) {
+    fprintf(stderr, "uv_dlsym failed: %i\n", success);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
@@ -230,7 +239,7 @@ void Require(const FunctionCallbackInfo<Value> &args)
 {
   HandleScope handle_scope(args.GetIsolate());
   String::Utf8Value str(args.GetIsolate(), args[0]);
-  const char *cstr = ToCString(str);
+  const char *cstr = *str;
   Local<String> source_text;
   if (!ReadFile(args.GetIsolate(), cstr).ToLocal(&source_text))
   {
@@ -240,7 +249,6 @@ void Require(const FunctionCallbackInfo<Value> &args)
   Local<String> fname =
       String::NewFromUtf8(args.GetIsolate(), cstr, NewStringType::kNormal)
           .ToLocalChecked();
-  Local<Object> that = args.Holder();
   TryCatch try_catch(args.GetIsolate());
   Local<Integer> line_offset;
   Local<Integer> column_offset;
@@ -267,6 +275,11 @@ void Require(const FunctionCallbackInfo<Value> &args)
   {
     String::Utf8Value utf8string(args.GetIsolate(), source_text);
     Maybe<bool> ok = module->InstantiateModule(context, OnModuleInstantiate);
+    if (!ok.ToChecked()) {
+      fprintf(stderr, "instantiate module failed\n");
+      args.GetReturnValue().Set(Null(args.GetIsolate()));
+      return;
+    }
     MaybeLocal<Value> result = module->Evaluate(context);
     args.GetReturnValue().Set(result.ToLocalChecked());
   }

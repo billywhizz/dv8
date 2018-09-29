@@ -1,10 +1,14 @@
 .vscode
 app/.ash_history
 app/core
+app/count
+app/*.sh
 *.o
 *.so
 *.a
 build/dv8
+*.ods
+build/count
 deps/v8
 deps/uv
 *.gz

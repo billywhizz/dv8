@@ -39,10 +39,14 @@ using v8::HeapStatistics;
 using v8::Float64Array;
 
 static uv_signal_t* signalHandle;
+typedef struct {
+  uv_write_t req; // libu write handle
+  uv_buf_t buf; // buffer reference
+  uint32_t fd; // id of the context
+} write_req_t;
 
 typedef void* (*register_plugin)();
 
-const char *ToCString(const String::Utf8Value &value);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
 bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bool report_exceptions);
 MaybeLocal<String> ReadFile(Isolate *isolate, const char *name);

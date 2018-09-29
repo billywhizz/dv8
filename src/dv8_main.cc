@@ -56,21 +56,26 @@ int main(int argc, char *argv[]) {
         dv8::DecorateErrorStack(isolate, try_catch);
         return 1;
       }
-      v8::MaybeLocal<v8::Value> result = script.ToLocalChecked()->Run(context);
+      script.ToLocalChecked()->Run(context);
       if (try_catch.HasCaught()) {
         dv8::DecorateErrorStack(isolate, try_catch);
         return 1;
       }
-      bool more;
+      int alive;
       do {
         uv_run(uv_default_loop(), UV_RUN_DEFAULT);
-        more = uv_loop_alive(uv_default_loop());
-        if (more) {
+        alive = uv_loop_alive(uv_default_loop());
+        if (alive != 0) {
           continue;
         }
-      } while (more == true);
+        alive = uv_loop_alive(uv_default_loop());
+      } while (alive != 0);
+      dv8::shutdown();
+      uv_tty_reset_mode();
       int r = uv_loop_close(uv_default_loop());
-      fprintf(stderr, "uv_loop_close: %i\n", r);
+      if (r != 0) {
+        fprintf(stderr, "uv_loop_close: %i\n", r);
+      }
     }
     //isolate->Exit();
     isolate->Dispose();

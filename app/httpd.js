@@ -48,7 +48,7 @@ sock.onClose(fd => {
 	conn--
 })
 
-setInterval(() => {
+const t = setInterval(() => {
 	print(JSON.stringify({
         connections: conn
     }, null, '  '))

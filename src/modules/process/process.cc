@@ -39,7 +39,6 @@ namespace process {
     Isolate* isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall()) {
-      Local<Context> context = isolate->GetCurrentContext();
       Process* obj = new Process();
       obj->Wrap(args.This());
       args.GetReturnValue().Set(args.This());

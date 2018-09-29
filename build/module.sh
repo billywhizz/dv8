@@ -19,6 +19,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -40,6 +42,8 @@ g++ \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -m64 \
     -O3 \
     -fno-omit-frame-pointer \
@@ -53,7 +57,6 @@ g++ \
 g++ \
     -shared \
     -pthread \
-    -rdynamic \
     -m64 \
     -Wl,-soname=$MODULE_NAME.so \
     -o ./$MODULE_NAME.so \

@@ -85,12 +85,18 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
+void Timer::OnClose(uv_handle_t* handle) {
+    free(handle);
+}
+
 void Timer::Stop(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Timer* t = ObjectWrap::Unwrap<Timer>(args.Holder());
     int r = uv_timer_stop(t->handle);
+    uv_handle_t* handle = (uv_handle_t*)t->handle;
+    uv_close(handle, OnClose);
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
@@ -103,7 +109,7 @@ void Timer::OnTimeout(uv_timer_t *handle)
     Local<Value> argv[argc] = { };
     Local<Function> foo = Local<Function>::New(isolate, t->onTimeout);
     v8::TryCatch try_catch(isolate);
-    v8::MaybeLocal<v8::Value> ret = foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     if (try_catch.HasCaught()) {
         DecorateErrorStack(isolate, try_catch);
     }
