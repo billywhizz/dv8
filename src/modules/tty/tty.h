@@ -5,7 +5,7 @@
 
 namespace dv8 {
 
-namespace builtins {
+namespace tty {
 
 typedef union {
   struct {

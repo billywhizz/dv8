@@ -4,7 +4,7 @@
 namespace dv8
 {
 
-namespace builtins
+namespace tty
 {
 using v8::Array;
 using v8::Context;
@@ -20,6 +20,7 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 using dv8::write_req_t;
+using dv8::builtins::Buffer;
 
 Persistent<Function> TTY::constructor;
 

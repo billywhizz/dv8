@@ -1,3 +1,4 @@
+const { TTY } = module('tty', {})
 const b = new Buffer()
 b.alloc(64 * 1024)
 const stdin = new TTY(0, len => {
