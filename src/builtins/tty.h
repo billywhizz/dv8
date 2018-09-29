@@ -44,6 +44,7 @@ class TTY : public dv8::ObjectWrap {
   unsigned int fd;
   tty_stats stats;
   bool paused;
+  bool closing;
 
  private:
 

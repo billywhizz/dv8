@@ -1,0 +1,11 @@
+const b = new Buffer()
+b.alloc(64 * 1024)
+const stdin = new TTY(0, len => {
+    const r = stdout.write(len)
+    if (r < 0) return stdout.close()
+    if (r < len && stdout.queueSize() >= (64 * 1024)) stdin.pause()
+}, () => stdin.close(), () => stdout.close())
+const stdout = new TTY(1, () => {}, () => stdin.resume())
+stdin.setup(b)
+stdout.setup(b)
+stdin.resume()

@@ -211,10 +211,10 @@ void TTY::OnWrite(uv_write_t* req, int status) {
         free(wr);
         t->stats.out.free++;
         if (t->paused) {
-            Local<Value> argv[1] = { Number::New(isolate, status) };
-            Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
-            t->stats.out.drain++;
-            Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+            //Local<Value> argv[1] = { Number::New(isolate, status) };
+            //Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
+            //t->stats.out.drain++;
+            //Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         }
         return;
     }
@@ -231,6 +231,9 @@ void TTY::OnWrite(uv_write_t* req, int status) {
             t->stats.out.drain++;
         }
         Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+        if (t->closing) {
+            uv_close((uv_handle_t*)t->handle, OnClose);
+        }
     }
     t->stats.out.written += wr->buf.len;
     free(wr->buf.base);
@@ -305,7 +308,13 @@ void TTY::Close(const FunctionCallbackInfo<Value> &args)
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
-    uv_close((uv_handle_t*)t->handle, OnClose);
+    uv_stream_t* s = (uv_stream_t*)t->handle;
+    size_t queueSize = s->write_queue_size;
+    if (t->paused && queueSize > 0) {
+        t->closing = true;
+    } else {
+        uv_close((uv_handle_t*)t->handle, OnClose);
+    }
 }
 
 void TTY::Pause(const FunctionCallbackInfo<Value> &args)

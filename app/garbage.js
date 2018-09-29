@@ -11,7 +11,7 @@ class Foo {
     }
 }
 
-setInterval(() => {
+const t = setInterval(() => {
     objects.push(new Foo())
 }, 100)
 
