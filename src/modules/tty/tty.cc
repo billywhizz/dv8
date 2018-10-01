@@ -104,6 +104,7 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
         TTY *obj = new TTY();
         obj->handle = (uv_tty_t*)calloc(1, sizeof(uv_tty_t));
         obj->handle->data = obj;
+        obj->closing = false;
         int len = args.Length();
         obj->paused = true;
         unsigned int fd = 0; // stdin

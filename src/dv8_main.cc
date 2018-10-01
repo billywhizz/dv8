@@ -44,7 +44,6 @@ int main(int argc, char *argv[]) {
       v8::Local<v8::Object> globalInstance = context->Global();
       globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
       dv8::builtins::Buffer::Init(globalInstance);
-      dv8::builtins::Timer::Init(globalInstance);
       v8::TryCatch try_catch(isolate);
       v8::MaybeLocal<v8::String> source = dv8::ReadFile(isolate, str);
       if (try_catch.HasCaught()) {

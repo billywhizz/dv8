@@ -3,7 +3,7 @@
 namespace dv8
 {
 
-namespace builtins
+namespace timer
 {
 using v8::Array;
 using v8::Context;
