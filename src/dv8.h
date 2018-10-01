@@ -8,7 +8,6 @@
 #include <uv.h>
 #include <common.h>
 #include <buffer.h>
-#include <timer.h>
 
 namespace dv8 {
 

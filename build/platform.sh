@@ -26,26 +26,6 @@ g++ \
     -c \
     -o buffer.o \
     /src/builtins/buffer.cc
-g++ \
-    -I$V8_INCLUDE \
-    -I$UV_INCLUDE \
-    -I$BUILTINS \
-    -I/src \
-    -pthread \
-    -Wall \
-    -Wextra \
-    -Wno-unused-parameter \
-    -Wno-unused-variable \
-    -Wno-unused-function \
-    -m64 \
-    -O3 \
-    -fno-omit-frame-pointer \
-    -fno-rtti \
-    -fno-exceptions \
-    -std=gnu++1y \
-    -c \
-    -o timer.o \
-    /src/builtins/timer.cc
 # compile the dv8 core library
 g++ \
     -I$V8_INCLUDE \
@@ -69,7 +49,7 @@ g++ \
     /src/dv8.cc
 # create the lib
 rm -f dv8.a
-ar crsT dv8.a buffer.o timer.o dv8.o
+ar crsT dv8.a buffer.o dv8.o
 # compile the main executable
 g++ \
     -I$V8_INCLUDE \

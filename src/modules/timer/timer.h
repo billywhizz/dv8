@@ -5,7 +5,7 @@
 
 namespace dv8 {
 
-namespace builtins {
+namespace timer {
 
 class Timer : public dv8::ObjectWrap {
  public:
