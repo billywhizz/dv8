@@ -53,7 +53,7 @@ void TTY::Setup(const FunctionCallbackInfo<Value>& args) {
     Local<Context> context = isolate->GetCurrentContext();
     TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
     v8::HandleScope handleScope(isolate);
-    Buffer* b = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
+    Buffer* b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
     size_t len = b->_length;
     t->in = uv_buf_init((char*)b->_data, len);
     uint32_t mode = args[1]->Uint32Value(context).ToChecked();
