@@ -43,15 +43,21 @@ void TTY::Init(Local<Object> exports)
 
     constructor.Reset(isolate, tpl->GetFunction());
     DV8_SET_EXPORT(isolate, tpl, "TTY", exports);
+    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 0), "UV_TTY_MODE_NORMAL", exports);
+    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 1), "UV_TTY_MODE_RAW", exports);
+    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 2), "UV_TTY_MODE_IO", exports);
 }
 
 void TTY::Setup(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
     v8::HandleScope handleScope(isolate);
     Buffer* b = ObjectWrap::Unwrap<Buffer>(args[0]->ToObject());
     size_t len = b->_length;
     t->in = uv_buf_init((char*)b->_data, len);
+    uint32_t mode = args[1]->Uint32Value(context).ToChecked();
+    uv_tty_set_mode(t->handle, mode);
 }
 
 void TTY::OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf)

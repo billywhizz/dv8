@@ -1,4 +1,5 @@
 const { Process } = module('process', {})
+const { Timer } = module('timer', {})
 
 const process = new Process()
 

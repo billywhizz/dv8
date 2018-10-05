@@ -1,4 +1,5 @@
-const { TTY } = module('tty', {})
+const tty = module('tty', {})
+const { TTY } = tty
 const { Timer } = module('timer', {})
 const b = new Buffer()
 b.alloc(64 * 1024)
