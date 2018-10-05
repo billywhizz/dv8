@@ -1,7 +1,7 @@
 const { Process } = module('process', {})
+const { Timer } = module('timer', {})
 
 const process = new Process()
-
 const mem = new Float64Array(4)
 
 function getMemoryUsage() {

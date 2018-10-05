@@ -13,7 +13,7 @@ static void DecorateErrorStack(v8::Isolate* isolate, const v8::TryCatch &try_cat
   v8::Local<v8::Object> err_obj = exception.As<v8::Object>();
   v8::Local<v8::Value> stack = err_obj->Get(v8::String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked());
   v8::String::Utf8Value strStack(isolate, stack);
-  fprintf(stderr, "UncaughtException:\n%s\n", *strStack);
+  fprintf(stderr, "UncaughtException:\nStack:\n%s\n", *strStack);
 }
 class ObjectWrap {
   public:
