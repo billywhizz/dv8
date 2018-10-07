@@ -172,8 +172,10 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
   const char *module_name = *str;
+  char lib_name[128];
+  snprintf(lib_name, 128, "/usr/local/lib/%s.so", module_name);
   uv_lib_t lib;
-  int success = uv_dlopen(module_name, &lib);
+  int success = uv_dlopen(lib_name, &lib);
   Local<Object> exports;
   if (success != 0) {
     fprintf(stderr, "uv_dlopen failed: %i\n", success);
