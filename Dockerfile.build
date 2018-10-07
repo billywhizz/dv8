@@ -1,4 +1,0 @@
-FROM alpine:3.8
-WORKDIR /build
-RUN apk add --no-cache g++
-CMD [ "/bin/sh" ]
