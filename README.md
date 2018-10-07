@@ -8,7 +8,7 @@ A low level v8 based JS runtime with small footprint (well, as small as is possi
 ### Build all with dependencies (v8 and libuv)
 ```bash
 ## clone the repo
-git@github.com:billywhizz/dv8.git
+git clone git@github.com:billywhizz/dv8.git
 cd dv8
 ## build v8
 docker build -t v8-build --target v8-build .
@@ -25,7 +25,7 @@ docker build -t dv8 -f Dockerfile.runtime .
 ## pull the sdk image
 docker pull dv8-sdk
 ## clone the repo
-git@github.com:billywhizz/dv8.git
+git clone git@github.com:billywhizz/dv8.git
 cd dv8
 ## build the platform
 docker run -it --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/src:/src dv8-sdk ./platform.sh
