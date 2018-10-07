@@ -1,3 +1,6 @@
+/*
+record 
+*/
 const start = Date.now()
 require('./base.js')
 let mem = memoryUsage()
@@ -22,15 +25,17 @@ function printStats(pipe, end = Date.now()) {
     const seconds = elapsed / 1000
     const MiBRate = Math.floor(toMiB(bytes) / seconds * 100) / 100
     const MibRate = Math.floor(toMib(bytes) / seconds * 100) / 100
+    // print is just doing an fprintf(stderr) under the hood so it will block - need to fix/remove it
     print(`${ANSI_MAGENTA}${name.padEnd(12, ' ')}${ANSI_DEFAULT}: ${bytes.toString().padStart(12, ' ')} ${ANSI_CYAN}bytes${ANSI_DEFAULT} ${seconds.toString().padStart(7, ' ')} ${ANSI_CYAN}sec${ANSI_DEFAULT} ${MibRate.toString().padStart(10, ' ')} ${ANSI_CYAN}Mib/s${ANSI_DEFAULT} ${MiBRate.toString().padStart(10, ' ')} ${ANSI_CYAN}MiB/s${ANSI_DEFAULT} ${toMiB(mem.rss.toString().padStart(10, ' '))} ${ANSI_GREEN}RSS${ANSI_DEFAULT} ${toMiB(mem.heapUsed.toString().padStart(10, ' '))} ${ANSI_GREEN}Heap${ANSI_DEFAULT} ${toMiB(mem.external.toString().padStart(10, ' '))} ${ANSI_GREEN}Ext${ANSI_DEFAULT}`)
 }
 
 module.exports = {
     start: (pipe, output) => {
-        return setInterval(() => {
+        pipe.timer = setInterval(() => {
             mem = memoryUsage()
             if (output) printStats(pipe, Date.now())
         }, 1000)
+        return
     },
     stop: (pipe) => {
         printStats(pipe, Date.now())

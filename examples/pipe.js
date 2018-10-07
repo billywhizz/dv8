@@ -22,6 +22,6 @@ stdin.bytes = 0
 stdout.bytes = 0
 stdin.name = 'pipe.stdin'
 stdout.name = 'pipe.stdout'
-stdin.timer = start(stdin)
-stdout.timer = start(stdout)
+start(stdin)
+start(stdout)
 stdin.resume()

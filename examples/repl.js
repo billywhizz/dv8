@@ -1,3 +1,6 @@
+/*
+A very crappy repl so you can inspect some of the builtins
+*/
 const tty = module('tty', {})
 const { TTY } = tty
 const b = new Buffer()

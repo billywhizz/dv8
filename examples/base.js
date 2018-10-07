@@ -1,3 +1,6 @@
+/*
+A PoC base module which exposes timers and memoryUsage
+*/
 const { Process } = module('process', {})
 const { Timer } = module('timer', {})
 
@@ -5,6 +8,7 @@ const process = new Process()
 const mem = new Float64Array(4)
 
 function getMemoryUsage() {
+    // read the values into the float array
     process.memoryUsage(mem)
     return {
         rss: mem[0],
@@ -16,7 +20,9 @@ function getMemoryUsage() {
 
 function setTimeout(fn, delay) {
     const t = new Timer()
+    // the module will make the callback after delay
     t.start(fn, delay)
+    // return the timer so it can be stopped. no gc/unref handling yet!
     return t
 }
 
@@ -27,6 +33,7 @@ function setInterval(fn, repeat) {
 }
 
 function clearTimeout(t) {
+    // this will close the libuv handle for the timer
     t.stop()
 }
 
