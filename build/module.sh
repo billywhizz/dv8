@@ -65,3 +65,4 @@ g++ \
     ./$MODULE_NAME.binding.o \
     -Wl,--end-group
 strip ./$MODULE_NAME.so
+cp -f ./$MODULE_NAME.so /out/lib/$MODULE_NAME.so

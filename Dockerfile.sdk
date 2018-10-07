@@ -1,0 +1,19 @@
+FROM alpine:3.8 as dv8-sdk
+WORKDIR /build
+RUN apk add --no-cache g++
+RUN mkdir -p /out/bin
+RUN mkdir -p /out/lib
+COPY --from=v8-build /tmp/v8/include /deps/v8/include
+COPY --from=v8-build /tmp/v8/out.gn/x64.release/obj/libv8_monolith.a /deps/v8/out.gn/x64.release/obj/libv8_monolith.a
+COPY --from=uv-build /source/uv/include /deps/uv/include
+COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/out/Release/libuv.a
+COPY src /src
+COPY build/platform.sh /build/platform.sh
+COPY build/module.sh /build/module.sh
+RUN ./platform.sh
+RUN ./module.sh os
+RUN ./module.sh process
+RUN ./module.sh socket
+RUN ./module.sh timer
+RUN ./module.sh tty
+CMD ["/bin/sh"]
