@@ -44,27 +44,26 @@ docker build -t dv8 -f Dockerfile.runtime .
 
 ### Build runtime and standard libs from source
 ```bash
-## pull the sdk image
-docker pull billywhizz/dv8-sdk
-## clone the repo
-git clone git@github.com:billywhizz/dv8.git
-cd dv8
+## get the source
+wget https://github.com/billywhizz/dv8/archive/v0.0.3.tar.gz
+tar -zxvf v0.0.3.tar.gz
+cd dv8-0.0.3
 ## build the platform
-docker run -it --rm -v $(pwd)/out/bin:/out/bin -v $(pwd)/src:/src dv8-sdk ./platform.sh
+docker run -it --rm -v $(pwd)/out/bin:/out/bin -v $(pwd)/src:/src billywhizz/dv8-sdk:0.0.3 ./platform.sh
 ## build the standard modules
-docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src dv8-sdk ./module.sh os
-docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src dv8-sdk ./module.sh process
-docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src dv8-sdk ./module.sh socket
-docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src dv8-sdk ./module.sh timer
-docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src dv8-sdk ./module.sh tty
+docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src billywhizz/dv8-sdk:0.0.3 ./module.sh os
+docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src billywhizz/dv8-sdk:0.0.3 ./module.sh process
+docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src billywhizz/dv8-sdk:0.0.3 ./module.sh socket
+docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src billywhizz/dv8-sdk:0.0.3 ./module.sh timer
+docker run -it --rm -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src billywhizz/dv8-sdk:0.0.3 ./module.sh tty
 ## run with your build
-docker run -it --rm -v $(pwd)/out/bin/dv8:/usr/local/bin/dv8 -v $(pwd)/out/lib:/usr/local/lib dv8 /bin/sh
+docker run -it --rm -v $(pwd)/out/bin/dv8:/usr/local/bin/dv8 -v $(pwd)/out/lib:/usr/local/lib billywhizz/dv8:0.0.3 /bin/sh
 ```
 
 ### Build a module (To Be Improved)
 ```bash
 ## pull the sdk image
-docker pull billywhizz/dv8-sdk
+docker pull billywhizz/dv8-sdk:0.0.3
 ```
 - create a binding.cc and main cc and h files as in standard library
 - export your binding register function
@@ -92,11 +91,19 @@ extern "C" {
 ```
 - build your module
 ```bash
-docker run -it --rm -v $(pwd):/src/modules/$MODULE_NAME -v $(pwd)/out/lib:/out/lib billywhizz/dv8-sdk ./module.sh $MODULE_NAME
+docker run -it --rm -v $(pwd):/src/modules/$MODULE_NAME -v $(pwd)/out/lib:/out/lib billywhizz/dv8-sdk:0.0.3 ./module.sh $MODULE_NAME
 ```
 - run with your module
 ```bash
-docker run -it --rm -v $(pwd)/out/lib/$MODULE_NAME.so:/usr/local/lib/$MODULE_NAME.so billywhizz/dv8 /bin/sh
+docker run -it --rm -v $(pwd)/out/lib/$MODULE_NAME.so:/usr/local/lib/$MODULE_NAME.so billywhizz/dv8:0.0.3 /bin/sh
+```
+
+## Release
+```
+docker tag dv8 billywhizz/dv8:0.0.3
+docker push billywhizz/dv8:0.0.3
+docker tag dv8-sdk billywhizz/dv8-sdk:0.0.3
+docker push billywhizz/dv8-sdk:0.0.3
 ```
 
 ## Principles
