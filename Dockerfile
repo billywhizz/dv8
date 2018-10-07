@@ -1,4 +1,5 @@
-FROM alpine:3.8
+## Build v8 monolithic lib
+FROM alpine:3.8 as v8-build
 
 LABEL repository.hub="alexmasterov/alpine-libv8:7.1" \
       repository.url="https://github.com/AlexMasterov/dockerfiles" \
@@ -36,8 +37,8 @@ RUN set -x \
     ninja \
     python \
     tar \
-    xz \
-  && : "---------- V8 ----------" \
+    xz
+RUN : "---------- V8 ----------" \
   && mkdir -p /tmp/v8 \
   && curl -fSL --connect-timeout 30 ${V8_SOURCE} | tar xmz -C /tmp/v8 \
   && : "---------- Dependencies ----------" \
@@ -74,7 +75,6 @@ RUN set -x \
     libexecinfo \
     libstdc++ \
   && curl -fSL --connect-timeout 30 ${GN_SOURCE} | tar xmz -C /tmp/v8/buildtools/linux64/
-
 RUN cd /tmp/v8 \
   && ./tools/dev/v8gen.py \
     x64.release \
@@ -106,7 +106,7 @@ RUN cd /tmp/v8 \
       v8_extra_library_files=[] \
       proprietary_codecs=false \
       safe_browsing_mode=0 \
-      toolkit_views=false \   
+      toolkit_views=false \
       use_aura=false \
       use_dbus=false \
       use_gio=false \
@@ -118,8 +118,22 @@ RUN cd /tmp/v8 \
       v8_enable_gdbjit=false \
       v8_imminent_deprecation_warnings=false \
       v8_untrusted_code_mitigations=false \
-      disable_glibcxx_debug=false \
-      v8_embedder_string=dv8
+      disable_glibcxx_debug=false
 
 RUN cd /tmp/v8 \
   && ninja v8_monolith -C out.gn/x64.release/ -j 2
+
+## Build libuv
+FROM alpine:3.8 as uv-build
+WORKDIR /source
+RUN apk update \
+    && apk add --no-cache --virtual .build-deps make g++ python gcc git
+RUN wget "https://github.com/libuv/libuv/archive/v1.23.0.tar.gz" \
+    && tar -zxvf v1.23.0.tar.gz \
+    && mv libuv-1.23.0 uv
+RUN cd uv \
+    && git clone https://chromium.googlesource.com/external/gyp build/gyp
+RUN cd uv \
+    && ./gyp_uv.py -f make \
+    && BUILDTYPE=Release make -C out
+CMD ["/bin/sh"]
