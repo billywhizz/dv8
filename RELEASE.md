@@ -1,6 +1,9 @@
 # 0.0.1
 - build minimal v8/libuv javascript environment
 - running on alpine docker
-# 0.0.2
+# 0.0.3
 - working tty
 - docker build system
+# 0.0.4
+- license
+- readme improvements
