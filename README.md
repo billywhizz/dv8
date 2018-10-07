@@ -105,10 +105,11 @@ docker run -it --rm -v $(pwd)/out/lib/$MODULE_NAME.so:/usr/local/lib/$MODULE_NAM
 
 ## Summary
 - alpine docker only (for now)
-- 15MiB binary
-- 21MiB runtime docker image
-- 13MiB RSS on startup
-- xxx "hello world" process time
+- 15 MiB binary
+- 21 MiB runtime docker image
+- 9  MiB compressed docker image
+- 13 MiB RSS on startup
+- 0.01s "hello world" process time
 - defaults to an environment with only the core JS runtime and the following globals
     - version()
     - print()
