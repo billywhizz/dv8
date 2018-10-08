@@ -37,7 +37,6 @@ using v8::Function;
 using v8::HeapStatistics;
 using v8::Float64Array;
 
-static uv_signal_t* signalHandle;
 typedef struct {
   uv_write_t req; // libu write handle
   uv_buf_t buf; // buffer reference
@@ -56,9 +55,6 @@ void Version(const FunctionCallbackInfo<Value> &args);
 void LoadModule(const FunctionCallbackInfo<Value>& args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
 void Require(const FunctionCallbackInfo<Value> &args);
-void SingnalHandler();
-void OnSignal(uv_signal_t* handle, int signum);
-void on_signal_close(uv_handle_t* h);
 void shutdown();
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void CollectGarbage(const FunctionCallbackInfo<Value> &args);
