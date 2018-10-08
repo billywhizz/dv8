@@ -232,8 +232,12 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 - goal is to be small and fast and as close to metal as possible in JS
 - easy to build other abstractions on top of this
 - core is all C++, no JS
+- no event emitters
+- no streams
+- no big abtractions - only the base api's in core
 - standard library should not cause mark/sweep gc
 - return codes, not exceptions as much as possible
+- module interop - in c++ - how?
 - top level async
 - Metrics in core - exposed in standard format
 - secure, small, fast

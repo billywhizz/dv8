@@ -1,4 +1,4 @@
-#include <os.h>
+#include "os.h"
 
 namespace dv8 {
 
@@ -26,7 +26,7 @@ namespace os {
     tpl->SetClassName(String::NewFromUtf8(isolate, "OS"));
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "sleep", OS::Sleep);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onSignal", OS::OnSignal);
 
     constructor.Reset(isolate, tpl->GetFunction());
     DV8_SET_EXPORT(isolate, tpl, "OS", exports);
@@ -57,14 +57,35 @@ namespace os {
     args.GetReturnValue().Set(instance);
   }
 
-  void OS::Sleep(const FunctionCallbackInfo<Value>& args) {
+  void OS::OnSignal(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
+    OS* os = ObjectWrap::Unwrap<OS>(args.Holder());
     if(args.Length() > 0) {
-      Local<Context> context = isolate->GetCurrentContext();
-      uint32_t time = args[0]->Int32Value(context).ToChecked();
-      sleep(time);
+      if(args[0]->IsFunction()) {
+          Local<Function> onSignal = Local<Function>::Cast(args[0]);
+          os->_onSignal.Reset(isolate, onSignal);
+          uv_signal_t* signalHandle = new uv_signal_t;
+          signalHandle->data = os;
+          int r = uv_signal_init(uv_default_loop(), signalHandle);
+          int sigmask = 15;
+          if (args.Length() > 1) {
+            Local<Context> context = isolate->GetCurrentContext();
+            sigmask = args[1]->Uint32Value(context).ToChecked();
+          }
+          r = uv_signal_start(signalHandle, on_signal, sigmask);
+          args.GetReturnValue().Set(Integer::New(isolate, r));
+      }
     }
+  }
+
+  void OS::on_signal(uv_signal_t* handle, int signum) {
+    Isolate * isolate = Isolate::GetCurrent();
+    v8::HandleScope handleScope(isolate);
+    OS* os = (OS*)handle->data;
+    Local<Value> argv[1] = { Number::New(isolate, signum) };
+    Local<Function> Callback = Local<Function>::New(isolate, os->_onSignal);
+    Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
   }
 
 }

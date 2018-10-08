@@ -5,21 +5,6 @@ namespace dv8
 
 using InitializerCallback = void (*)(Local<Object> exports);
 
-void SingnalHandler() {
-  signalHandle = new uv_signal_t;
-  int r = uv_signal_init(uv_default_loop(), signalHandle);
-  fprintf(stderr, "uv_signal_init: %i\n", r);
-  r = uv_signal_start(signalHandle, OnSignal, 15 | 2);
-  fprintf(stderr, "uv_signal_start: %i\n", r);
-}
-
-void OnSignal(uv_signal_t* handle, int signum) {
-  fprintf(stderr, "signal: %i\n", signum);
-  int r = uv_signal_stop(handle);
-  fprintf(stderr, "uv_signal_stop: %i\n", r);
-  uv_stop(uv_default_loop());
-}
-
 void on_handle_close(uv_handle_t* h) {
   free(h);
 }
@@ -174,6 +159,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   const char *module_name = *str;
   char lib_name[128];
   snprintf(lib_name, 128, "/usr/local/lib/%s.so", module_name);
+  fprintf(stderr, "loading module: %s\n", lib_name);
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   Local<Object> exports;

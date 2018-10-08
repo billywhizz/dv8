@@ -23,7 +23,6 @@ int main(int argc, char *argv[]) {
     v8::V8::InitializePlatform(platform.get());
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
-    //dv8::SingnalHandler();
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
     v8::Isolate::CreateParams create_params;

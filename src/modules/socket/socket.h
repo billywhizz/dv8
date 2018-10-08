@@ -1,5 +1,5 @@
-#ifndef TINYSOCKET_H
-#define TINYSOCKET_H
+#ifndef DV8_SOCKET_H
+#define DV8_SOCKET_H
 
 #include <stdio.h>
 #include <stdlib.h>

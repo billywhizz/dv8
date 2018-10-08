@@ -33,8 +33,10 @@ namespace builtins {
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "alloc", Buffer::Alloc);
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pull", Buffer::Pull);
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "push", Buffer::Push);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "free", Buffer::Free);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "read", Buffer::Read);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Buffer::Write);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "copy", Buffer::Copy);
 
     constructor.Reset(isolate, tpl->GetFunction());
     DV8_SET_EXPORT(isolate, tpl, "Buffer", exports);
@@ -78,14 +80,30 @@ namespace builtins {
         return;
       }
       Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kInternalized);
-      b->ab.Reset(isolate, ab);
       //isolate->AdjustAmountOfExternalAllocatedMemory(length);
       args.GetReturnValue().Set(ab);
       b->_length = length;
     }
   }
 
-  void Buffer::Pull(const FunctionCallbackInfo<Value>& args) {
+  void Buffer::Copy(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    v8::HandleScope handleScope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    uint32_t length = args[1]->Uint32Value(context).ToChecked();
+    Buffer* source = ObjectWrap::Unwrap<Buffer>(args.Holder());
+    Buffer* dest = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
+    memcpy(dest->_data, source->_data, length);
+  }
+
+  void Buffer::Free(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    v8::HandleScope handleScope(isolate);
+    Buffer* b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+    free(b->_data);
+  }
+
+  void Buffer::Read(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
@@ -96,7 +114,7 @@ namespace builtins {
     args.GetReturnValue().Set(String::NewFromUtf8(isolate, data, v8::String::kNormalString, len));
   }
 
-  void Buffer::Push(const FunctionCallbackInfo<Value>& args) {
+  void Buffer::Write(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Local<Context> context = isolate->GetCurrentContext();

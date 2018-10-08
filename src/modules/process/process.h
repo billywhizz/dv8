@@ -1,3 +1,6 @@
+#ifndef DV8_PROCESS_H
+#define DV8_PROCESS_H
+
 #include <dv8.h>
 
 namespace dv8 {
@@ -26,3 +29,4 @@ class Process : public dv8::ObjectWrap {
 
 }
 }
+#endif
