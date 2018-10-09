@@ -1,20 +1,5 @@
 #include <dv8.h>
 
-bool ShouldAbortOnUncaughtException(v8::Isolate *isolate) {
-  fprintf(stderr, "ShouldAbortOnUncaughtException\n");
-  return true;
-}
-
-static void OnFatalError(const char *location, const char *message) {
-  if (location) {
-    fprintf(stderr, "FATAL ERROR: %s %s\n", location, message);
-  }
-  else {
-    fprintf(stderr, "FATAL ERROR: %s\n", message);
-  }
-  fflush(stderr);
-}
-
 int main(int argc, char *argv[]) {
   if (argc > 1) {
     v8::V8::InitializeICUDefaultLocation(argv[0]);
@@ -29,8 +14,8 @@ int main(int argc, char *argv[]) {
     create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
     v8::Isolate *isolate = v8::Isolate::New(create_params);
     {
-      isolate->SetAbortOnUncaughtExceptionCallback(ShouldAbortOnUncaughtException);
-      isolate->SetFatalErrorHandler(OnFatalError);
+      isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
+      isolate->SetFatalErrorHandler(dv8::OnFatalError);
       v8::Isolate::Scope isolate_scope(isolate);
       v8::HandleScope handle_scope(isolate);
       v8::Local<v8::Context> context = dv8::CreateContext(isolate);

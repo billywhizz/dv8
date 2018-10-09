@@ -22,6 +22,8 @@ namespace builtins {
   using v8::ArrayBuffer;
   using v8::MaybeLocal;
   using v8::Uint8Array;
+  using dv8::ShouldAbortOnUncaughtException;
+  using dv8::OnFatalError;
 
   Persistent<Function> Buffer::constructor;
 

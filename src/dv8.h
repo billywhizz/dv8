@@ -87,5 +87,20 @@ inline void DV8_SET_EXPORT_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> o
     exports->Set(constant_name, obj);
 }
 
+inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate) {
+  fprintf(stderr, "ShouldAbortOnUncaughtException\n");
+  return true;
+}
+
+inline void OnFatalError(const char *location, const char *message) {
+  if (location) {
+    fprintf(stderr, "FATAL ERROR: %s %s\n", location, message);
+  }
+  else {
+    fprintf(stderr, "FATAL ERROR: %s\n", message);
+  }
+  fflush(stderr);
+}
+
 } // namespace dv8
 #endif
