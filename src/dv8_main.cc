@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
         }
         alive = uv_loop_alive(uv_default_loop());
       } while (alive != 0);
-      dv8::shutdown();
+      dv8::shutdown(uv_default_loop());
       uv_tty_reset_mode();
       int r = uv_loop_close(uv_default_loop());
       if (r != 0) {

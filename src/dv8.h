@@ -55,7 +55,7 @@ void Version(const FunctionCallbackInfo<Value> &args);
 void LoadModule(const FunctionCallbackInfo<Value>& args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
 void Require(const FunctionCallbackInfo<Value> &args);
-void shutdown();
+void shutdown(uv_loop_t* loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void CollectGarbage(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value>& args);
