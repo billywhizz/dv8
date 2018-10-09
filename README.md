@@ -238,7 +238,6 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 - standard library should not cause mark/sweep gc
 - return codes, not exceptions as much as possible
 - module interop - in c++ - how?
-- top level async
 - Metrics in core - exposed in standard format
 - secure, small, fast
 - iOT support - arm build

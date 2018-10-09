@@ -14,3 +14,4 @@ deps/uv
 *.gz
 scratch
 deploy.sh
+out
