@@ -141,9 +141,9 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
     - shutdown() - shutdown the event loop
     - gc() - force garbage collection (requires --expose-gc command line argument)
     - Buffer
-        - alloc() - allocate memory outside the v8 heap
-        - pull() - pull a v8 string from the buffer
-        - push() - push a v8 string into the buffer (should rename these to read/write)
+        - alloc(size) - allocate memory outside the v8 heap
+        - read(len) - read a v8 string from the buffer
+        - write(str) - write a v8 string into the buffer
 - the standard library is available as a set of optional shared modules
     - os (poc)
     - process (poc)
@@ -232,13 +232,19 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 - goal is to be small and fast and as close to metal as possible in JS
 - easy to build other abstractions on top of this
 - core is all C++, no JS
+  - maybe an optional js bootstrap that can be compiled in at build time
 - no event emitters
 - no streams
 - no big abtractions - only the base api's in core
 - standard library should not cause mark/sweep gc
 - return codes, not exceptions as much as possible
 - module interop - in c++ - how?
+  - modules need to be able to inherit from each other
+  - need to be able to wrap a module (e.g. socket) and implement on top of it (e.g. tls)
 - Metrics in core - exposed in standard format
+  - recorded in buffers in c++ land
+  - JS land can read the metrics whenever it needs to
+  - DataViews?
 - secure, small, fast
 - iOT support - arm build
 - static modules for packaged binary
@@ -257,3 +263,89 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 - sane mechanism for ref'ing handles
 - minimal abstractions - no common streams library - make api's for each
 - figure out how to do the sockets module better - Socket instance for each connection, no fd's
+
+# 10 October 2018
+
+## NEXT
+
+- builtin js startup
+- atexit/onexit support
+- thread stop - shutdown loop
+- environment variables
+- command line args
+- inspector
+- thread.global functions for gc/shutdown
+- libuv - loop inspection - handles
+- idle handler/nexttick
+- fork/exec
+
+# API
+
+## JS
+
+### main.global
+  version()
+  print()
+  module()
+  require()
+  shutdown()
+  gc()
+### thread.global
+  version()
+  print()
+  module()
+  require()
+### os
+  onSignal()
+### process
+  pid()
+  memoryUsage()
+### socket
+  listen()
+  connect()
+  bind()
+  close()
+  pull()
+  push()
+  write()
+  writeText()
+  setup()
+  setNoDelay()
+  pause()
+  resume()
+  setKeepAlive()
+  proxy()
+  remoteAddress()
+  onConnect()
+  onClose()
+  onWrite()
+  onData()
+  onError()
+### thread
+  start()
+### timer
+  start()
+  stop()
+### tty
+  writeString()
+  write()
+  close()
+  setup()
+  pause()
+  resume()
+  queueSize()
+  stats()
+  UV_TTY_MODE_NORMAL
+  UV_TTY_MODE_RAW
+  UV_TTY_MODE_IO
+
+
+## C++
+
+### global
+dv8::Version()
+dv8::Require()
+
+### builtins
+
+### modules

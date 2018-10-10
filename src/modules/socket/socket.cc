@@ -109,7 +109,7 @@ namespace socket {
 
   void after_shutdown(uv_shutdown_t* req, int status) {
     if(uv_is_closing((uv_handle_t*)req->handle) == 0) {
-      //uv_close((uv_handle_t*)req->handle, on_close);
+      uv_close((uv_handle_t*)req->handle, on_close);
       free(req);
     }
   }
@@ -309,6 +309,7 @@ namespace socket {
         args.GetReturnValue().Set(Integer::New(isolate, r));
       } else {
         uv_close((uv_handle_t*)ctx->handle, on_close);
+        args.GetReturnValue().Set(Integer::New(isolate, 0));
       }
     } else if(s->_stream) {
       uv_close((uv_handle_t*)s->_stream, on_close2);
