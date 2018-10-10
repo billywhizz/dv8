@@ -278,6 +278,7 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 - libuv - loop inspection - handles
 - idle handler/nexttick
 - fork/exec
+- standardise stream/backpressure handling in socket and tty modules
 
 # API
 
