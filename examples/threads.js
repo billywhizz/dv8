@@ -11,10 +11,10 @@ function spawn() {
     const bytes = new Uint8Array(thread.buffer.alloc(10))
     bytes[0] = threadId // max 255
     bytes[1] = 10 // time to run
-    thread.start(thread.buffer, () => {
+    thread.start('./app.js', () => {
         print(`main  : ${threadId} complete`)
         timer.stop()
-    })
+    }, thread.buffer)
     threads.push(thread)
     const timer = setInterval(() => {
         const [ id, duration, t1, t2, t3, t4 ] = bytes
@@ -23,5 +23,5 @@ function spawn() {
     }, 1000)
 }
 
-spawn()
-spawn()
+let count = 100
+while(count--) spawn()

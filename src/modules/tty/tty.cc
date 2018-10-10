@@ -21,6 +21,7 @@ using v8::String;
 using v8::Value;
 using dv8::write_req_t;
 using dv8::builtins::Buffer;
+using dv8::builtins::Environment;
 
 Persistent<Function> TTY::constructor;
 
@@ -107,6 +108,8 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
     if (args.IsConstructCall())
     {
         Local<Context> context = isolate->GetCurrentContext();
+        Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+
         TTY *obj = new TTY();
         obj->handle = (uv_tty_t*)calloc(1, sizeof(uv_tty_t));
         obj->handle->data = obj;
@@ -125,7 +128,7 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
             obj->stats.in.data = 0;
             obj->stats.in.resume = 0;
             obj->stats.in.end = 0;
-            uv_tty_init(uv_default_loop(), obj->handle, fd, 1);
+            uv_tty_init(env->loop, obj->handle, fd, 1);
             if (len > 1) {
                 if(args[1]->IsFunction()) {
                     Local<Function> onRead = Local<Function>::Cast(args[1]);
@@ -155,7 +158,7 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
             obj->stats.out.alloc = 0;
             obj->stats.out.free = 0;
             obj->stats.out.eagain = 0;
-            uv_tty_init(uv_default_loop(), obj->handle, fd, 0);
+            uv_tty_init(env->loop, obj->handle, fd, 0);
             if (len > 1) {
                 if(args[1]->IsFunction()) {
                     Local<Function> onClose = Local<Function>::Cast(args[1]);

@@ -19,11 +19,14 @@ int main(int argc, char *argv[]) {
       v8::Isolate::Scope isolate_scope(isolate);
       v8::HandleScope handle_scope(isolate);
       v8::Local<v8::Context> context = dv8::CreateContext(isolate);
+      dv8::builtins::Environment* env = new dv8::builtins::Environment();
+      env->AssignToContext(context);
       if (context.IsEmpty()) {
         fprintf(stderr, "Error creating context\n");
         return 1;
       }
       const char *str = argv[1];
+      env->loop = uv_default_loop();
       v8::Context::Scope context_scope(context);
       v8::Local<v8::Object> globalInstance = context->Global();
       globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);

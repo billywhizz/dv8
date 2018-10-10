@@ -18,6 +18,7 @@ using v8::Object;
 using v8::Persistent;
 using v8::String;
 using v8::Value;
+using dv8::builtins::Environment;
 
 Persistent<Function> Timer::constructor;
 
@@ -73,11 +74,12 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
+    Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
     Local<Function> onTimeout = Local<Function>::Cast(args[0]);
     Timer* t = ObjectWrap::Unwrap<Timer>(args.Holder());
     t->onTimeout.Reset(isolate, onTimeout);
     int timeout = args[1]->Int32Value(context).ToChecked();
-    int r = uv_timer_init(uv_default_loop(), t->handle);
+    int r = uv_timer_init(env->loop, t->handle);
     r = uv_timer_start(t->handle, OnTimeout, timeout, 0);
     if (args.Length() > 2) {
         uv_timer_set_repeat(t->handle, args[2]->Int32Value(context).ToChecked());

@@ -159,7 +159,6 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   const char *module_name = *str;
   char lib_name[128];
   snprintf(lib_name, 128, "/usr/local/lib/%s.so", module_name);
-  fprintf(stderr, "loading module: %s\n", lib_name);
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   Local<Object> exports;

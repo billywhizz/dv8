@@ -4,7 +4,7 @@ A very crappy repl so you can inspect some of the builtins
 const tty = module('tty', {})
 const { TTY } = tty
 const b = new Buffer()
-b.alloc(64 * 1024)
+const ab = new Uint8Array(b.alloc(64 * 1024))
 stdin = new TTY(0, len => {
     const text = b.read(0, len)
     const res = `${JSON.stringify(eval(text), null, '  ')}\n`

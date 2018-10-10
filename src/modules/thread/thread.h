@@ -10,6 +10,7 @@ typedef struct {
 	void* data;
 	void* object;
 	size_t length;
+	const char* fname;
 } thread_handle;
 
 	class Thread : public dv8::ObjectWrap {

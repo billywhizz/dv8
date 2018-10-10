@@ -2,7 +2,7 @@ const { start, stop } = require('./meter.js')
 const tty = module('tty', {})
 const { TTY } = tty
 const b = new Buffer()
-b.alloc(64 * 1024)
+const bytes = new Uint8Array(b.alloc(64 * 1024))
 const stdin = new TTY(0, len => {
     stdin.bytes += len
     const r = stdout.write(len)

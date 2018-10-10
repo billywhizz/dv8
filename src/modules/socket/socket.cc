@@ -17,6 +17,7 @@ namespace socket {
   using v8::Value;
   using v8::Array;
   using dv8::builtins::Buffer;
+  using dv8::builtins::Environment;
 
   Persistent<Function> Socket::constructor;
   static int contextid = 0; // incrementing counter for context ids
@@ -179,14 +180,17 @@ namespace socket {
     uv_stream_t* stream;
     cb foo = (cb)baton->callback;
     Socket* s = (Socket*)baton->object;
+    Isolate * isolate = Isolate::GetCurrent();
+    Local<Context> context = isolate->GetCurrentContext();
+    Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
     if(s->socktype == TCP) {
       stream = (uv_stream_t*)malloc(sizeof(uv_tcp_t));
-      status = uv_tcp_init(uv_default_loop(), (uv_tcp_t*)stream);
+      status = uv_tcp_init(env->loop, (uv_tcp_t*)stream);
       status = uv_tcp_simultaneous_accepts((uv_tcp_t*) stream, 1);
     }
     else {
       stream = (uv_stream_t*)malloc(sizeof(uv_pipe_t));
-      status = uv_pipe_init(uv_default_loop(), (uv_pipe_t*)stream, 0);
+      status = uv_pipe_init(env->loop, (uv_pipe_t*)stream, 0);
     }
     status = uv_accept(server, stream);
     _context* ctx = context_init(stream, s, 0);
@@ -470,6 +474,7 @@ namespace socket {
     Isolate* isolate = args.GetIsolate();
     Socket* s = ObjectWrap::Unwrap<Socket>(args.Holder());
     Local<Context> context = isolate->GetCurrentContext();
+    Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
     if (s->socktype == TCP) {
       String::Utf8Value str(args.GetIsolate(), args[0]);
       const char* ip_address = *str;
@@ -482,7 +487,7 @@ namespace socket {
       baton->callback = (void*)onNewConnection;
       baton->object = s;
       sock->data = baton;
-      r = uv_tcp_init(uv_default_loop(), sock);
+      r = uv_tcp_init(env->loop, sock);
       if (r) {
         args.GetReturnValue().Set(Integer::New(isolate, r));
         return;
@@ -507,7 +512,7 @@ namespace socket {
       baton->callback = (void*)onNewConnection;
       baton->object = s;
       sock->data = baton;
-      int r = uv_pipe_init(uv_default_loop(), sock, 0);
+      int r = uv_pipe_init(env->loop, sock, 0);
       if (r) {
         args.GetReturnValue().Set(Integer::New(isolate, r));
         return;
@@ -576,6 +581,7 @@ namespace socket {
     Socket* s = ObjectWrap::Unwrap<Socket>(args.Holder());
     if(args[0]->IsNumber()) { // we have been passed a socket handle that has already been bound
       Local<Context> context = isolate->GetCurrentContext();
+      Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
       int fd = args[0]->Int32Value(context).ToChecked();
       if(s->socktype == TCP) {
         uv_tcp_t* sock = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
@@ -584,7 +590,7 @@ namespace socket {
         baton->callback = (void*)onNewConnection;
         baton->object = sock->data;
         sock->data = baton;
-        int status = uv_tcp_init(uv_default_loop(), sock);
+        int status = uv_tcp_init(env->loop, sock);
         if (status) {
           args.GetReturnValue().Set(Integer::New(isolate, status));
           return;
@@ -607,7 +613,7 @@ namespace socket {
         baton->callback = (void*)onNewConnection;
         baton->object = sock->data;
         sock->data = baton;
-        int status = uv_pipe_init(uv_default_loop(), sock, 0);
+        int status = uv_pipe_init(env->loop, sock, 0);
         if (status) {
           args.GetReturnValue().Set(Integer::New(isolate, status));
           return;
@@ -629,6 +635,7 @@ namespace socket {
     }
     else if(s->socktype == TCP) { // we are getting a port so must be TCP
       Local<Context> context = isolate->GetCurrentContext();
+      Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
       uv_tcp_t* sock = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
       sock->data = s;
       String::Utf8Value str(args.GetIsolate(), args[0]);
@@ -640,11 +647,9 @@ namespace socket {
       baton->callback = (void*)onNewConnection;
       baton->object = sock->data;
       sock->data = baton;
-      //int more = uv_loop_alive(uv_default_loop());
-      //fprintf(stderr, "more: %i\n", more);
       uv_thread_t t = uv_thread_self();
       fprintf(stderr, "thread: %lu\n", t);
-      int status = uv_tcp_init_ex(uv_default_loop(), sock, AF_INET);
+      int status = uv_tcp_init_ex(env->loop, sock, AF_INET);
       if (status) {
         args.GetReturnValue().Set(Integer::New(isolate, status));
         return;
@@ -666,6 +671,8 @@ namespace socket {
       s->_stream = (uv_stream_t*)sock;
     }
     else if(s->socktype == UNIX) { // use first argument as path to domain socket
+      Local<Context> context = isolate->GetCurrentContext();
+      Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
       String::Utf8Value str(args.GetIsolate(), args[0]);
       const char* path = *str;
       uv_pipe_t* sock = (uv_pipe_t*)malloc(sizeof(uv_pipe_t));
@@ -674,7 +681,7 @@ namespace socket {
       baton->callback = (void*)onNewConnection;
       baton->object = sock->data;
       sock->data = baton;
-      int status = uv_pipe_init(uv_default_loop(), sock, 0);
+      int status = uv_pipe_init(env->loop, sock, 0);
       if (status) {
         args.GetReturnValue().Set(Integer::New(isolate, status));
         return;
@@ -703,6 +710,7 @@ namespace socket {
     Socket* s = ObjectWrap::Unwrap<Socket>(args.Holder());
     if(s->socktype == TCP) {
       Local<Context> context = isolate->GetCurrentContext();
+      Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
       const unsigned int port = args[1]->IntegerValue(context).ToChecked();
       uv_tcp_t* sock = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
       sock->data = s;
@@ -714,7 +722,7 @@ namespace socket {
       baton->callback = (void*)onNewConnection;
       baton->object = sock->data;
       sock->data = baton;
-      int status = uv_tcp_init_ex(uv_default_loop(), sock, AF_INET);
+      int status = uv_tcp_init_ex(env->loop, sock, AF_INET);
       if (status) {
         args.GetReturnValue().Set(Integer::New(isolate, status));
         return;
@@ -730,6 +738,8 @@ namespace socket {
       }
     }
     else if(s->socktype == UNIX) { // it is a domain socket
+      Local<Context> context = isolate->GetCurrentContext();
+      Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
       String::Utf8Value str(args.GetIsolate(), args[0]);
       const char* path = *str;
       uv_pipe_t* sock = (uv_pipe_t*)malloc(sizeof(uv_pipe_t));
@@ -738,7 +748,7 @@ namespace socket {
       baton->callback = (void*)onNewConnection;
       baton->object = sock->data;
       sock->data = baton;
-      int status = uv_pipe_init(uv_default_loop(), sock, 0);
+      int status = uv_pipe_init(env->loop, sock, 0);
       if (status) {
         args.GetReturnValue().Set(Integer::New(isolate, status));
         return;

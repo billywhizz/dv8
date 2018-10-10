@@ -16,6 +16,7 @@ namespace os {
   using v8::String;
   using v8::Value;
   using v8::Array;
+  using dv8::builtins::Environment;
 
   Persistent<Function> OS::constructor;
 
@@ -60,6 +61,8 @@ namespace os {
   void OS::OnSignal(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
     OS* os = ObjectWrap::Unwrap<OS>(args.Holder());
     if(args.Length() > 0) {
       if(args[0]->IsFunction()) {
@@ -67,7 +70,7 @@ namespace os {
           os->_onSignal.Reset(isolate, onSignal);
           uv_signal_t* signalHandle = new uv_signal_t;
           signalHandle->data = os;
-          int r = uv_signal_init(uv_default_loop(), signalHandle);
+          int r = uv_signal_init(env->loop, signalHandle);
           int sigmask = 15;
           if (args.Length() > 1) {
             Local<Context> context = isolate->GetCurrentContext();
@@ -82,10 +85,16 @@ namespace os {
   void OS::on_signal(uv_signal_t* handle, int signum) {
     Isolate * isolate = Isolate::GetCurrent();
     v8::HandleScope handleScope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
     OS* os = (OS*)handle->data;
     Local<Value> argv[1] = { Number::New(isolate, signum) };
     Local<Function> Callback = Local<Function>::New(isolate, os->_onSignal);
-    Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    Local<Value> ret = Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    uint32_t close = ret->Uint32Value(context).ToChecked();
+    if (close == 1) {
+      uv_signal_stop(handle);
+      fprintf(stderr, "singal watcher stopped: %i\n", signum);
+    }
   }
 
 }

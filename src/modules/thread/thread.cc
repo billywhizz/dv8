@@ -20,6 +20,7 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 using v8::ArrayBufferCreationMode;
+using dv8::builtins::Environment;
 
 Persistent<Function> Thread::constructor;
 
@@ -46,14 +47,18 @@ void start_context(uv_work_t *req)
 			fprintf(stderr, "Error creating context\n");
 			return;
 		}
-		const char *str = "./foo.js";
+		dv8::builtins::Environment* env = new dv8::builtins::Environment();
+		uv_loop_t* loop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
+		env->loop = loop;
+		uv_loop_init(loop);
+		env->AssignToContext(context);
 		v8::Context::Scope context_scope(context);
 		v8::Local<v8::Object> globalInstance = context->Global();
 		dv8::builtins::Buffer::Init(globalInstance);
 		globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
 		globalInstance->Set(String::NewFromUtf8(isolate, "workerData", v8::NewStringType::kNormal).ToLocalChecked(), ArrayBuffer::New(isolate, th->data, th->length, ArrayBufferCreationMode::kExternalized));
 		v8::TryCatch try_catch(isolate);
-		v8::MaybeLocal<v8::String> source = dv8::ReadFile(isolate, str);
+		v8::MaybeLocal<v8::String> source = dv8::ReadFile(isolate, th->fname);
 		if (try_catch.HasCaught())
 		{
 			dv8::DecorateErrorStack(isolate, try_catch);
@@ -72,20 +77,6 @@ void start_context(uv_work_t *req)
 			return;
 		}
 		int alive;
-/*
-		do
-		{
-			uv_run(uv_default_loop(), UV_RUN_DEFAULT);
-			alive = uv_loop_alive(uv_default_loop());
-			if (alive != 0)
-			{
-				continue;
-			}
-			alive = uv_loop_alive(uv_default_loop());
-		} while (alive != 0);
-*/
-		uv_loop_t* loop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
-		uv_loop_init(loop);
 		do
 		{
 			uv_run(loop, UV_RUN_DEFAULT);
@@ -169,10 +160,13 @@ void Thread::NewInstance(const FunctionCallbackInfo<Value> &args)
 void Thread::Start(const FunctionCallbackInfo<Value> &args)
 {
 	Isolate *isolate = args.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
 	v8::HandleScope handleScope(isolate);
 	Thread *obj = ObjectWrap::Unwrap<Thread>(args.Holder());
-	Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
+	String::Utf8Value str(args.GetIsolate(), args[0]);
 	Local<Function> onComplete = Local<Function>::Cast(args[1]);
+	Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
 	obj->onComplete.Reset(isolate, onComplete);
 	size_t len = b->_length;
 	obj->handle = (uv_work_t *)malloc(sizeof(uv_work_t));
@@ -180,8 +174,12 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	th->data = b->_data;
 	th->length = b->_length;
 	th->object = (void *)obj;
+	const char* fname = *str;
+	char* lib_name = (char*)calloc(128, 1);
+	snprintf(lib_name, 128, "%s", *str);
+	th->fname = lib_name;
 	obj->handle->data = (void *)th;
-	uv_queue_work(uv_default_loop(), obj->handle, start_context, on_context_complete);
+	uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
 	args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 

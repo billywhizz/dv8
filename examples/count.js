@@ -8,7 +8,7 @@ const { TTY } = module('tty', {})
 // create a new buffer
 const b = new Buffer()
 // allocate 64k outside the v8 heap
-b.alloc(64 * 1024)
+const bytes = new Uint8Array(b.alloc(64 * 1024))
 // open stdin, with event handlers for onRead, onEnd, onClose 
 const stdin = new TTY(0, len => stdin.bytes += len, () => {
     // close stdin TTY

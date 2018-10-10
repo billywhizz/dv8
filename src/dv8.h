@@ -8,6 +8,7 @@
 #include <uv.h>
 #include <common.h>
 #include <buffer.h>
+#include <env.h>
 
 namespace dv8 {
 
