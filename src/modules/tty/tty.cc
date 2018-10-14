@@ -6,6 +6,9 @@ namespace dv8
 
 namespace tty
 {
+using dv8::write_req_t;
+using dv8::builtins::Buffer;
+using dv8::builtins::Environment;
 using v8::Array;
 using v8::Context;
 using v8::Function;
@@ -19,9 +22,6 @@ using v8::Object;
 using v8::Persistent;
 using v8::String;
 using v8::Value;
-using dv8::write_req_t;
-using dv8::builtins::Buffer;
-using dv8::builtins::Environment;
 
 Persistent<Function> TTY::constructor;
 
@@ -49,63 +49,73 @@ void TTY::Init(Local<Object> exports)
     DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 2), "UV_TTY_MODE_IO", exports);
 }
 
-void TTY::Error(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate = args.GetIsolate();
+void TTY::Error(const FunctionCallbackInfo<Value> &args)
+{
+    Isolate *isolate = args.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     int r = args[1]->IntegerValue(context).ToChecked();
-    const char* error = uv_strerror(r);
+    const char *error = uv_strerror(r);
     args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), error, NewStringType::kNormal).ToLocalChecked());
 }
 
-void TTY::Setup(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate = args.GetIsolate();
+void TTY::Setup(const FunctionCallbackInfo<Value> &args)
+{
+    Isolate *isolate = args.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
+    TTY *t = ObjectWrap::Unwrap<TTY>(args.Holder());
     v8::HandleScope handleScope(isolate);
-    Buffer* b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
+    Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
     t->in = b->_data;
     int argc = args.Length();
-    if (argc > 1) {
+    if (argc > 1)
+    {
         uint32_t mode = args[1]->Uint32Value(context).ToChecked();
         uv_tty_set_mode(t->handle, mode);
     }
 }
 
-void TTY::OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf)
+void TTY::OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
-    Isolate * isolate = Isolate::GetCurrent();
+    Isolate *isolate = Isolate::GetCurrent();
     v8::HandleScope handleScope(isolate);
-    TTY* t = (TTY*)handle->data;
+    TTY *t = (TTY *)handle->data;
     v8::TryCatch try_catch(isolate);
     Local<Function> Callback;
-    if (nread > 0) {
-        Local<Value> argv[1] = { Number::New(isolate, nread) };
+    if (nread > 0)
+    {
+        Local<Value> argv[1] = {Number::New(isolate, nread)};
         Local<Function> Callback = Local<Function>::New(isolate, t->_onRead);
         Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
         t->stats.in.read += (uint64_t)nread;
         t->stats.in.data++;
-    } else if (nread == UV_EOF) {
-        Local<Value> argv[] = { };
+    }
+    else if (nread == UV_EOF)
+    {
+        Local<Value> argv[] = {};
         Local<Function> Callback = Local<Function>::New(isolate, t->_onEnd);
         Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         t->stats.in.end++;
         //uv_close((uv_handle_t*)handle, OnClose);
-    } else if (nread < 0) {
+    }
+    else if (nread < 0)
+    {
         //TODO: change to onerror? same as socket?
-        Local<Value> argv[2] = { Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString) };
+        Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
         Local<Function> Callback = Local<Function>::New(isolate, t->_onEnd);
         Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
         t->stats.in.end++;
         t->stats.error++;
         //uv_close((uv_handle_t*)handle, OnClose);
     }
-    if (try_catch.HasCaught()) {
+    if (try_catch.HasCaught())
+    {
         DecorateErrorStack(isolate, try_catch);
     }
 }
 
-static void alloc_chunk(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
-    TTY* t = (TTY*)handle->data;
+static void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf)
+{
+    TTY *t = (TTY *)handle->data;
     buf->base = t->in;
     buf->len = size;
 }
@@ -117,17 +127,18 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
     if (args.IsConstructCall())
     {
         Local<Context> context = isolate->GetCurrentContext();
-        Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+        Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
 
         TTY *obj = new TTY();
-        obj->handle = (uv_tty_t*)calloc(1, sizeof(uv_tty_t));
+        obj->handle = (uv_tty_t *)calloc(1, sizeof(uv_tty_t));
         obj->handle->data = obj;
         obj->closing = false;
         int len = args.Length();
         obj->paused = true;
         obj->blocked = false;
         unsigned int fd = 0; // stdin
-        if(len > 0) {
+        if (len > 0)
+        {
             fd = args[0]->Uint32Value(context).ToChecked();
         }
         obj->stats.close = 0;
@@ -145,42 +156,57 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
         obj->stats.out.alloc = 0;
         obj->stats.out.free = 0;
         obj->stats.out.eagain = 0;
-        if (fd == 0) {
+        if (fd == 0)
+        {
             uv_tty_init(env->loop, obj->handle, fd, 1);
-            if (len > 1) {
-                if(args[1]->IsFunction()) {
+            if (len > 1)
+            {
+                if (args[1]->IsFunction())
+                {
                     Local<Function> onRead = Local<Function>::Cast(args[1]);
                     obj->_onRead.Reset(isolate, onRead);
                 }
             }
-            if (len > 2) {
-                if(args[2]->IsFunction()) {
+            if (len > 2)
+            {
+                if (args[2]->IsFunction())
+                {
                     Local<Function> onEnd = Local<Function>::Cast(args[2]);
                     obj->_onEnd.Reset(isolate, onEnd);
                 }
             }
-            if (len > 3) {
-                if(args[3]->IsFunction()) {
+            if (len > 3)
+            {
+                if (args[3]->IsFunction())
+                {
                     Local<Function> onClose = Local<Function>::Cast(args[3]);
                     obj->_onClose.Reset(isolate, onClose);
                 }
             }
-        } else {
+        }
+        else
+        {
             uv_tty_init(env->loop, obj->handle, fd, 0);
-            if (len > 1) {
-                if(args[1]->IsFunction()) {
+            if (len > 1)
+            {
+                if (args[1]->IsFunction())
+                {
                     Local<Function> onClose = Local<Function>::Cast(args[1]);
                     obj->_onClose.Reset(isolate, onClose);
                 }
             }
-            if (len > 2) {
-                if(args[2]->IsFunction()) {
+            if (len > 2)
+            {
+                if (args[2]->IsFunction())
+                {
                     Local<Function> onDrain = Local<Function>::Cast(args[2]);
                     obj->_onDrain.Reset(isolate, onDrain);
                 }
             }
-            if (len > 3) {
-                if(args[3]->IsFunction()) {
+            if (len > 3)
+            {
+                if (args[3]->IsFunction())
+                {
                     Local<Function> onError = Local<Function>::Cast(args[3]);
                     obj->_onError.Reset(isolate, onError);
                 }
@@ -212,37 +238,43 @@ void TTY::NewInstance(const FunctionCallbackInfo<Value> &args)
     args.GetReturnValue().Set(instance);
 }
 
-void TTY::OnWrite(uv_write_t* req, int status) {
-    Isolate * isolate = Isolate::GetCurrent();
+void TTY::OnWrite(uv_write_t *req, int status)
+{
+    Isolate *isolate = Isolate::GetCurrent();
     v8::HandleScope handleScope(isolate);
-    write_req_t* wr = (write_req_t*) req;
-    TTY* t = (TTY*)wr->req.data;
-    if (status < 0) {
+    write_req_t *wr = (write_req_t *)req;
+    TTY *t = (TTY *)wr->req.data;
+    if (status < 0)
+    {
         t->stats.error++;
         free(wr->buf.base);
         free(wr);
         t->stats.out.free++;
-        Local<Value> argv[1] = { Number::New(isolate, status) };
+        Local<Value> argv[1] = {Number::New(isolate, status)};
         Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
         Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         return;
     }
-    uv_stream_t* s = (uv_stream_t*)req->handle;
+    uv_stream_t *s = (uv_stream_t *)req->handle;
     size_t queueSize = s->write_queue_size;
-    if (queueSize > t->stats.out.maxQueue) {
+    if (queueSize > t->stats.out.maxQueue)
+    {
         t->stats.out.maxQueue = queueSize;
     }
-    if (queueSize == 0) {
+    if (queueSize == 0)
+    {
         // emit a drain event
-        if (t->blocked) {
-            Local<Value> argv[0] = { };
+        if (t->blocked)
+        {
+            Local<Value> argv[0] = {};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
             t->stats.out.drain++;
             Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
             t->blocked = false;
         }
-        if (t->closing) {
-            uv_close((uv_handle_t*)t->handle, OnClose);
+        if (t->closing)
+        {
+            uv_close((uv_handle_t *)t->handle, OnClose);
             t->closing = false;
         }
     }
@@ -256,61 +288,73 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
+    TTY *t = ObjectWrap::Unwrap<TTY>(args.Holder());
     Local<Context> context = isolate->GetCurrentContext();
     uint32_t length = args[0]->Uint32Value(context).ToChecked();
     uv_buf_t buf;
     buf.base = t->in;
     buf.len = length;
-    int r = uv_try_write((uv_stream_t*)t->handle, &buf, 1);
-    if (r == UV_EAGAIN || r == UV_ENOSYS) {
+    int r = uv_try_write((uv_stream_t *)t->handle, &buf, 1);
+    if (r == UV_EAGAIN || r == UV_ENOSYS)
+    {
         // no data could be sent, queue the async write
         write_req_t *wr;
         wr = (write_req_t *)malloc(sizeof *wr);
         wr->req.data = t;
-        char* wrb = (char*)calloc(length, 1);
+        char *wrb = (char *)calloc(length, 1);
         memcpy(wrb, t->in, length);
         t->stats.out.alloc++;
         t->stats.out.eagain++;
         wr->buf = uv_buf_init(wrb, length);
-        r = uv_write(&wr->req, (uv_stream_t*)t->handle, &wr->buf, 1, OnWrite);
+        r = uv_write(&wr->req, (uv_stream_t *)t->handle, &wr->buf, 1, OnWrite);
         t->blocked = true;
-    } else if (r < 0) {
+    }
+    else if (r < 0)
+    {
         t->stats.error++;
-    } else if ((uint32_t)r < length) {
+    }
+    else if ((uint32_t)r < length)
+    {
         t->stats.out.incomplete++;
         t->stats.out.written += r;
         write_req_t *wr;
         wr = (write_req_t *)malloc(sizeof *wr);
         wr->req.data = t;
-        char* wrb = (char*)calloc(length - r, 1);
-        char* base = t->in + r;
+        char *wrb = (char *)calloc(length - r, 1);
+        char *base = t->in + r;
         memcpy(wrb, base, length - r);
         t->stats.out.alloc++;
         wr->buf = uv_buf_init(wrb, length - r);
-        int status = uv_write(&wr->req, (uv_stream_t*)t->handle, &wr->buf, 1, OnWrite);
-        if (status != 0) {
+        int status = uv_write(&wr->req, (uv_stream_t *)t->handle, &wr->buf, 1, OnWrite);
+        if (status != 0)
+        {
             r = status;
         }
         t->blocked = true;
-    } else {
+    }
+    else
+    {
         t->stats.out.full++;
         t->stats.out.written += (uint64_t)r;
     }
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
-void TTY::OnClose(uv_handle_t* handle) {
-    Isolate * isolate = Isolate::GetCurrent();
+void TTY::OnClose(uv_handle_t *handle)
+{
+    Isolate *isolate = Isolate::GetCurrent();
     v8::HandleScope handleScope(isolate);
-    TTY* t = (TTY*)handle->data;
-    if (t->fd == 0) {
+    TTY *t = (TTY *)handle->data;
+    if (t->fd == 0)
+    {
         t->stats.close++;
-    } else {
+    }
+    else
+    {
         t->stats.close++;
     }
     free(handle);
-    Local<Value> argv[0] = { };
+    Local<Value> argv[0] = {};
     Local<Function> Callback = Local<Function>::New(isolate, t->_onClose);
     Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
 }
@@ -319,13 +363,16 @@ void TTY::Close(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
-    uv_stream_t* s = (uv_stream_t*)t->handle;
+    TTY *t = ObjectWrap::Unwrap<TTY>(args.Holder());
+    uv_stream_t *s = (uv_stream_t *)t->handle;
     size_t queueSize = s->write_queue_size;
-    if (queueSize > 0) {
+    if (queueSize > 0)
+    {
         t->closing = true;
-    } else {
-        uv_close((uv_handle_t*)t->handle, OnClose);
+    }
+    else
+    {
+        uv_close((uv_handle_t *)t->handle, OnClose);
     }
 }
 
@@ -333,9 +380,9 @@ void TTY::Pause(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
+    TTY *t = ObjectWrap::Unwrap<TTY>(args.Holder());
     t->stats.in.pause++;
-    int r = uv_read_stop((uv_stream_t*)t->handle);
+    int r = uv_read_stop((uv_stream_t *)t->handle);
     t->paused = true;
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
@@ -344,10 +391,11 @@ void TTY::Resume(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
-    if (t->paused) {
+    TTY *t = ObjectWrap::Unwrap<TTY>(args.Holder());
+    if (t->paused)
+    {
         t->stats.in.resume++;
-        int r = uv_read_start((uv_stream_t*)t->handle, alloc_chunk, OnRead);
+        int r = uv_read_start((uv_stream_t *)t->handle, alloc_chunk, OnRead);
         t->paused = false;
         args.GetReturnValue().Set(Integer::New(isolate, r));
         return;
@@ -359,22 +407,24 @@ void TTY::QueueSize(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
-    uv_stream_t* s = (uv_stream_t*)t->handle;
+    TTY *t = ObjectWrap::Unwrap<TTY>(args.Holder());
+    uv_stream_t *s = (uv_stream_t *)t->handle;
     size_t queueSize = s->write_queue_size;
-    if (queueSize > t->stats.out.maxQueue) {
+    if (queueSize > t->stats.out.maxQueue)
+    {
         t->stats.out.maxQueue = queueSize;
     }
     args.GetReturnValue().Set(Integer::New(isolate, queueSize));
 }
 
-void TTY::Stats(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate = args.GetIsolate();
+void TTY::Stats(const FunctionCallbackInfo<Value> &args)
+{
+    Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
+    TTY *t = ObjectWrap::Unwrap<TTY>(args.Holder());
     Local<v8::BigUint64Array> array = args[0].As<v8::BigUint64Array>();
     Local<ArrayBuffer> ab = array->Buffer();
-    uint64_t* fields = static_cast<uint64_t*>(ab->GetContents().Data());
+    uint64_t *fields = static_cast<uint64_t *>(ab->GetContents().Data());
     fields[0] = t->stats.close;
     fields[1] = t->stats.error;
     fields[2] = t->stats.in.read;
@@ -397,5 +447,5 @@ void TTY::Stats(const FunctionCallbackInfo<Value>& args) {
     fields[19] = 0;
 }
 
-} // namespace builtins
+} // namespace tty
 } // namespace dv8

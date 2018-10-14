@@ -3,14 +3,18 @@
 
 #include <dv8.h>
 
-namespace dv8 {
+namespace dv8
+{
 
-namespace tty {
+namespace tty
+{
 
-typedef struct {
+typedef struct
+{
   uint32_t close;
   uint32_t error;
-  struct {
+  struct
+  {
     uint64_t written;
     uint32_t incomplete;
     uint32_t full;
@@ -20,7 +24,8 @@ typedef struct {
     uint32_t free;
     uint32_t eagain;
   } out;
-  struct {
+  struct
+  {
     uint64_t read;
     uint32_t pause;
     uint32_t end;
@@ -29,12 +34,13 @@ typedef struct {
   } in;
 } tty_stats;
 
-class TTY : public dv8::ObjectWrap {
- public:
+class TTY : public dv8::ObjectWrap
+{
+public:
   static void Init(v8::Local<v8::Object> exports);
-  static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
-  uv_tty_t* handle;
-  char* in;
+  static void NewInstance(const v8::FunctionCallbackInfo<v8::Value> &args);
+  uv_tty_t *handle;
+  char *in;
   v8::Persistent<v8::Function> _onRead;
   v8::Persistent<v8::Function> _onEnd;
   v8::Persistent<v8::Function> _onDrain;
@@ -46,32 +52,32 @@ class TTY : public dv8::ObjectWrap {
   bool closing;
   bool blocked;
 
- private:
-
-  TTY() {
+private:
+  TTY()
+  {
   }
 
-  ~TTY() {
+  ~TTY()
+  {
   }
 
-  static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void New(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Write(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Close(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Setup(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Pause(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Resume(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void QueueSize(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Error(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-  static void OnClose(uv_handle_t* handle);
-  static void OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf);
-  static void OnWrite(uv_write_t* req, int status);
+  static void OnClose(uv_handle_t *handle);
+  static void OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
+  static void OnWrite(uv_write_t *req, int status);
 
   static v8::Persistent<v8::Function> constructor;
-
 };
 
-}
-}
+} // namespace tty
+} // namespace dv8
 #endif

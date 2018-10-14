@@ -6,7 +6,9 @@ namespace dv8
 namespace thread
 {
 using dv8::builtins::Buffer;
+using dv8::builtins::Environment;
 using v8::Array;
+using v8::ArrayBufferCreationMode;
 using v8::Context;
 using v8::Function;
 using v8::FunctionCallbackInfo;
@@ -19,8 +21,6 @@ using v8::Object;
 using v8::Persistent;
 using v8::String;
 using v8::Value;
-using v8::ArrayBufferCreationMode;
-using dv8::builtins::Environment;
 
 Persistent<Function> Thread::constructor;
 
@@ -50,8 +50,8 @@ void start_context(uv_work_t *req)
 			fprintf(stderr, "Error creating context\n");
 			return;
 		}
-		dv8::builtins::Environment* env = new dv8::builtins::Environment();
-		uv_loop_t* loop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
+		dv8::builtins::Environment *env = new dv8::builtins::Environment();
+		uv_loop_t *loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 		env->loop = loop;
 		uv_loop_init(loop);
 		env->AssignToContext(context);
@@ -60,7 +60,8 @@ void start_context(uv_work_t *req)
 		dv8::builtins::Buffer::Init(globalInstance);
 
 		globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
-		if (th->length > 0) {
+		if (th->length > 0)
+		{
 			globalInstance->Set(String::NewFromUtf8(isolate, "workerData", v8::NewStringType::kNormal).ToLocalChecked(), ArrayBuffer::New(isolate, th->data, th->length, ArrayBufferCreationMode::kExternalized));
 		}
 		v8::TryCatch try_catch(isolate);
@@ -93,18 +94,21 @@ void start_context(uv_work_t *req)
 			}
 			alive = uv_loop_alive(loop);
 		} while (alive != 0);
-		if (!env->onExit.IsEmpty()) {
+		if (!env->onExit.IsEmpty())
+		{
 			const unsigned int argc = 0;
-			v8::Local<v8::Value> argv[argc] = { };
+			v8::Local<v8::Value> argv[argc] = {};
 			v8::Local<v8::Function> onExit = v8::Local<v8::Function>::New(isolate, env->onExit);
 			v8::TryCatch try_catch(isolate);
 			onExit->Call(globalInstance, 0, argv);
-			if (try_catch.HasCaught()) {
+			if (try_catch.HasCaught())
+			{
 				dv8::DecorateErrorStack(isolate, try_catch);
 			}
 		}
 		int r = uv_loop_close(loop);
-		if (r != 0) {
+		if (r != 0)
+		{
 			fprintf(stderr, "uv_thread_loop_close: %i\n", r);
 		}
 	}
@@ -177,8 +181,8 @@ void Thread::NewInstance(const FunctionCallbackInfo<Value> &args)
 void Thread::Stop(const FunctionCallbackInfo<Value> &args)
 {
 	Isolate *isolate = args.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+	Local<Context> context = isolate->GetCurrentContext();
+	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
 	v8::HandleScope handleScope(isolate);
 	//TODO: need to signal the thread. then it should invoke an onExit event and shutdown event loop when it returns
 	// i.e. same behaviour as when thread gets SIGTERM
@@ -187,8 +191,8 @@ void Thread::Stop(const FunctionCallbackInfo<Value> &args)
 void Thread::Start(const FunctionCallbackInfo<Value> &args)
 {
 	Isolate *isolate = args.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+	Local<Context> context = isolate->GetCurrentContext();
+	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
 	v8::HandleScope handleScope(isolate);
 
 	int argc = args.Length();
@@ -198,17 +202,20 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	obj->onComplete.Reset(isolate, onComplete);
 	obj->handle = (uv_work_t *)malloc(sizeof(uv_work_t));
 	thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
-	if (argc > 2) {
+	if (argc > 2)
+	{
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
 		size_t len = b->_length;
 		th->data = b->_data;
 		th->length = b->_length;
-	} else {
+	}
+	else
+	{
 		th->length = 0;
 	}
 	th->object = (void *)obj;
-	const char* fname = *str;
-	char* lib_name = (char*)calloc(128, 1);
+	const char *fname = *str;
+	char *lib_name = (char *)calloc(128, 1);
 	snprintf(lib_name, 128, "%s", *str);
 	th->fname = lib_name;
 	obj->handle->data = (void *)th;
