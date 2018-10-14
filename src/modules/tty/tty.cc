@@ -33,7 +33,6 @@ void TTY::Init(Local<Object> exports)
     tpl->SetClassName(String::NewFromUtf8(isolate, "TTY"));
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "writeString", TTY::WriteString);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", TTY::Write);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", TTY::Close);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", TTY::Setup);
@@ -41,6 +40,7 @@ void TTY::Init(Local<Object> exports)
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "resume", TTY::Resume);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "queueSize", TTY::QueueSize);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", TTY::Stats);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "error", TTY::Error);
 
     constructor.Reset(isolate, tpl->GetFunction());
     DV8_SET_EXPORT(isolate, tpl, "TTY", exports);
@@ -49,16 +49,26 @@ void TTY::Init(Local<Object> exports)
     DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 2), "UV_TTY_MODE_IO", exports);
 }
 
+void TTY::Error(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    int r = args[1]->IntegerValue(context).ToChecked();
+    const char* error = uv_strerror(r);
+    args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), error, NewStringType::kNormal).ToLocalChecked());
+}
+
 void TTY::Setup(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
     v8::HandleScope handleScope(isolate);
     Buffer* b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
-    size_t len = b->_length;
-    t->in = uv_buf_init((char*)b->_data, len);
-    uint32_t mode = args[1]->Uint32Value(context).ToChecked();
-    uv_tty_set_mode(t->handle, mode);
+    t->in = b->_data;
+    int argc = args.Length();
+    if (argc > 1) {
+        uint32_t mode = args[1]->Uint32Value(context).ToChecked();
+        uv_tty_set_mode(t->handle, mode);
+    }
 }
 
 void TTY::OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf)
@@ -79,12 +89,15 @@ void TTY::OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf)
         Local<Function> Callback = Local<Function>::New(isolate, t->_onEnd);
         Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         t->stats.in.end++;
+        //uv_close((uv_handle_t*)handle, OnClose);
     } else if (nread < 0) {
-        Local<Value> argv[1] = { Number::New(isolate, nread) };
+        //TODO: change to onerror? same as socket?
+        Local<Value> argv[2] = { Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString) };
         Local<Function> Callback = Local<Function>::New(isolate, t->_onEnd);
-        Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+        Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
         t->stats.in.end++;
-        t->stats.in.error++;
+        t->stats.error++;
+        //uv_close((uv_handle_t*)handle, OnClose);
     }
     if (try_catch.HasCaught()) {
         DecorateErrorStack(isolate, try_catch);
@@ -93,11 +106,7 @@ void TTY::OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf)
 
 static void alloc_chunk(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
     TTY* t = (TTY*)handle->data;
-    buf->base = t->in.base;
-    if (size > t->in.len) {
-        buf->len = t->in.len;
-        return;
-    }
+    buf->base = t->in;
     buf->len = size;
 }
 
@@ -116,18 +125,27 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
         obj->closing = false;
         int len = args.Length();
         obj->paused = true;
+        obj->blocked = false;
         unsigned int fd = 0; // stdin
         if(len > 0) {
             fd = args[0]->Uint32Value(context).ToChecked();
         }
+        obj->stats.close = 0;
+        obj->stats.error = 0;
+        obj->stats.in.read = 0;
+        obj->stats.in.pause = 0;
+        obj->stats.in.data = 0;
+        obj->stats.in.resume = 0;
+        obj->stats.in.end = 0;
+        obj->stats.out.written = 0;
+        obj->stats.out.incomplete = 0;
+        obj->stats.out.full = 0;
+        obj->stats.out.drain = 0;
+        obj->stats.out.maxQueue = 0;
+        obj->stats.out.alloc = 0;
+        obj->stats.out.free = 0;
+        obj->stats.out.eagain = 0;
         if (fd == 0) {
-            obj->stats.in.read = 0;
-            obj->stats.in.error = 0;
-            obj->stats.in.pause = 0;
-            obj->stats.in.close = 0;
-            obj->stats.in.data = 0;
-            obj->stats.in.resume = 0;
-            obj->stats.in.end = 0;
             uv_tty_init(env->loop, obj->handle, fd, 1);
             if (len > 1) {
                 if(args[1]->IsFunction()) {
@@ -148,16 +166,6 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
                 }
             }
         } else {
-            obj->stats.out.written = 0;
-            obj->stats.out.incomplete = 0;
-            obj->stats.out.full = 0;
-            obj->stats.out.error = 0;
-            obj->stats.out.drain = 0;
-            obj->stats.out.close = 0;
-            obj->stats.out.maxQueue = 0;
-            obj->stats.out.alloc = 0;
-            obj->stats.out.free = 0;
-            obj->stats.out.eagain = 0;
             uv_tty_init(env->loop, obj->handle, fd, 0);
             if (len > 1) {
                 if(args[1]->IsFunction()) {
@@ -204,26 +212,13 @@ void TTY::NewInstance(const FunctionCallbackInfo<Value> &args)
     args.GetReturnValue().Set(instance);
 }
 
-void TTY::WriteString(const FunctionCallbackInfo<Value> &args)
-{
-    Isolate *isolate = args.GetIsolate();
-    v8::HandleScope handleScope(isolate);
-    uv_buf_t buf;
-    String::Utf8Value str(args.GetIsolate(), args[0]);
-    buf.base = *str;
-    buf.len = str.length();
-    TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
-    int r = uv_try_write((uv_stream_t*)t->handle, &buf, 1);
-    args.GetReturnValue().Set(Integer::New(isolate, r));
-}
-
 void TTY::OnWrite(uv_write_t* req, int status) {
     Isolate * isolate = Isolate::GetCurrent();
     v8::HandleScope handleScope(isolate);
     write_req_t* wr = (write_req_t*) req;
     TTY* t = (TTY*)wr->req.data;
     if (status < 0) {
-        t->stats.out.error++;
+        t->stats.error++;
         free(wr->buf.base);
         free(wr);
         t->stats.out.free++;
@@ -234,17 +229,18 @@ void TTY::OnWrite(uv_write_t* req, int status) {
     }
     uv_stream_t* s = (uv_stream_t*)req->handle;
     size_t queueSize = s->write_queue_size;
-    if (t->fd > 0 && queueSize > t->stats.out.maxQueue) {
+    if (queueSize > t->stats.out.maxQueue) {
         t->stats.out.maxQueue = queueSize;
     }
     if (queueSize == 0) {
         // emit a drain event
-        Local<Value> argv[0] = { };
-        Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
-        if (t->fd > 0) {
+        if (t->blocked) {
+            Local<Value> argv[0] = { };
+            Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
             t->stats.out.drain++;
+            Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+            t->blocked = false;
         }
-        Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         if (t->closing) {
             uv_close((uv_handle_t*)t->handle, OnClose);
             t->closing = false;
@@ -264,7 +260,7 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
     Local<Context> context = isolate->GetCurrentContext();
     uint32_t length = args[0]->Uint32Value(context).ToChecked();
     uv_buf_t buf;
-    buf.base = t->in.base;
+    buf.base = t->in;
     buf.len = length;
     int r = uv_try_write((uv_stream_t*)t->handle, &buf, 1);
     if (r == UV_EAGAIN || r == UV_ENOSYS) {
@@ -273,13 +269,14 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
         wr = (write_req_t *)malloc(sizeof *wr);
         wr->req.data = t;
         char* wrb = (char*)calloc(length, 1);
-        memcpy(wrb, t->in.base, length);
+        memcpy(wrb, t->in, length);
         t->stats.out.alloc++;
         t->stats.out.eagain++;
         wr->buf = uv_buf_init(wrb, length);
         r = uv_write(&wr->req, (uv_stream_t*)t->handle, &wr->buf, 1, OnWrite);
+        t->blocked = true;
     } else if (r < 0) {
-        t->stats.out.error++;
+        t->stats.error++;
     } else if ((uint32_t)r < length) {
         t->stats.out.incomplete++;
         t->stats.out.written += r;
@@ -287,7 +284,7 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
         wr = (write_req_t *)malloc(sizeof *wr);
         wr->req.data = t;
         char* wrb = (char*)calloc(length - r, 1);
-        char* base = t->in.base + r;
+        char* base = t->in + r;
         memcpy(wrb, base, length - r);
         t->stats.out.alloc++;
         wr->buf = uv_buf_init(wrb, length - r);
@@ -295,6 +292,7 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
         if (status != 0) {
             r = status;
         }
+        t->blocked = true;
     } else {
         t->stats.out.full++;
         t->stats.out.written += (uint64_t)r;
@@ -307,9 +305,9 @@ void TTY::OnClose(uv_handle_t* handle) {
     v8::HandleScope handleScope(isolate);
     TTY* t = (TTY*)handle->data;
     if (t->fd == 0) {
-        t->stats.in.close++;
+        t->stats.close++;
     } else {
-        t->stats.out.close++;
+        t->stats.close++;
     }
     free(handle);
     Local<Value> argv[0] = { };
@@ -347,10 +345,14 @@ void TTY::Resume(const FunctionCallbackInfo<Value> &args)
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     TTY* t = ObjectWrap::Unwrap<TTY>(args.Holder());
-    t->stats.in.resume++;
-    t->paused = false;
-    int r = uv_read_start((uv_stream_t*)t->handle, alloc_chunk, OnRead);
-    args.GetReturnValue().Set(Integer::New(isolate, r));
+    if (t->paused) {
+        t->stats.in.resume++;
+        int r = uv_read_start((uv_stream_t*)t->handle, alloc_chunk, OnRead);
+        t->paused = false;
+        args.GetReturnValue().Set(Integer::New(isolate, r));
+        return;
+    }
+    args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 
 void TTY::QueueSize(const FunctionCallbackInfo<Value> &args)
@@ -373,26 +375,26 @@ void TTY::Stats(const FunctionCallbackInfo<Value>& args) {
     Local<v8::BigUint64Array> array = args[0].As<v8::BigUint64Array>();
     Local<ArrayBuffer> ab = array->Buffer();
     uint64_t* fields = static_cast<uint64_t*>(ab->GetContents().Data());
-    if (t->fd == 0) {
-        fields[0] = t->stats.in.read;
-        fields[1] = t->stats.in.error;
-        fields[2] = t->stats.in.pause;
-        fields[3] = t->stats.in.close;
-        fields[4] = t->stats.in.data;
-        fields[5] = t->stats.in.resume;
-        fields[6] = t->stats.in.end;
-    } else if (t->fd == 1) {
-        fields[0] = t->stats.out.written;
-        fields[1] = t->stats.out.incomplete;
-        fields[2] = t->stats.out.full;
-        fields[3] = t->stats.out.error;
-        fields[4] = t->stats.out.drain;
-        fields[5] = t->stats.out.close;
-        fields[6] = t->stats.out.maxQueue;
-        fields[7] = t->stats.out.alloc;
-        fields[8] = t->stats.out.free;
-        fields[9] = t->stats.out.eagain;
-    }
+    fields[0] = t->stats.close;
+    fields[1] = t->stats.error;
+    fields[2] = t->stats.in.read;
+    fields[3] = t->stats.in.pause;
+    fields[4] = t->stats.in.data;
+    fields[5] = t->stats.in.resume;
+    fields[6] = t->stats.in.end;
+    fields[7] = 0;
+    fields[8] = 0;
+    fields[9] = 0;
+    fields[10] = t->stats.out.written;
+    fields[11] = t->stats.out.incomplete;
+    fields[12] = t->stats.out.full;
+    fields[13] = t->stats.out.drain;
+    fields[14] = t->stats.out.maxQueue;
+    fields[15] = t->stats.out.alloc;
+    fields[16] = t->stats.out.free;
+    fields[17] = t->stats.out.eagain;
+    fields[18] = 0;
+    fields[19] = 0;
 }
 
 } // namespace builtins

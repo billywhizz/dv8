@@ -16,7 +16,7 @@ const heap = [
     new Float64Array(4),
     new Float64Array(4),
     new Float64Array(4),
-    new Float64Array(4),
+    new Float64Array(4)
 ]
 
 function cpuUsage() {

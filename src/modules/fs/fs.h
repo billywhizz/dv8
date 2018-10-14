@@ -20,7 +20,7 @@
 	  }
 	
 	  static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-	  static void Hello(const v8::FunctionCallbackInfo<v8::Value>& args);
+	  static void Unlink(const v8::FunctionCallbackInfo<v8::Value>& args);
 	  static v8::Persistent<v8::Function> constructor;
 	
 	};

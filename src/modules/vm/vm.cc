@@ -1,8 +1,8 @@
-#include "js.h"
+#include "vm.h"
 
 namespace dv8 {
 
-namespace js {
+namespace vm {
 	using v8::Context;
 	using v8::Function;
 	using v8::FunctionCallbackInfo;
@@ -18,26 +18,26 @@ namespace js {
 	using v8::Array;
 	using dv8::builtins::Environment;
 
-	Persistent<Function> JS::constructor;
+	Persistent<Function> VM::constructor;
 
-	void JS::Init(Local<Object> exports) {
+	void VM::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "JS"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "VM"));
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hello", JS::Hello);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hello", VM::Hello);
 	
 		constructor.Reset(isolate, tpl->GetFunction());
-		DV8_SET_EXPORT(isolate, tpl, "JS", exports);
+		DV8_SET_EXPORT(isolate, tpl, "VM", exports);
 	}
 
-	void JS::New(const FunctionCallbackInfo<Value>& args) {
+	void VM::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
 		if (args.IsConstructCall()) {
-			JS* obj = new JS();
+			VM* obj = new VM();
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
 		} else {
@@ -48,7 +48,7 @@ namespace js {
 		}
 	}
 
-	void JS::NewInstance(const FunctionCallbackInfo<Value>& args) {
+	void VM::NewInstance(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		const unsigned argc = 2;
 		Local<Value> argv[argc] = { args[0], args[1] };
@@ -58,13 +58,13 @@ namespace js {
 		args.GetReturnValue().Set(instance);
 	}
 
-	void JS::Hello(const FunctionCallbackInfo<Value> &args)
+	void VM::Hello(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
 		v8::HandleScope handleScope(isolate);
-		JS* obj = ObjectWrap::Unwrap<JS>(args.Holder());
+		VM* obj = ObjectWrap::Unwrap<VM>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 	

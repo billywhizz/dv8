@@ -16,6 +16,7 @@
 	  using v8::String;
 	  using v8::Value;
 	  using v8::Array;
+		using dv8::builtins::Environment;
 	
 	  Persistent<Function> Filesystem::constructor;
 	
@@ -26,7 +27,7 @@
 		tpl->SetClassName(String::NewFromUtf8(isolate, "Filesystem"));
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hello", Filesystem::Hello);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unlink", Filesystem::Unlink);
 	
 		constructor.Reset(isolate, tpl->GetFunction());
 		DV8_SET_EXPORT(isolate, tpl, "Filesystem", exports);
@@ -57,11 +58,15 @@
 		args.GetReturnValue().Set(instance);
 	  }
 
-	  void Filesystem::Hello(const FunctionCallbackInfo<Value> &args)
+	  void Filesystem::Unlink(const FunctionCallbackInfo<Value> &args)
 	  {
 		  Isolate *isolate = args.GetIsolate();
 		  v8::HandleScope handleScope(isolate);
 		  Filesystem* obj = ObjectWrap::Unwrap<Filesystem>(args.Holder());
+			Local<Context> context = isolate->GetCurrentContext();
+			//Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+			//const int argc = args.Length();
+      //String::Utf8Value filepath(isolate, args[0]);
 		  args.GetReturnValue().Set(Integer::New(isolate, 0));
 	  }
 	  

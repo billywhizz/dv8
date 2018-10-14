@@ -1,0 +1,34 @@
+const stats = new BigUint64Array(20)
+
+function printStats(pipe, direction = 'in', fd) {
+    if (fd || fd === 0) {
+        pipe.stats(fd, stats)
+    } else {
+        pipe.stats(stats)
+    }
+    if(direction === 'in') {
+        print(`close:     ${stats[0]}
+error:     ${stats[1]}
+read:      ${stats[2]}
+pause:     ${stats[3]}
+data:      ${stats[4]}
+resume:    ${stats[5]}
+end:       ${stats[6]}
+`)
+        
+    } else {
+        print(`close:      ${stats[0]}
+error:      ${stats[1]}
+written:    ${stats[10]}
+incomplete: ${stats[11]}
+full:       ${stats[12]}
+drain:      ${stats[13]}
+maxQueue:   ${stats[14]}
+alloc:      ${stats[15]}
+free:       ${stats[16]}
+eagain:     ${stats[17]}
+`)
+    }
+}
+
+module.exports = { printStats }

@@ -1,23 +1,23 @@
-#ifndef DV8_JS_H
-#define DV8_JS_H
+#ifndef DV8_VM_H
+#define DV8_VM_H
 
 #include <dv8.h>
 
 namespace dv8 {
 
-namespace js {
+namespace vm {
 
-class JS : public dv8::ObjectWrap {
+class VM : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
 		static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	private:
 
-		JS() {
+		VM() {
 		}
 
-		~JS() {
+		~VM() {
 		}
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);

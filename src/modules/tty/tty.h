@@ -7,14 +7,14 @@ namespace dv8 {
 
 namespace tty {
 
-typedef union {
+typedef struct {
+  uint32_t close;
+  uint32_t error;
   struct {
     uint64_t written;
     uint32_t incomplete;
     uint32_t full;
-    uint32_t error;
     uint32_t drain;
-    uint32_t close;
     uint32_t maxQueue;
     uint32_t alloc;
     uint32_t free;
@@ -22,9 +22,7 @@ typedef union {
   } out;
   struct {
     uint64_t read;
-    uint32_t error;
     uint32_t pause;
-    uint32_t close;
     uint32_t end;
     uint32_t data;
     uint32_t resume;
@@ -36,7 +34,7 @@ class TTY : public dv8::ObjectWrap {
   static void Init(v8::Local<v8::Object> exports);
   static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
   uv_tty_t* handle;
-  uv_buf_t in;
+  char* in;
   v8::Persistent<v8::Function> _onRead;
   v8::Persistent<v8::Function> _onEnd;
   v8::Persistent<v8::Function> _onDrain;
@@ -46,6 +44,7 @@ class TTY : public dv8::ObjectWrap {
   tty_stats stats;
   bool paused;
   bool closing;
+  bool blocked;
 
  private:
 
@@ -56,7 +55,6 @@ class TTY : public dv8::ObjectWrap {
   }
 
   static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static void WriteString(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -64,6 +62,7 @@ class TTY : public dv8::ObjectWrap {
   static void Resume(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void QueueSize(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Error(const v8::FunctionCallbackInfo<v8::Value> &args);
 
   static void OnClose(uv_handle_t* handle);
   static void OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf);

@@ -268,17 +268,17 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 
 ## NEXT
 
-- builtin js startup
-- atexit/onexit support
-- thread stop - shutdown loop
-- environment variables
-- command line args
-- inspector
-- thread.global functions for gc/shutdown
-- libuv - loop inspection - handles
+- command line args - DONE
+- environment variables - DONE
+- standardise stream/backpressure handling in socket and tty modules
 - idle handler/nexttick
 - fork/exec
-- standardise stream/backpressure handling in socket and tty modules
+- libuv - loop inspection - handles
+- thread.global functions for gc/shutdown
+- atexit/onexit support - DONE
+- inspector PoC
+- thread stop - shutdown loop
+- builtin js startup
 
 # API
 
@@ -350,3 +350,59 @@ dv8::Require()
 ### builtins
 
 ### modules
+
+
+# Tests
+
+## netcat/pipecat
+
+```bash
+# run pipecat
+rm -f /tmp/pipe.sock & dv8 pipecat.js | cat 1> /dev/null
+# test pipecat using socat
+dd if=/dev/zero count=100000 bs=65536 | socat - unix:/tmp/pipe.sock
+# test pipecat using netcat
+dd if=/dev/zero count=100000 bs=65536 | dv8 netcat.js
+# test netcat using socat
+rm -f /tmp/pipe.sock & socat unix-listen:/tmp/pipe.sock - | cat 1> /dev/null
+
+```
+
+testing pipecat/netcat/count
+
+rm -f /tmp/pipe.sock
+dv8 pipecat.js | dv8 count.js
+dd if=/dev/zero count=300000 bs=65536 | dv8 netcat.js
+
+
+netcat test
+
+assert(stdout.written === stdin.read)
+assert(stdout.incomplete + stdout.full + stdout.eagain === stdin.data)
+assert(stdin.pause === stdin.resume - 1)
+assert(stdin.close === 1)
+assert(stdin.error === 0)
+assert(stdin.end === 1)
+assert(stdout.close === 1)
+assert(stdout.error === 0)
+assert(stdout.alloc === stdout.free)
+
+
+pipecat test
+
+stdin.read === netcat.stdout.written
+
+
+being able to make a prediction about what will happen in a given
+scenario is probably the most import aspect of programming. if the code
+is too complex it's very hard to make these predictions and to verify them
+
+tests
+
+dd if=/dev/urandom of=test.bin count=10000 bs=65536
+cat test.bin | dv8 count.js
+verify bytes
+md5 check
+crc check
+
+counts the bytes in a 6.5 GB file in 2.5 seconds - 20Gb/sec

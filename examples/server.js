@@ -31,6 +31,11 @@ let conn = 0 // number of active connections
 let bytesRead = 0 // number of bytes received
 let bytesWritten = 0 // number of bytes received
 
+// onExit handler - fired when there are no active handles on the event loop and we are about to terminate
+onExit(() => {
+    printMetrics()
+}) 
+
 // handle SIGTERM
 function terminateHandler(signum) {
     // print is just a wrapper around fprintf(stderr, "%s"). we should replace with libuv as this can block
@@ -107,7 +112,7 @@ sock.onConnect(fd => {
             // and close our end of the socket
             if (closing) {
                 // tell the client to close
-                sock.write(fd, size200, size200Close)
+                bytesWritten += sock.write(fd, size200, size200Close)
                 // close our end
                 sock.close(fd, 1)
                 return
@@ -122,7 +127,7 @@ sock.onConnect(fd => {
         context.parser.reinitialize(HTTPParser.REQUEST)
         context.parser[HTTPParser.kOnMessageComplete] = () => {
             if (closing) {
-                sock.write(fd, size200, size200Close)
+                bytesWritten += sock.write(fd, size200, size200Close)
                 sock.close(fd, 1)
                 return
             }
@@ -153,10 +158,6 @@ sock.onData((fd, len) => {
 // this is fired when the socket is closed
 sock.onClose(fd => {
     conn--
-    // if we have no connections left, print the metrics
-    if (conn === 0) printMetrics()
-    // if we had an onexit event (when all handles in event loop are closed)
-    // we could know when process is ready to exit
 })    
 
 // setup the timer to display metrics

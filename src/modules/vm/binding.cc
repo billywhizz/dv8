@@ -1,18 +1,18 @@
-#include "js.h"
+#include "vm.h"
 
 namespace dv8 {
-namespace js {
+namespace vm {
 	using v8::Local;
 	using v8::Object;
 
 	void InitAll(Local<Object> exports) {
-		JS::Init(exports);
+		VM::Init(exports);
 	}
 }
 }
 
 extern "C" {
-	void* _register_js() {
-		return (void*)dv8::js::InitAll;
+	void* _register_vm() {
+		return (void*)dv8::vm::InitAll;
 	}
 }

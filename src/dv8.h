@@ -9,7 +9,11 @@
 #include <common.h>
 #include <buffer.h>
 #include <env.h>
+#include <string.h>
 
+#define MICROS_PER_SEC 1e6
+
+extern char **environ;
 namespace dv8 {
 
 using v8::ArrayBuffer;
@@ -59,7 +63,8 @@ void Require(const FunctionCallbackInfo<Value> &args);
 void shutdown(uv_loop_t* loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void CollectGarbage(const FunctionCallbackInfo<Value> &args);
-void MemoryUsage(const FunctionCallbackInfo<Value>& args);
+void EnvVars(const FunctionCallbackInfo<Value>& args);
+void OnExit(const FunctionCallbackInfo<Value>& args);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
     v8::HandleScope handle_scope(isolate);

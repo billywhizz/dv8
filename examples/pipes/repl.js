@@ -1,9 +1,7 @@
 /*
 A very crappy repl so you can inspect some of the builtins
 */
-require('./utils.js')
-const tty = module('tty', {})
-const { TTY } = tty
+const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, UV_TTY_MODE_IO,  TTY } = module('tty', {})
 const b = new Buffer()
 const ab = new Uint8Array(b.alloc(64 * 1024))
 
@@ -27,8 +25,11 @@ const stdin = new TTY(0, len => {
     if (r < 0) return stdout.close()
 }, () => stdin.close(), () => stdout.close())
 const stdout = new TTY(1, () => {}, () => stdin.resume(), e => { print(`write error: ${e}`) })
-stdin.setup(b)
-stdout.setup(b)
+print(`normal: ${UV_TTY_MODE_NORMAL}`)
+print(`raw   : ${UV_TTY_MODE_RAW}`)
+print(`io    : ${UV_TTY_MODE_IO}`)
+stdin.setup(b, UV_TTY_MODE_NORMAL)
+stdout.setup(b, UV_TTY_MODE_NORMAL)
 
 payload = '> '
 written = b.write(payload, 0)

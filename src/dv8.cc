@@ -3,6 +3,9 @@
 namespace dv8
 {
 
+using dv8::builtins::Environment;
+using v8::HeapSpaceStatistics;
+
 using InitializerCallback = void (*)(Local<Object> exports);
 
 void on_handle_close(uv_handle_t* h) {
@@ -200,6 +203,34 @@ void CollectGarbage(const FunctionCallbackInfo<Value> &args)
   isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
 }
 
+void EnvVars(const FunctionCallbackInfo<Value> &args)
+{
+  //TODO: not thread safe
+  Isolate *isolate = args.GetIsolate();
+  HandleScope handleScope(isolate);
+  int size = 0;
+  while (environ[size])
+    size++;
+  Local<v8::Array> envarr = v8::Array::New(isolate);
+  for (int i = 0; i < size; ++i) {
+    const char* var = environ[i];
+    envarr->Set(i, String::NewFromUtf8(isolate, var, v8::String::kNormalString, strlen(var)));
+  }
+  args.GetReturnValue().Set(envarr);
+}
+
+void OnExit(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+  if(args[0]->IsFunction()) {
+    Local<Function> onExit = Local<Function>::Cast(args[0]);
+    env->onExit.Reset(isolate, onExit);
+  }
+}
+
 void Require(const FunctionCallbackInfo<Value> &args)
 {
   HandleScope handle_scope(args.GetIsolate());
@@ -259,6 +290,8 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
   global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
+  global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
+  global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
   return Context::New(isolate, NULL, global);
 }
 
