@@ -78,9 +78,9 @@ void after_write(uv_write_t *req, int status)
   Socket *socket = (Socket *)ctx->data;
   if (socket->callbacks.onWrite == 1)
   {
-    Local<Value> argv[3] = {Integer::New(isolate, ctx->fd), Integer::New(isolate, status), Integer::New(isolate, wr->buf.len)};
+    Local<Value> argv[2] = {Integer::New(isolate, wr->buf.len), Integer::New(isolate, status)};
     Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-    onWrite->Call(isolate->GetCurrentContext()->Global(), 3, argv);
+    onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
   }
   if (status < 0)
   {
@@ -90,9 +90,9 @@ void after_write(uv_write_t *req, int status)
     ctx->stats.out.free++;
     if (socket->callbacks.onError == 1)
     {
-      Local<Value> argv[2] = {Integer::New(isolate, ctx->fd), Number::New(isolate, status)};
+      Local<Value> argv[1] = {Number::New(isolate, status)};
       Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
-      Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
     return;
   }
@@ -109,9 +109,9 @@ void after_write(uv_write_t *req, int status)
     {
       if (socket->callbacks.onDrain == 1)
       {
-        Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
+        Local<Value> argv[0] = {};
         Local<Function> Callback = Local<Function>::New(isolate, socket->_onDrain);
-        Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+        Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
       }
       ctx->stats.out.drain++;
       ctx->blocked = false;
@@ -140,9 +140,9 @@ void on_close(uv_handle_t *peer)
   ctx->stats.close++;
   if (s->callbacks.onClose == 1)
   {
-    Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
+    Local<Value> argv[0] = {};
     Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
-    onClose->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
   }
   context_free(peer);
 }
@@ -184,18 +184,18 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     ctx->stats.in.data++;
     if (s->callbacks.onData == 1)
     {
-      Local<Value> argv[2] = {Integer::New(isolate, ctx->fd), Number::New(isolate, nread)};
+      Local<Value> argv[1] = {Number::New(isolate, nread)};
       Local<Function> onData = Local<Function>::New(isolate, s->_onData);
-      onData->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      onData->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
   }
   else if (nread == UV_EOF)
   {
     if (s->callbacks.onEnd == 1)
     {
-      Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
+      Local<Value> argv[0] = {};
       Local<Function> onEnd = Local<Function>::New(isolate, s->_onEnd);
-      onEnd->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      onEnd->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     }
     ctx->stats.in.end++;
     uv_close((uv_handle_t *)handle, on_close);
@@ -204,9 +204,9 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   {
     if (s->callbacks.onError == 1)
     {
-      Local<Value> argv[3] = {Integer::New(isolate, ctx->fd), Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
+      Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
       Local<Function> onError = Local<Function>::New(isolate, s->_onError);
-      onError->Call(isolate->GetCurrentContext()->Global(), 3, argv);
+      onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
     }
     ctx->stats.in.end++;
     ctx->stats.error++;
@@ -296,7 +296,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onClose", onClose);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onDrain", onDrain);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onWrite", onWrite);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onData", onData);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRead", onData);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", onError);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onEnd", onEnd);
 
@@ -311,9 +311,8 @@ void Socket::QueueSize(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
+  Socket *socket = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = socket->context;
   uv_stream_t *s = ctx->handle;
   size_t queueSize = s->write_queue_size;
   if (queueSize > ctx->stats.out.maxQueue)
@@ -327,10 +326,8 @@ void Socket::Stats(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
   Socket *socket = ObjectWrap::Unwrap<Socket>(args.Holder());
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
+  _context *ctx = socket->context;
   Local<v8::BigUint64Array> array = args[1].As<v8::BigUint64Array>();
   Local<ArrayBuffer> ab = array->Buffer();
   uint64_t *fields = static_cast<uint64_t *>(ab->GetContents().Data());
@@ -360,7 +357,7 @@ void Socket::Error(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  int r = args[1]->IntegerValue(context).ToChecked();
+  int r = args[0]->IntegerValue(context).ToChecked();
   const char *error = uv_strerror(r);
   args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), error, NewStringType::kNormal).ToLocalChecked());
 }
@@ -409,9 +406,7 @@ void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
   struct sockaddr_storage address;
   if (args.Length() > 0)
   {
-    Local<Context> context = isolate->GetCurrentContext();
-    int fd = args[0]->Int32Value(context).ToChecked();
-    _context *ctx = contextMap[fd];
+    _context *ctx = s->context;
     int addrlen = sizeof(address);
     int r = uv_tcp_getpeername((uv_tcp_t *)ctx->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
     if (r)
@@ -438,8 +433,7 @@ void Socket::Close(const FunctionCallbackInfo<Value> &args)
   if (args.Length() > 0)
   {
     Local<Context> context = isolate->GetCurrentContext();
-    int fd = args[0]->Int32Value(context).ToChecked();
-    _context *ctx = contextMap[fd];
+    _context *ctx = s->context;
     if (args.Length() > 1)
     {
       do_shutdown = args[1]->Int32Value(context).ToChecked();
@@ -498,6 +492,8 @@ void Socket::Setup(const FunctionCallbackInfo<Value> &args)
   Local<Context> context = isolate->GetCurrentContext();
   int fd = args[0]->Int32Value(context).ToChecked();
   _context *ctx = contextMap[fd];
+  ctx->data = s;
+  s->context = ctx;
   Buffer *b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
   size_t len = b->_length;
   ctx->in = uv_buf_init((char *)b->_data, len);
@@ -513,8 +509,8 @@ void Socket::SetKeepAlive(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
   int enable = static_cast<int>(args[1]->BooleanValue(context).ToChecked());
   unsigned int delay = args[2]->Uint32Value(context).ToChecked();
   int r = uv_tcp_keepalive((uv_tcp_t *)ctx->handle, enable, delay);
@@ -525,8 +521,8 @@ void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
   int enable = static_cast<int>(args[1]->BooleanValue(context).ToChecked());
   int r = uv_tcp_nodelay((uv_tcp_t *)ctx->handle, enable);
   args.GetReturnValue().Set(Integer::New(isolate, r));
@@ -535,11 +531,9 @@ void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
 void Socket::Pause(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
-  Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
   ctx->paused = true;
-  Socket *s = (Socket *)ctx->data;
   ctx->stats.in.pause++;
   int r = uv_read_stop(ctx->handle);
   args.GetReturnValue().Set(Integer::New(isolate, r));
@@ -548,12 +542,10 @@ void Socket::Pause(const FunctionCallbackInfo<Value> &args)
 void Socket::Resume(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
-  Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
   if (ctx->paused)
   {
-    Socket *s = (Socket *)ctx->data;
     ctx->stats.in.resume++;
     int r = uv_read_start(ctx->handle, echo_alloc, after_read);
     args.GetReturnValue().Set(Integer::New(isolate, r));
@@ -568,10 +560,9 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *socket = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  int off = args[1]->Int32Value(context).ToChecked();
-  uint32_t len = args[2]->Uint32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
+  int off = args[0]->Int32Value(context).ToChecked();
+  uint32_t len = args[1]->Uint32Value(context).ToChecked();
+  _context *ctx = socket->context;
   char *src = ctx->out.base + off;
   uv_buf_t buf;
   buf.base = src;
@@ -586,8 +577,11 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     ctx->stats.out.alloc++;
     ctx->stats.out.eagain++;
     wr->buf = uv_buf_init(wrb, len);
-    wr->fd = fd;
-    r = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+    wr->fd = ctx->fd;
+    int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+    if (status != 0) {
+      r = status;
+    }
     ctx->blocked = true;
   }
   else if (r < 0)
@@ -595,9 +589,9 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     ctx->stats.error++;
     if (socket->callbacks.onError == 1)
     {
-      Local<Value> argv[2] = {Integer::New(isolate, ctx->fd), Number::New(isolate, r)};
+      Local<Value> argv[1] = {Number::New(isolate, r)};
       Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
-      Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
   }
   else if ((uint32_t)r < len)
@@ -611,18 +605,30 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     memcpy(wrb, base, len - r);
     ctx->stats.out.alloc++;
     wr->buf = uv_buf_init(wrb, len - r);
-    wr->fd = fd;
+    wr->fd = ctx->fd;
     int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+    ctx->blocked = true;
+    if (socket->callbacks.onWrite == 1)
+    {
+      Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
+      Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+      onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+    }
     if (status != 0)
     {
       r = status;
     }
-    ctx->blocked = true;
   }
   else
   {
     ctx->stats.out.full++;
     ctx->stats.out.written += (uint64_t)r;
+    if (socket->callbacks.onWrite == 1)
+    {
+      Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
+      Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+      onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+    }
   }
   args.GetReturnValue().Set(Integer::New(isolate, r));
 }
