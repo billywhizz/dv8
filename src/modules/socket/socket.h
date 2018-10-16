@@ -13,7 +13,6 @@
 
 // size of work buffer for reading. this should be user configurable and be same size as in buffer
 // TODO: need to figure out what is correct for this
-#define READ_BUFFER 4096
 #define MAX_CONTEXTS 4096
 
 namespace dv8
@@ -48,7 +47,7 @@ typedef struct
   uint8_t onConnect;
   uint8_t onClose;
   uint8_t onWrite;
-  uint8_t onData;
+  uint8_t onRead;
   uint8_t onError;
   uint8_t onDrain;
   uint8_t onEnd;
@@ -64,13 +63,13 @@ void context_init(uv_stream_t *handle, _context *ctx);
 void context_free(uv_handle_t *handle);
 
 // socket callback signatures
-void on_connection(uv_stream_t *server, int status);
-void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
-void after_write(uv_write_t *req, int status);
-void after_write2(uv_write_t *req, int status);
-void on_close(uv_handle_t *peer);
-void after_shutdown(uv_shutdown_t *req, int status);
-void echo_alloc(uv_handle_t *handle, size_t size, uv_buf_t *buf);
+static void on_connection(uv_stream_t *server, int status);
+static void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
+static void after_write(uv_write_t *req, int status);
+static void after_write2(uv_write_t *req, int status);
+static void on_close(uv_handle_t *peer);
+static void after_shutdown(uv_shutdown_t *req, int status);
+static void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf);
 
 // socket stats
 typedef struct
@@ -130,7 +129,7 @@ public:
   v8::Persistent<v8::Function> _onClose;
   v8::Persistent<v8::Function> _onDrain;
   v8::Persistent<v8::Function> _onWrite;
-  v8::Persistent<v8::Function> _onData;
+  v8::Persistent<v8::Function> _onRead;
   v8::Persistent<v8::Function> _onError;
   v8::Persistent<v8::Function> _onEnd;
 
@@ -173,7 +172,7 @@ private:
   //static void onConnect(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
   static void onConnect(const v8::FunctionCallbackInfo<v8::Value> &args); // when we get a new socket connection
   static void onError(const v8::FunctionCallbackInfo<v8::Value> &args);   // when we have an error on the socket
-  static void onData(const v8::FunctionCallbackInfo<v8::Value> &args);    // when we receive bytes on the socket
+  static void onRead(const v8::FunctionCallbackInfo<v8::Value> &args);    // when we receive bytes on the socket
   static void onWrite(const v8::FunctionCallbackInfo<v8::Value> &args);   // when write has been flushed to socket
   static void onClose(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket closes
   static void onEnd(const v8::FunctionCallbackInfo<v8::Value> &args);     // when a read socket gets EOF

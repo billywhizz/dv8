@@ -2,7 +2,7 @@
 record 
 */
 let start
-require('./base.js')
+require('./lib/base.js')
 let mem = memoryUsage()
 
 function toMiB(bytes) {

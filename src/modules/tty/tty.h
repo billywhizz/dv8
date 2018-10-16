@@ -9,6 +9,11 @@ namespace dv8
 namespace tty
 {
 
+static void on_close(uv_handle_t *handle);
+static void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
+static void after_write(uv_write_t *req, int status);
+static void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf);
+
 typedef struct
 {
   uint32_t close;
@@ -34,19 +39,31 @@ typedef struct
   } in;
 } tty_stats;
 
+typedef struct
+{
+  uint8_t onClose;
+  uint8_t onWrite;
+  uint8_t onRead;
+  uint8_t onError;
+  uint8_t onDrain;
+  uint8_t onEnd;
+} callbacks_t;
+
 class TTY : public dv8::ObjectWrap
 {
 public:
   static void Init(v8::Local<v8::Object> exports);
   static void NewInstance(const v8::FunctionCallbackInfo<v8::Value> &args);
   uv_tty_t *handle;
+  callbacks_t callbacks;      // pointers to JS callbacks
   char *in;
   v8::Persistent<v8::Function> _onRead;
   v8::Persistent<v8::Function> _onEnd;
   v8::Persistent<v8::Function> _onDrain;
   v8::Persistent<v8::Function> _onClose;
   v8::Persistent<v8::Function> _onError;
-  unsigned int fd;
+  v8::Persistent<v8::Function> _onWrite;
+  unsigned int ttype;
   tty_stats stats;
   bool paused;
   bool closing;
@@ -71,9 +88,12 @@ private:
   static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Error(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-  static void OnClose(uv_handle_t *handle);
-  static void OnRead(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
-  static void OnWrite(uv_write_t *req, int status);
+  static void onError(const v8::FunctionCallbackInfo<v8::Value> &args);   // when we have an error on the socket
+  static void onRead(const v8::FunctionCallbackInfo<v8::Value> &args);    // when we receive bytes on the socket
+  static void onWrite(const v8::FunctionCallbackInfo<v8::Value> &args);   // when write has been flushed to socket
+  static void onClose(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket closes
+  static void onEnd(const v8::FunctionCallbackInfo<v8::Value> &args);     // when a read socket gets EOF
+  static void onDrain(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket write buffers have flushed
 
   static v8::Persistent<v8::Function> constructor;
 };

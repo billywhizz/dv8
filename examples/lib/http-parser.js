@@ -171,7 +171,7 @@ HTTPParser.prototype.consumeLine = function () {
   var end = this.end,
       chunk = this.chunk;
   for (var i = this.offset; i < end; i++) {
-    if (chunk.ab[i] === 0x0a) { // \n
+    if (chunk.bytes[i] === 0x0a) { // \n
       var line = this.line + chunk.read(this.offset, i - this.offset);
       if (line.charAt(line.length - 1) === '\r') {
         line = line.substr(0, line.length - 1);

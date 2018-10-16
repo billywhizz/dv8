@@ -1,6 +1,6 @@
-const { start, stop } = require('./meter.js')
+const { start, stop } = require('./lib/meter.js')
 const { Socket, TCP, UNIX } = module('socket', {})
-const { printStats } = require('./util.js')
+const { printStats } = require('./lib/util.js')
 const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, UV_TTY_MODE_IO,  TTY } = module('tty', {})
 
 const READ_BUFFER_SIZE = 64 * 1024

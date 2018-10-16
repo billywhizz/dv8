@@ -1,21 +1,6 @@
-const { start, stop } = require('./meter.js')
+const { start, stop } = require('./lib/meter.js')
+const { printStats } = require('./lib/util.js')
 const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, UV_TTY_MODE_IO,  TTY } = module('tty', {})
-
-function printStats(pipe, direction = 'in') {
-    const stats = new BigUint64Array(20)
-    pipe.stats(stats)
-    print(`
-COUNT.${direction}
------------------------
-close:     ${stats[0]}
-error:     ${stats[1]}
-read:      ${stats[2]}
-pause:     ${stats[3]}
-data:      ${stats[4]}
-resume:    ${stats[5]}
-end:       ${stats[6]}
-`)
-}
 
 function onRead(len) {
     if (stdin.bytes === 0) start(stdin)
@@ -28,13 +13,16 @@ function onEnd() {
 }
 
 function onClose() {
-    printStats(stdin)    
+    printStats(stdin)
 }
 
-const stdin = new TTY(0, onRead, onEnd, onClose)
+const stdin = new TTY(0)
 const b = new Buffer()
-stdin.buffer = b.alloc(64 * 1024)
+b.alloc(64 * 1024)
 stdin.bytes = 0
 stdin.name = 'count.stdin'
 stdin.setup(b, UV_TTY_MODE_RAW)
+stdin.onRead(onRead)
+stdin.onEnd(onEnd)
+stdin.onClose(onClose)
 stdin.resume()

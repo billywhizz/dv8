@@ -1,5 +1,6 @@
-const { start, stop } = require('./meter.js')
+const { start, stop } = require('./lib/meter.js')
 const { Socket, TCP, UNIX } = module('socket', {})
+const { printStats } = require('./lib/util.js')
 const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, UV_TTY_MODE_IO,  TTY } = module('tty', {})
 
 const READ_BUFFER_SIZE = 64 * 1024
@@ -22,27 +23,12 @@ function onConnect(fd) {
     }
     const stdout = context.stdout = new TTY(1, () => {
         stop(stdout)
-        const stats = new BigUint64Array(20)
-        stdout.stats(stats)
-        print(`
-PIPECAT.stdout
------------------------
-close:      ${stats[0]}
-error:      ${stats[1]}
-written:    ${stats[10]}
-incomplete: ${stats[11]}
-full:       ${stats[12]}
-drain:      ${stats[13]}
-maxQueue:   ${stats[14]}
-alloc:      ${stats[15]}
-free:       ${stats[16]}
-eagain:     ${stats[17]}
-`)
+        printStats(stdout, 'out')
     }, () => stdin.resume(), e => { print(`write error: ${e}`) })
-    stdout.setup(context.in, UV_TTY_MODE_NORMAL)
+    stdout.setup(context.in, UV_TTY_MODE_RAW)
     stdout.bytes = 0
-    stdout.name = 'pipe.stdout'
-    stdin.close()
+    stdout.name = 'recv.stdout'
+    stdin.close() // closes server, stops any new connections
 }
 
 function onEnd(fd) {
@@ -67,19 +53,7 @@ function onData(fd, len) {
 
 function onClose(fd) {
     stop(stdin)
-    const stats = new BigUint64Array(20)
-    stdin.stats(fd, stats)
-    print(`
-PIPECAT.stdin
------------------------
-close:     ${stats[0]}
-error:     ${stats[1]}
-read:      ${stats[2]}
-pause:     ${stats[3]}
-data:      ${stats[4]}
-resume:    ${stats[5]}
-end:       ${stats[6]}
-`)    
+    printStats(stdin, 'in', fd)
     const { stdout } = contexts[fd]
     stdout.close()
 }
@@ -87,7 +61,7 @@ end:       ${stats[6]}
 const stdin = new Socket(UNIX)
 
 stdin.bytes = 0
-stdin.name = 'pipe.socket'
+stdin.name = 'recv.stdin'
 
 stdin.onConnect(onConnect)
 stdin.onData(onData)
@@ -95,7 +69,7 @@ stdin.onClose(onClose)
 stdin.onEnd(onEnd)
 stdin.onError(e => print(`read error: ${e}`))
 
-const r = stdin.listen('/tmp/pipe.sock')
+const r = stdin.listen(args[2] || '/tmp/pipe.sock')
 if(r !== 0) {
     print(`listen: ${r}, ${stdin.error(r)}`)
 }

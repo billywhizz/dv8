@@ -118,8 +118,7 @@ void after_write(uv_write_t *req, int status)
     }
     if (ctx->closing)
     {
-      if (uv_is_closing((uv_handle_t *)ctx->handle) == 0)
-      {
+      if (uv_is_closing((uv_handle_t *)ctx->handle) == 0) {
         uv_close((uv_handle_t *)ctx->handle, on_close);
       }
       ctx->closing = false;
@@ -163,8 +162,7 @@ void after_shutdown(uv_shutdown_t *req, int status)
   }
   else
   {
-    if (uv_is_closing((uv_handle_t *)ctx->handle) == 0)
-    {
+    if (uv_is_closing((uv_handle_t *)ctx->handle) == 0) {
       uv_close((uv_handle_t *)ctx->handle, on_close);
     }
   }
@@ -178,19 +176,17 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   _context *ctx = (_context *)handle->data;
   Socket *s = (Socket *)ctx->data;
   v8::TryCatch try_catch(isolate);
-  if (nread > 0)
-  {
+  if (nread > 0) {
     ctx->stats.in.read += (uint64_t)nread;
     ctx->stats.in.data++;
-    if (s->callbacks.onData == 1)
+    if (s->callbacks.onRead == 1)
     {
       Local<Value> argv[1] = {Number::New(isolate, nread)};
-      Local<Function> onData = Local<Function>::New(isolate, s->_onData);
-      onData->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      Local<Function> onRead = Local<Function>::New(isolate, s->_onRead);
+      onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
   }
-  else if (nread == UV_EOF)
-  {
+  else if (nread == UV_EOF) {
     if (s->callbacks.onEnd == 1)
     {
       Local<Value> argv[0] = {};
@@ -198,10 +194,13 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       onEnd->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     }
     ctx->stats.in.end++;
-    uv_close((uv_handle_t *)handle, on_close);
+/*
+    if (uv_is_closing((uv_handle_t *)handle) == 0) {
+      uv_close((uv_handle_t *)handle, on_close);
+    }
+*/
   }
-  else if (nread < 0)
-  {
+  else if (nread < 0) {
     if (s->callbacks.onError == 1)
     {
       Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
@@ -210,7 +209,11 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     }
     ctx->stats.in.end++;
     ctx->stats.error++;
-    uv_close((uv_handle_t *)handle, on_close);
+    if (uv_is_closing((uv_handle_t *)handle) == 0) {
+      uv_close((uv_handle_t *)handle, on_close);
+    }
+  } else {
+      // nread = 0, we got an EAGAIN or EWOULDBLOCK
   }
   if (try_catch.HasCaught())
   {
@@ -218,8 +221,10 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   }
 }
 
-void echo_alloc(uv_handle_t *handle, size_t size, uv_buf_t *buf)
+void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf)
 {
+  // we are safe to reuse the same buffer for each allocation
+  // it will not be overwritten until after after_read completes
   _context *ctx = (_context *)handle->data;
   buf->base = ctx->in.base;
   buf->len = ctx->readBufferLength;
@@ -237,7 +242,7 @@ void on_client_connection(uv_connect_t *client, int status)
     return;
   }
   callback(ctx);
-  status = uv_read_start(client->handle, echo_alloc, after_read);
+  status = uv_read_start(client->handle, alloc_chunk, after_read);
   assert(status == 0);
 }
 
@@ -265,7 +270,7 @@ void on_connection(uv_stream_t *server, int status)
   _context *ctx = context_init(stream, s);
   ctx->data = baton->object;
   callback(ctx);
-  status = uv_read_start(stream, echo_alloc, after_read);
+  status = uv_read_start(stream, alloc_chunk, after_read);
   assert(status == 0);
 }
 
@@ -296,7 +301,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onClose", onClose);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onDrain", onDrain);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onWrite", onWrite);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRead", onData);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRead", onRead);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", onError);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onEnd", onEnd);
 
@@ -455,8 +460,7 @@ void Socket::Close(const FunctionCallbackInfo<Value> &args)
       }
       else
       {
-        if (uv_is_closing((uv_handle_t *)ctx->handle) == 0)
-        {
+        if (uv_is_closing((uv_handle_t *)ctx->handle) == 0) {
           uv_close((uv_handle_t *)ctx->handle, on_close);
         }
         args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -465,7 +469,9 @@ void Socket::Close(const FunctionCallbackInfo<Value> &args)
   }
   else if (s->_stream)
   {
-    uv_close((uv_handle_t *)s->_stream, on_close2);
+    if (uv_is_closing((uv_handle_t *)s->_stream) == 0) {
+      uv_close((uv_handle_t *)s->_stream, on_close2);
+    }
     args.GetReturnValue().Set(Integer::New(isolate, 0));
   }
 }
@@ -547,7 +553,7 @@ void Socket::Resume(const FunctionCallbackInfo<Value> &args)
   if (ctx->paused)
   {
     ctx->stats.in.resume++;
-    int r = uv_read_start(ctx->handle, echo_alloc, after_read);
+    int r = uv_read_start(ctx->handle, alloc_chunk, after_read);
     args.GetReturnValue().Set(Integer::New(isolate, r));
     ctx->paused = false;
     return;
@@ -579,6 +585,7 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     wr->buf = uv_buf_init(wrb, len);
     wr->fd = ctx->fd;
     int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+    r = 0;
     if (status != 0) {
       r = status;
     }
@@ -618,9 +625,7 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     {
       r = status;
     }
-  }
-  else
-  {
+  } else {
     ctx->stats.out.full++;
     ctx->stats.out.written += (uint64_t)r;
     if (socket->callbacks.onWrite == 1)
@@ -742,15 +747,15 @@ void Socket::onWrite(const v8::FunctionCallbackInfo<v8::Value> &args)
   }
 }
 
-void Socket::onData(const v8::FunctionCallbackInfo<v8::Value> &args)
+void Socket::onRead(const v8::FunctionCallbackInfo<v8::Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   if (args[0]->IsFunction())
   {
-    Local<Function> onData = Local<Function>::Cast(args[0]);
-    s->_onData.Reset(isolate, onData);
-    s->callbacks.onData = 1;
+    Local<Function> onRead = Local<Function>::Cast(args[0]);
+    s->_onRead.Reset(isolate, onRead);
+    s->callbacks.onRead = 1;
   }
 }
 
