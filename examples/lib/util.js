@@ -31,4 +31,10 @@ eagain:     ${stats[17]}
     }
 }
 
-module.exports = { printStats }
+function createBuffer(size) {
+    const buf = new Buffer()
+    buf.bytes = buf.alloc(size) // buf.bytes is an instance of ArrayBuffer
+    return buf
+}
+
+module.exports = { printStats, createBuffer }

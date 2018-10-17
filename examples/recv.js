@@ -1,75 +1,63 @@
+const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
+const { Socket, UNIX } = module('socket', {})
 const { start, stop } = require('./lib/meter.js')
-const { Socket, TCP, UNIX } = module('socket', {})
-const { printStats } = require('./lib/util.js')
-const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, UV_TTY_MODE_IO,  TTY } = module('tty', {})
+const { printStats, createBuffer } = require('./lib/util.js')
 
-const READ_BUFFER_SIZE = 64 * 1024
-const MAX_BUFFER = 4 * READ_BUFFER_SIZE
-const contexts = {}
+const server = new Socket(UNIX)
+const BUFFER_SIZE = 4096
+const MAX_BUFFER = 4 * BUFFER_SIZE
 
-function createContext(fd) {
-    const b = new Buffer()
-    b.alloc(READ_BUFFER_SIZE)
-    const context = { fd, in: b, out: b }
-    contexts[fd] = context
-    stdin.setup(fd, b, b)
-    return context
-}
-
-function onConnect(fd) {
-    let context = contexts[fd]
-    if (!context) {
-        context = createContext(fd)
-    }
-    const stdout = context.stdout = new TTY(1, () => {
-        stop(stdout)
-        printStats(stdout, 'out')
-    }, () => stdin.resume(), e => { print(`write error: ${e}`) })
-    stdout.setup(context.in, UV_TTY_MODE_RAW)
+server.onConnect(fd => {
+    print('server.connect')
+    server.close() // closes server, stops any new connections
+    const stdin = new Socket(UNIX)
+    const stdout = new TTY(1)
+    const buf = createBuffer(BUFFER_SIZE)
+    stdin.setup(fd, buf, buf)
+    stdout.setup(buf, UV_TTY_MODE_RAW)
+    stdin.bytes = 0
+    stdin.name = 'recv.stdin'
     stdout.bytes = 0
     stdout.name = 'recv.stdout'
-    stdin.close() // closes server, stops any new connections
-}
+    stdin.onRead(len => {
+        if (stdin.bytes === 0) {
+            start(stdin)
+            start(stdout)
+        }
+        stdin.bytes += len
+        const r = stdout.write(len)
+        if (r < 0) {
+            print(`write error: ${r} - ${stdout.error(r)}`)
+            return stdout.close()
+        }
+        stdout.bytes += len // assume they will go
+        if (r < len && stdout.queueSize() >= MAX_BUFFER) stdin.pause()
+    })
+    stdin.onClose(() => {
+        printStats(stdin)
+        stdout.close()
+    })
+    stdin.onError(err => {
+        print(`server.onError: ${err}`)
+    })
+    stdin.onEnd(() => {
+        stop(stdin)
+        print(`server.onEnd`)
+        stdin.close()
+    })
+    stdout.onClose(() => {
+        stop(stdout)
+        printStats(stdout, 'out')
+    })
+    stdout.onDrain(() => {
+        stdin.resume()
+    })
+    stdout.onError((e, message) => {
+        print(`stdout.error: ${e.toString()}\n${message}`)
+    })
+})
 
-function onEnd(fd) {
-    print(`onEnd`)
-}
-
-function onData(fd, len) {
-    const { stdout } = contexts[fd]
-    if (stdin.bytes === 0) {
-        start(stdin)
-        start(stdout)
-    }
-    stdin.bytes += len
-    const r = stdout.write(len)
-    if (r < 0) {
-        print(`write error: ${r} - ${stdout.error(r)}`)
-        return stdout.close()
-    }
-    stdout.bytes += len // assume they will go
-    if (r < len && stdout.queueSize() >= MAX_BUFFER) stdin.pause(fd)
-}
-
-function onClose(fd) {
-    stop(stdin)
-    printStats(stdin, 'in', fd)
-    const { stdout } = contexts[fd]
-    stdout.close()
-}
-
-const stdin = new Socket(UNIX)
-
-stdin.bytes = 0
-stdin.name = 'recv.stdin'
-
-stdin.onConnect(onConnect)
-stdin.onData(onData)
-stdin.onClose(onClose)
-stdin.onEnd(onEnd)
-stdin.onError(e => print(`read error: ${e}`))
-
-const r = stdin.listen(args[2] || '/tmp/pipe.sock')
+const r = server.listen(args[2] || '/tmp/pipe.sock')
 if(r !== 0) {
-    print(`listen: ${r}, ${stdin.error(r)}`)
+    print(`listen: ${r}, ${server.error(r)}`)
 }

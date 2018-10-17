@@ -1,4 +1,4 @@
-require('./base.js')
+require('./lib/base.js')
 const { Thread } = module('thread', {})
 
 const threads = []

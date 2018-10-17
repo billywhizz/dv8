@@ -118,9 +118,7 @@ void after_write(uv_write_t *req, int status)
     }
     if (ctx->closing)
     {
-      if (uv_is_closing((uv_handle_t *)ctx->handle) == 0) {
-        uv_close((uv_handle_t *)ctx->handle, on_close);
-      }
+      uv_close((uv_handle_t *)ctx->handle, on_close);
       ctx->closing = false;
     }
   }
@@ -162,9 +160,7 @@ void after_shutdown(uv_shutdown_t *req, int status)
   }
   else
   {
-    if (uv_is_closing((uv_handle_t *)ctx->handle) == 0) {
-      uv_close((uv_handle_t *)ctx->handle, on_close);
-    }
+    uv_close((uv_handle_t *)ctx->handle, on_close);
   }
   free(req);
 }
@@ -209,9 +205,7 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     }
     ctx->stats.in.end++;
     ctx->stats.error++;
-    if (uv_is_closing((uv_handle_t *)handle) == 0) {
-      uv_close((uv_handle_t *)handle, on_close);
-    }
+    uv_close((uv_handle_t *)handle, on_close);
   } else {
       // nread = 0, we got an EAGAIN or EWOULDBLOCK
   }
@@ -434,45 +428,34 @@ void Socket::Close(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
-  int do_shutdown = 1;
-  if (args.Length() > 0)
-  {
-    Local<Context> context = isolate->GetCurrentContext();
-    _context *ctx = s->context;
-    if (args.Length() > 1)
-    {
-      do_shutdown = args[1]->Int32Value(context).ToChecked();
-    }
-    if (do_shutdown)
-    {
-      uv_shutdown_t *req;
-      req = (uv_shutdown_t *)malloc(sizeof *req);
-      int r = uv_shutdown(req, ctx->handle, after_shutdown);
-      args.GetReturnValue().Set(Integer::New(isolate, r));
-    }
-    else
-    {
-      size_t queueSize = ctx->handle->write_queue_size;
-      if (queueSize > 0)
-      {
-        ctx->closing = true;
-        args.GetReturnValue().Set(Integer::New(isolate, 1));
-      }
-      else
-      {
-        if (uv_is_closing((uv_handle_t *)ctx->handle) == 0) {
-          uv_close((uv_handle_t *)ctx->handle, on_close);
-        }
-        args.GetReturnValue().Set(Integer::New(isolate, 0));
-      }
-    }
-  }
-  else if (s->_stream)
-  {
-    if (uv_is_closing((uv_handle_t *)s->_stream) == 0) {
-      uv_close((uv_handle_t *)s->_stream, on_close2);
-    }
+  if (s->_stream) {
+    uv_close((uv_handle_t *)s->_stream, on_close2);
     args.GetReturnValue().Set(Integer::New(isolate, 0));
+    return;
+  }
+  int do_shutdown = 1;
+  int argc = args.Length();
+  Local<Context> context = isolate->GetCurrentContext();
+  _context *ctx = s->context;
+  if (argc > 0) {
+    do_shutdown = args[0]->Int32Value(context).ToChecked();
+  }
+  if (do_shutdown) {
+    uv_shutdown_t *req;
+    req = (uv_shutdown_t *)malloc(sizeof *req);
+    int r = uv_shutdown(req, ctx->handle, after_shutdown);
+    args.GetReturnValue().Set(Integer::New(isolate, r));
+  }
+  else {
+    size_t queueSize = ctx->handle->write_queue_size;
+    if (queueSize > 0) {
+      ctx->closing = true;
+      args.GetReturnValue().Set(Integer::New(isolate, 1));
+    }
+    else {
+      uv_close((uv_handle_t *)ctx->handle, on_close);
+      args.GetReturnValue().Set(Integer::New(isolate, 0));
+    }
   }
 }
 

@@ -85,9 +85,7 @@ void after_write(uv_write_t *req, int status)
         }
         if (t->closing)
         {
-            if (uv_is_closing((uv_handle_t *)t->handle) == 0) {
-                uv_close((uv_handle_t *)t->handle, on_close);
-            }
+            uv_close((uv_handle_t *)t->handle, on_close);
             t->closing = false;
         }
     }
@@ -127,11 +125,7 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
             Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
         }
         t->stats.in.end++;
-/*
-        if (uv_is_closing((uv_handle_t *)handle) == 0) {
-            uv_close((uv_handle_t*)handle, OnClose);
-        }
-*/
+        //uv_close((uv_handle_t*)handle, on_close);
     }
     else if (nread < 0) {
         // we got a system error
@@ -142,9 +136,7 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
             Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
         }
         t->stats.error++;
-        if (uv_is_closing((uv_handle_t *)handle) == 0) {
-            uv_close((uv_handle_t*)handle, on_close);
-        }
+        uv_close((uv_handle_t*)handle, on_close);
     } else {
         // nread = 0, we got an EAGAIN or EWOULDBLOCK
     }
@@ -374,12 +366,12 @@ void TTY::Close(const FunctionCallbackInfo<Value> &args)
     uv_stream_t *s = (uv_stream_t *)t->handle;
     size_t queueSize = s->write_queue_size;
     if (queueSize > 0) {
+        fprintf(stderr, "closing\n");
         t->closing = true;
     }
     else {
-        if (uv_is_closing((uv_handle_t *)t->handle) == 0) {
-            uv_close((uv_handle_t *)t->handle, on_close);
-        }
+        uv_close((uv_handle_t *)t->handle, on_close);
+        t->closing = false;
     }
 }
 

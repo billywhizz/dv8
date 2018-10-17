@@ -3,9 +3,9 @@
 #diff test.bin copy.bin
 #cat test.bin | dv8 pipe.js | cksum
 #cat test.bin | cksum
-dd if=/dev/urandom count=1638400 bs=4096 > test.bin
-time cat test.bin | cksum
-time cat test.bin | dv8 pipe.js | cksum
-time cat test.bin | md5sum
-time cat test.bin | dv8 pipe.js | md5sum
+dd if=/dev/urandom count=1638400 status=none bs=4096 > test.bin
+cat test.bin | cksum
+cat test.bin | dv8 pipe.js | cksum
+cat test.bin | md5sum
+cat test.bin | dv8 pipe.js | md5sum
 rm -f test.bin

@@ -9,7 +9,11 @@ let payload
 let written
 let r
 
-const stdin = new TTY(0, len => {
+const MAXBUF = 4 * 64 * 1024
+const stdin = new TTY(0)
+stdin.setup(b, UV_TTY_MODE_NORMAL)
+
+stdin.onRead(len => {
     const text = b.read(0, len)
     const res = eval(text)
     payload = `${JSON.stringify(res, null, 2)}\n`
@@ -23,13 +27,32 @@ const stdin = new TTY(0, len => {
     written = b.write(payload, 0)
     r = stdout.write(written)
     if (r < 0) return stdout.close()
-}, () => stdin.close(), () => stdout.close())
+    if (r < len && stdout.queueSize() >= MAXBUF) stdin.pause()
+})
+
+stdin.onEnd(() => {
+    stdin.close()
+})
+
+stdin.onClose(() => {
+    stdout.close()
+})
+
 const stdout = new TTY(1, () => {}, () => stdin.resume(), e => { print(`write error: ${e}`) })
-print(`normal: ${UV_TTY_MODE_NORMAL}`)
-print(`raw   : ${UV_TTY_MODE_RAW}`)
-print(`io    : ${UV_TTY_MODE_IO}`)
-stdin.setup(b, UV_TTY_MODE_NORMAL)
 stdout.setup(b, UV_TTY_MODE_NORMAL)
+
+stdout.onClose(() => {
+
+})
+
+stdout.onDrain(() => {
+    stdin.resume()
+})
+
+stdout.onError((e, message) => {
+    print(`stdout.error:\n${e.toString()}\n${message}`)
+})
+
 
 payload = '> '
 written = b.write(payload, 0)
@@ -39,4 +62,3 @@ if (r < 0) {
 } else {
     stdin.resume()
 }
-

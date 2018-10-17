@@ -1,4 +1,4 @@
-require('./base.js')
+require('./lib/base.js')
 const start = Date.now()
 const dv = new DataView(workerData)
 const id = dv.getUint8(0)

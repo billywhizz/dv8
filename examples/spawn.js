@@ -9,7 +9,7 @@ onExit(() => {
 function spawn(fname) {
     const thread = new Thread()
     thread.buffer = new Buffer()
-    const bytes = new Uint8Array(thread.buffer.alloc(10))
+    const bytes = new Uint8Array(thread.buffer.alloc(100))
     const threadId = bytes[0] = id++
     thread.start(fname, () => {
         print(`worker ${threadId} stopped`)
