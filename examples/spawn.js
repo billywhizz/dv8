@@ -1,3 +1,4 @@
+require('./lib/base.js')
 const { Thread } = module('thread', {})
 
 let id = 1
@@ -7,12 +8,15 @@ onExit(() => {
 })
 
 function spawn(fname) {
+    const start = Date.now()
     const thread = new Thread()
     thread.buffer = new Buffer()
-    const bytes = new Uint8Array(thread.buffer.alloc(100))
-    const threadId = bytes[0] = id++
+    const dv = new DataView(thread.buffer.alloc(256))
+    const threadId = id++
+    dv.setUint8(0, threadId)
     thread.start(fname, () => {
-        print(`worker ${threadId} stopped`)
+        const finish = Date.now()
+        print(`worker ${threadId} stopped. time: ${finish - start} ms`)
     }, thread.buffer)
 }
 

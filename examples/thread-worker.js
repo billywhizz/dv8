@@ -5,12 +5,12 @@ const id = dv.getUint8(0)
 const duration = dv.getUint8(1)
 print(`thread: ${id} running for ${duration} seconds`)
 const timer = setInterval(() => {
-    const t = Date.now()
-    dv.setFloat64(2, t)
-    dv.setFloat64(10, ready)
-    const elapsed = Math.floor((t - start) / 1000)
+    dv.setBigUint64(2, BigInt(Date.now()))
+    const elapsed = Math.floor((Date.now() - start) / 1000)
     if (elapsed >= duration) {
         clearTimeout(timer)
     }
 }, 1000)
-const ready = Date.now()
+const ready = hrtime()
+dv.setBigUint64(10, ready)
+dv.setBigUint64(2, BigInt(Date.now()))
