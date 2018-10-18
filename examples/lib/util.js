@@ -1,11 +1,7 @@
-const stats = new BigUint64Array(20)
 
-function printStats(pipe, direction = 'in', fd) {
-    if (fd || fd === 0) {
-        pipe.stats(fd, stats)
-    } else {
-        pipe.stats(stats)
-    }
+function printStats(pipe, direction = 'in') {
+    const stats = new BigUint64Array(20)
+    pipe.stats(stats)
     if(direction === 'in') {
         print(`close:     ${stats[0]}
 error:     ${stats[1]}
@@ -15,7 +11,6 @@ data:      ${stats[4]}
 resume:    ${stats[5]}
 end:       ${stats[6]}
 `)
-        
     } else {
         print(`close:      ${stats[0]}
 error:      ${stats[1]}

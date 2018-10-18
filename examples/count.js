@@ -1,6 +1,6 @@
 const { start, stop } = require('./lib/meter.js')
 const { printStats } = require('./lib/util.js')
-const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, UV_TTY_MODE_IO,  TTY } = module('tty', {})
+const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
 
 function onRead(len) {
     if (stdin.bytes === 0) start(stdin)

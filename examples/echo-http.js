@@ -68,11 +68,11 @@ sock.onConnect(fd => {
     const parser = new HTTPParser(HTTPParser.REQUEST)
     parser[HTTPParser.kOnMessageComplete] = () => {
         if (closing) {
-            bytesWritten += client.write(size200, size200Close)
-            client.close(1)
+            bytesWritten += client.write(size200Close, size200)
+            client.close()
             return
         }
-        client.write(0, size200)
+        client.write(size200)
     }
     client.onRead(len => {
         bytesRead += len

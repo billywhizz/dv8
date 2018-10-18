@@ -224,6 +224,14 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
         obj->stats.out.alloc = 0;
         obj->stats.out.free = 0;
         obj->stats.out.eagain = 0;
+
+        obj->callbacks.onClose = 0;
+        obj->callbacks.onWrite = 0;
+        obj->callbacks.onRead = 0;
+        obj->callbacks.onError = 0;
+        obj->callbacks.onDrain = 0;
+        obj->callbacks.onEnd = 0;
+
         if (ttype == 0) {
             uv_tty_init(env->loop, obj->handle, ttype, 1);
         } else {

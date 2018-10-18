@@ -4,12 +4,10 @@ const { start, stop } = require('./lib/meter.js')
 const { printStats, createBuffer } = require('./lib/util.js')
 
 const server = new Socket(UNIX)
-const BUFFER_SIZE = 4096
+const BUFFER_SIZE = 64 * 1024
 const MAX_BUFFER = 4 * BUFFER_SIZE
 
 server.onConnect(fd => {
-    print('server.connect')
-    server.close() // closes server, stops any new connections
     const stdin = new Socket(UNIX)
     const stdout = new TTY(1)
     const buf = createBuffer(BUFFER_SIZE)
@@ -55,7 +53,14 @@ server.onConnect(fd => {
     stdout.onError((e, message) => {
         print(`stdout.error: ${e.toString()}\n${message}`)
     })
+    server.close() // closes server, stops any new connections
 })
+
+server.onClose(() => {
+    print('server.close')
+})
+
+server.onError(e => print(`server.error: ${e}`))
 
 const r = server.listen(args[2] || '/tmp/pipe.sock')
 if(r !== 0) {

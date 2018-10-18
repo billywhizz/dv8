@@ -186,6 +186,7 @@ void Thread::Stop(const FunctionCallbackInfo<Value> &args)
 	v8::HandleScope handleScope(isolate);
 	//TODO: need to signal the thread. then it should invoke an onExit event and shutdown event loop when it returns
 	// i.e. same behaviour as when thread gets SIGTERM
+	Thread *obj = ObjectWrap::Unwrap<Thread>(args.Holder());
 }
 
 void Thread::Start(const FunctionCallbackInfo<Value> &args)
@@ -194,7 +195,6 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	Local<Context> context = isolate->GetCurrentContext();
 	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
 	v8::HandleScope handleScope(isolate);
-
 	int argc = args.Length();
 	Thread *obj = ObjectWrap::Unwrap<Thread>(args.Holder());
 	String::Utf8Value str(args.GetIsolate(), args[0]);

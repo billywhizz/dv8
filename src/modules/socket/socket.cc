@@ -327,7 +327,7 @@ void Socket::Stats(const FunctionCallbackInfo<Value> &args)
   v8::HandleScope handleScope(isolate);
   Socket *socket = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = socket->context;
-  Local<v8::BigUint64Array> array = args[1].As<v8::BigUint64Array>();
+  Local<v8::BigUint64Array> array = args[0].As<v8::BigUint64Array>();
   Local<ArrayBuffer> ab = array->Buffer();
   uint64_t *fields = static_cast<uint64_t *>(ab->GetContents().Data());
   fields[0] = ctx->stats.close;
@@ -370,10 +370,17 @@ void Socket::New(const FunctionCallbackInfo<Value> &args)
     Local<Context> context = isolate->GetCurrentContext();
     Socket *obj = new Socket();
     int len = args.Length();
-    if (len > 0)
-    {
+    if (len > 0) {
       obj->socktype = (socket_type)args[0]->Uint32Value(context).ToChecked();
     }
+    obj->callbacks.onClose = 0;
+    obj->callbacks.onWrite = 0;
+    obj->callbacks.onRead = 0;
+    obj->callbacks.onError = 0;
+    obj->callbacks.onDrain = 0;
+    obj->callbacks.onEnd = 0;
+    obj->callbacks.onConnect = 0;
+    obj->_stream = NULL;
     obj->Wrap(args.This());
     args.GetReturnValue().Set(args.This());
   }
@@ -549,8 +556,12 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *socket = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
-  int off = args[0]->Int32Value(context).ToChecked();
-  uint32_t len = args[1]->Uint32Value(context).ToChecked();
+  int argc = args.Length();
+  uint32_t off = 0;
+  uint32_t len = args[0]->Uint32Value(context).ToChecked();
+  if (argc > 1) {
+    off = args[1]->Int32Value(context).ToChecked();
+  }
   _context *ctx = socket->context;
   char *src = ctx->out.base + off;
   uv_buf_t buf;
