@@ -7,3 +7,7 @@
 # 0.0.4
 - license
 - readme improvements
+# 0.0.5
+- core working
+- threads working
+- good set of examples

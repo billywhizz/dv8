@@ -11,14 +11,10 @@ COPY src /src
 COPY build/platform.sh /build/platform.sh
 COPY build/module.sh /build/module.sh
 RUN ./platform.sh && \
-    ./module.sh dns && \
-    ./module.sh event && \
-    ./module.sh fs && \
     ./module.sh os && \
     ./module.sh process && \
     ./module.sh socket && \
     ./module.sh thread && \
     ./module.sh timer && \
-    ./module.sh tty && \
-    ./module.sh udp
+    ./module.sh tty
 CMD ["/bin/sh"]

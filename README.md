@@ -9,10 +9,10 @@ Dockerfile for v8 modified from here: https://hub.docker.com/r/alexmasterov/alpi
 
 The code is of a very low standard and right now this is just a proof of concept. will be adding tasks to the roadmap below.
 
-## Run a shell
+## Quickstart Run a shell
 ```bash
 ## export the version
-export DV8_VERSION=0.0.4
+export DV8_VERSION=0.0.5
 docker run -it --rm -v $(pwd)/examples:/app billywhizz/dv8:$DV8_VERSION /bin/sh
 dv8 repl.js
 ```
@@ -38,7 +38,7 @@ count.stdin :  65536000000 bytes  14.326 sec   34901.57 Mib/s    4362.69 MiB/s 1
 ### Export the version you want to build
 ```bash
 ## export the version
-export DV8_VERSION=0.0.4
+export DV8_VERSION=0.0.5
 ```
 
 ### Build all with dependencies (v8 and libuv)
