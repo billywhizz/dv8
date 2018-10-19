@@ -1,28 +1,15 @@
-const { start, stop } = require('./lib/meter.js')
-const { printStats } = require('./lib/util.js')
 const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
-
-function onRead(len) {
-    if (stdin.bytes === 0) start(stdin)
-    stdin.bytes += len
-}
-
-function onEnd() {
-    stdin.close()
-    stop(stdin)
-}
-
-function onClose() {
-    printStats(stdin)
-}
+const { start, stop } = require('./lib/meter.js')
+const { createBuffer } = require('./lib/util.js')
 
 const stdin = new TTY(0)
-const b = new Buffer()
-b.alloc(64 * 1024)
-stdin.bytes = 0
+const BUFFER_SIZE = 64 * 1024
+
+const buf = createBuffer(BUFFER_SIZE)
 stdin.name = 'count.stdin'
-stdin.setup(b, UV_TTY_MODE_RAW)
-stdin.onRead(onRead)
-stdin.onEnd(onEnd)
-stdin.onClose(onClose)
+stdin.setup(buf, UV_TTY_MODE_RAW)
+stdin.onRead(len => {})
+stdin.onEnd(() => stdin.close())
+stdin.onClose(() => stop(stdin))
 stdin.resume()
+start(stdin)

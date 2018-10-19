@@ -1,21 +1,23 @@
 require('./lib/base.js')
 const { Thread } = module('thread', {})
+const { createBuffer } = require('./lib/util.js')
 
+const BUFFER_SIZE = 64 * 1024
 const threads = []
 
 function spawn() {
     const start = hrtime()
     const threadId = threads.length + 1
-    print(`main  : ${threadId} starting`)
     const thread = new Thread()
-    thread.buffer = new Buffer()
-    const dv = new DataView(thread.buffer.alloc(256))
+    thread.buffer = createBuffer(BUFFER_SIZE)
+    const dv = new DataView(thread.buffer.bytes)
     const duration = parseInt(args[3] || '10', 10)
-    dv.setUint8(0, threadId) // thread id
-    dv.setUint8(1, duration) // time to run
+    dv.setUint8(0, threadId)
+    dv.setUint8(1, duration)
     thread.start('./thread-worker.js', () => {
         const ready = dv.getBigUint64(10)
-        print(`boot: ${(ready - start) / 1000n} usec`)
+        const i = BigInt(1000)
+        print(`boot: ${(ready - start) / i} usec`)
     }, thread.buffer)
     threads.push(thread)
 }

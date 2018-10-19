@@ -50,7 +50,8 @@ int main(int argc, char *argv[])
         dv8::DecorateErrorStack(isolate, try_catch);
         return 1;
       }
-      v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source.ToLocalChecked());
+      v8::ScriptOrigin origin(v8::String::NewFromUtf8(isolate, str, v8::NewStringType::kNormal).ToLocalChecked());
+      v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source.ToLocalChecked(), &origin);
       if (try_catch.HasCaught())
       {
         dv8::DecorateErrorStack(isolate, try_catch);

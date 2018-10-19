@@ -31,12 +31,12 @@ void on_close(uv_handle_t *handle)
     v8::HandleScope handleScope(isolate);
     TTY *t = (TTY *)handle->data;
     t->stats.close++;
-    free(handle);
     if (t->callbacks.onClose == 1) {
         Local<Value> argv[0] = {};
         Local<Function> Callback = Local<Function>::New(isolate, t->_onClose);
         Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     }
+    free(handle);
 }
 
 void after_write(uv_write_t *req, int status)
@@ -374,7 +374,6 @@ void TTY::Close(const FunctionCallbackInfo<Value> &args)
     uv_stream_t *s = (uv_stream_t *)t->handle;
     size_t queueSize = s->write_queue_size;
     if (queueSize > 0) {
-        fprintf(stderr, "closing\n");
         t->closing = true;
     }
     else {

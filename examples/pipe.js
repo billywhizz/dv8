@@ -1,69 +1,31 @@
+const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
 const { start, stop } = require('./lib/meter.js')
-const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, UV_TTY_MODE_IO, UV_EAGAIN, UV_EOF, TTY } = module('tty', {})
-const { printStats } = require('./lib/util.js')
+const { createBuffer } = require('./lib/util.js')
 
-const MAXBUF = 4 * 64 * 1024
-const buf = new Buffer()
-buf.bytes = new Uint8Array(buf.alloc(64 * 1024))
+const BUFFER_SIZE = 64 * 1024
+const MAX_BUFFER = 4 * BUFFER_SIZE
 
 const stdin = new TTY(0)
+const stdout = new TTY(1)
+const buf = createBuffer(BUFFER_SIZE)
 stdin.setup(buf, UV_TTY_MODE_RAW)
-stdin.bytes = 0
+stdout.setup(buf, UV_TTY_MODE_RAW)
 stdin.name = 'pipe.stdin'
-
+stdout.name = 'pipe.stdout'
 stdin.onRead(len => {
-    if (stdin.bytes === 0) {
-        start(stdin)
-        start(stdout)
-    }
-    stdin.bytes += len
     const r = stdout.write(len)
-    if (r < 0) {
-        stdout.close()
-        return
-    }
-    if (r < len && stdout.queueSize() >= MAXBUF) stdin.pause()
-    stdout.bytes += len
+    if (r < 0) return stdout.close()
+    if (r < len && stdout.queueSize() >= MAX_BUFFER) stdin.pause()
 })
-
 stdin.onEnd(() => {
     stop(stdin)
     stdin.close()
 })
-
-stdin.onClose(() => {
-    printStats(stdin)
-    stdout.close()
-})
-
-stdin.onError(e => {
-    print(`stdin.error: ${e.toString()}`)
-})
-
-const stdout = new TTY(1)
-stdout.setup(buf, UV_TTY_MODE_RAW)
-stdout.bytes = 0
-stdout.name = 'pipe.stdout'
-
-stdout.onClose(() => {
-    stop(stdout)
-    printStats(stdout, 'out')
-})
-
-stdout.onDrain(() => {
-    stdin.resume()    
-})
-/*
-stdout.onWrite(len => {
-
-})
-
-stdout.onEnd(() => {
-
-})
-*/
-stdout.onError((e, message) => {
-    print(`stdout.error: ${e.toString()}\n${message}`)
-})
-
+stdin.onClose(() => stdout.close())
+stdin.onError(err => print(`stdin.error: ${err}`))
+stdout.onDrain(() => stdin.resume())
+stdout.onClose(() => stop(stdout))
+stdout.onError((err, message) => print(`stdout.error: ${err}\n${message}`))
 stdin.resume()
+start(stdin)
+start(stdout)
