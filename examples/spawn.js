@@ -1,5 +1,5 @@
+require('./lib/base.js')
 const { Thread } = module('thread', {})
-const { createBuffer } = require('./lib/util.js')
 
 const BUFFER_SIZE = 64 * 1024
 let threadId = 1
@@ -10,7 +10,7 @@ function spawn(fname) {
     const start = Date.now()
     const thread = new Thread()
     thread.buffer = createBuffer(BUFFER_SIZE)
-    const dv = new DataView(thread.buffer)
+    const dv = new DataView(thread.buffer.bytes)
     dv.setUint8(0, threadId++)
     thread.start(fname, () => {
         const finish = Date.now()

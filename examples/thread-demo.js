@@ -1,6 +1,5 @@
 require('./lib/base.js')
 const { Thread } = module('thread', {})
-const { createBuffer } = require('./lib/util.js')
 
 const BUFFER_SIZE = 64 * 1024
 const threads = []

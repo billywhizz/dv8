@@ -1,6 +1,6 @@
+require('./lib/base.js')
 const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
 const { start, stop } = require('./lib/meter.js')
-const { createBuffer } = require('./lib/util.js')
 
 const stdin = new TTY(0)
 const BUFFER_SIZE = 64 * 1024

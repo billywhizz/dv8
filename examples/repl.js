@@ -1,9 +1,11 @@
+require('./lib/base.js')
 const { UV_TTY_MODE_NORMAL, TTY } = module('tty', {})
-const { createBuffer } = require('./lib/util.js')
+
 const BUFFER_SIZE = 64 * 1024
 const MAX_BUFFER = 4 * BUFFER_SIZE
 const stdin = new TTY(0)
 const buf = createBuffer(BUFFER_SIZE)
+
 stdin.setup(buf, UV_TTY_MODE_NORMAL)
 stdin.onRead(len => {
     const source = buf.read(0, len)
@@ -20,6 +22,7 @@ stdin.onRead(len => {
 })
 stdin.onEnd(() => stdin.close())
 stdin.onClose(() => stdout.close())
+
 const stdout = new TTY(1)
 stdout.setup(buf, UV_TTY_MODE_NORMAL)
 stdout.onDrain(() => stdin.resume())

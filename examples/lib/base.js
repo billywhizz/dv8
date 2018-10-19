@@ -77,6 +77,12 @@ function clearTimeout(t) {
     t.stop()
 }
 
+function createBuffer(size) {
+    const buf = new Buffer()
+    buf.bytes = buf.alloc(size) // buf.bytes is an instance of ArrayBuffer
+    return buf
+}
+
 global.setTimeout = setTimeout
 global.setInterval = setInterval
 global.clearTimeout = clearTimeout
@@ -85,6 +91,7 @@ global.memoryUsage = getMemoryUsage
 global.heapUsage = heapUsage
 global.cpuUsage = cpuUsage
 global.hrtime = hrtime
+global.createBuffer = createBuffer
 
 global.threadId = 0
 
