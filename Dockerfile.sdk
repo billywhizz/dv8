@@ -10,10 +10,15 @@ COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/out/Release/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
 COPY build/module.sh /build/module.sh
-RUN ./platform.sh
-RUN ./module.sh os
-RUN ./module.sh process
-RUN ./module.sh socket
-RUN ./module.sh timer
-RUN ./module.sh tty
+RUN ./platform.sh && \
+    ./module.sh dns && \
+    ./module.sh event && \
+    ./module.sh fs && \
+    ./module.sh os && \
+    ./module.sh process && \
+    ./module.sh socket && \
+    ./module.sh thread && \
+    ./module.sh timer && \
+    ./module.sh tty && \
+    ./module.sh udp
 CMD ["/bin/sh"]

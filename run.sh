@@ -1,1 +1,1 @@
-docker run -it --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/out/lib:/usr/local/lib -v $(pwd)/examples:/app dv8 /bin/sh
+docker run -it --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/out/lib:/usr/local/lib -v $(pwd)/examples:/app -p 3000:3000 dv8 /bin/sh
