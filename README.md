@@ -141,9 +141,9 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
     - shutdown() - shutdown the event loop
     - gc() - force garbage collection (requires --expose-gc command line argument)
     - Buffer
-        - alloc() - allocate memory outside the v8 heap
-        - pull() - pull a v8 string from the buffer
-        - push() - push a v8 string into the buffer (should rename these to read/write)
+        - alloc(size) - allocate memory outside the v8 heap
+        - read(len) - read a v8 string from the buffer
+        - write(str) - write a v8 string into the buffer
 - the standard library is available as a set of optional shared modules
     - os (poc)
     - process (poc)
@@ -232,14 +232,19 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 - goal is to be small and fast and as close to metal as possible in JS
 - easy to build other abstractions on top of this
 - core is all C++, no JS
+  - maybe an optional js bootstrap that can be compiled in at build time
 - no event emitters
 - no streams
 - no big abtractions - only the base api's in core
 - standard library should not cause mark/sweep gc
 - return codes, not exceptions as much as possible
 - module interop - in c++ - how?
-- top level async
+  - modules need to be able to inherit from each other
+  - need to be able to wrap a module (e.g. socket) and implement on top of it (e.g. tls)
 - Metrics in core - exposed in standard format
+  - recorded in buffers in c++ land
+  - JS land can read the metrics whenever it needs to
+  - DataViews?
 - secure, small, fast
 - iOT support - arm build
 - static modules for packaged binary
@@ -258,3 +263,146 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
 - sane mechanism for ref'ing handles
 - minimal abstractions - no common streams library - make api's for each
 - figure out how to do the sockets module better - Socket instance for each connection, no fd's
+
+# 10 October 2018
+
+## NEXT
+
+- command line args - DONE
+- environment variables - DONE
+- standardise stream/backpressure handling in socket and tty modules
+- idle handler/nexttick
+- fork/exec
+- libuv - loop inspection - handles
+- thread.global functions for gc/shutdown
+- atexit/onexit support - DONE
+- inspector PoC
+- thread stop - shutdown loop
+- builtin js startup
+
+# API
+
+## JS
+
+### main.global
+  version()
+  print()
+  module()
+  require()
+  shutdown()
+  gc()
+### thread.global
+  version()
+  print()
+  module()
+  require()
+### os
+  onSignal()
+### process
+  pid()
+  memoryUsage()
+### socket
+  listen()
+  connect()
+  bind()
+  close()
+  pull()
+  push()
+  write()
+  writeText()
+  setup()
+  setNoDelay()
+  pause()
+  resume()
+  setKeepAlive()
+  proxy()
+  remoteAddress()
+  onConnect()
+  onClose()
+  onWrite()
+  onData()
+  onError()
+### thread
+  start()
+### timer
+  start()
+  stop()
+### tty
+  writeString()
+  write()
+  close()
+  setup()
+  pause()
+  resume()
+  queueSize()
+  stats()
+  UV_TTY_MODE_NORMAL
+  UV_TTY_MODE_RAW
+  UV_TTY_MODE_IO
+
+
+## C++
+
+### global
+dv8::Version()
+dv8::Require()
+
+### builtins
+
+### modules
+
+
+# Tests
+
+## netcat/pipecat
+
+```bash
+# run pipecat
+rm -f /tmp/pipe.sock & dv8 pipecat.js | cat 1> /dev/null
+# test pipecat using socat
+dd if=/dev/zero count=100000 bs=65536 | socat - unix:/tmp/pipe.sock
+# test pipecat using netcat
+dd if=/dev/zero count=100000 bs=65536 | dv8 netcat.js
+# test netcat using socat
+rm -f /tmp/pipe.sock & socat unix-listen:/tmp/pipe.sock - | cat 1> /dev/null
+
+```
+
+testing pipecat/netcat/count
+
+rm -f /tmp/pipe.sock
+dv8 pipecat.js | dv8 count.js
+dd if=/dev/zero count=300000 bs=65536 | dv8 netcat.js
+
+
+netcat test
+
+assert(stdout.written === stdin.read)
+assert(stdout.incomplete + stdout.full + stdout.eagain === stdin.data)
+assert(stdin.pause === stdin.resume - 1)
+assert(stdin.close === 1)
+assert(stdin.error === 0)
+assert(stdin.end === 1)
+assert(stdout.close === 1)
+assert(stdout.error === 0)
+assert(stdout.alloc === stdout.free)
+
+
+pipecat test
+
+stdin.read === netcat.stdout.written
+
+
+being able to make a prediction about what will happen in a given
+scenario is probably the most import aspect of programming. if the code
+is too complex it's very hard to make these predictions and to verify them
+
+tests
+
+dd if=/dev/urandom of=test.bin count=10000 bs=65536
+cat test.bin | dv8 count.js
+verify bytes
+md5 check
+crc check
+
+counts the bytes in a 6.5 GB file in 2.5 seconds - 20Gb/sec

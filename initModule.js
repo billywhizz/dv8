@@ -26,48 +26,49 @@ async function mkdirpAsync(p, mode = 0o777) {
 function getBinding(name, className) {
 	return `#include "${name}.h"
 
-	namespace dv8 {
-	namespace ${name} {
-	  using v8::Local;
-	  using v8::Object;
-	
-	  void InitAll(Local<Object> exports) {
+namespace dv8 {
+namespace ${name} {
+	using v8::Local;
+	using v8::Object;
+
+	void InitAll(Local<Object> exports) {
 		${className}::Init(exports);
-	  }
 	}
-	}
-	
-	extern "C" {
-	  void* _register_${name}() {
+}
+}
+
+extern "C" {
+	void* _register_${name}() {
 		return (void*)dv8::${name}::InitAll;
-	  }
 	}
+}
 `
 }
 
 function getSource(name, className) {
 	return `#include "${name}.h"
 
-	namespace dv8 {
-	
-	namespace ${name} {
-	  using v8::Context;
-	  using v8::Function;
-	  using v8::FunctionCallbackInfo;
-	  using v8::FunctionTemplate;
-	  using v8::Isolate;
-	  using v8::Local;
-	  using v8::Number;
-	  using v8::Integer;
-	  using v8::Object;
-	  using v8::Persistent;
-	  using v8::String;
-	  using v8::Value;
-	  using v8::Array;
-	
-	  Persistent<Function> ${className}::constructor;
-	
-	  void ${className}::Init(Local<Object> exports) {
+namespace dv8 {
+
+namespace ${name} {
+	using v8::Context;
+	using v8::Function;
+	using v8::FunctionCallbackInfo;
+	using v8::FunctionTemplate;
+	using v8::Isolate;
+	using v8::Local;
+	using v8::Number;
+	using v8::Integer;
+	using v8::Object;
+	using v8::Persistent;
+	using v8::String;
+	using v8::Value;
+	using v8::Array;
+	using dv8::builtins::Environment;
+
+	Persistent<Function> ${className}::constructor;
+
+	void ${className}::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
@@ -78,24 +79,24 @@ function getSource(name, className) {
 	
 		constructor.Reset(isolate, tpl->GetFunction());
 		DV8_SET_EXPORT(isolate, tpl, "${className}", exports);
-	  }
-	
-	  void ${className}::New(const FunctionCallbackInfo<Value>& args) {
+	}
+
+	void ${className}::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
 		if (args.IsConstructCall()) {
-		  ${className}* obj = new ${className}();
-		  obj->Wrap(args.This());
-		  args.GetReturnValue().Set(args.This());
+			${className}* obj = new ${className}();
+			obj->Wrap(args.This());
+			args.GetReturnValue().Set(args.This());
 		} else {
-		  Local<Function> cons = Local<Function>::New(isolate, constructor);
-		  Local<Context> context = isolate->GetCurrentContext();
-		  Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
-		  args.GetReturnValue().Set(instance);
+			Local<Function> cons = Local<Function>::New(isolate, constructor);
+			Local<Context> context = isolate->GetCurrentContext();
+			Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
+			args.GetReturnValue().Set(instance);
 		}
-	  }
-	
-	  void ${className}::NewInstance(const FunctionCallbackInfo<Value>& args) {
+	}
+
+	void ${className}::NewInstance(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		const unsigned argc = 2;
 		Local<Value> argv[argc] = { args[0], args[1] };
@@ -103,52 +104,55 @@ function getSource(name, className) {
 		Local<Context> context = isolate->GetCurrentContext();
 		Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
 		args.GetReturnValue().Set(instance);
-	  }
-
-	  void ${className}::Hello(const FunctionCallbackInfo<Value> &args)
-	  {
-		  Isolate *isolate = args.GetIsolate();
-		  v8::HandleScope handleScope(isolate);
-		  ${className}* obj = ObjectWrap::Unwrap<${className}>(args.Holder());
-		  args.GetReturnValue().Set(Integer::New(isolate, 0));
-	  }
-	  
 	}
-	}	
+
+	void ${className}::Hello(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		${className}* obj = ObjectWrap::Unwrap<${className}>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+	
+}
+}	
 `
 }
 
 function getHeader(name, className) {
 	return `#ifndef DV8_${className}_H
-	#define DV8_${className}_H
-	
-	#include <dv8.h>
-	
-	namespace dv8 {
-	
-	namespace ${name} {
-	class ${className} : public dv8::ObjectWrap {
-	 public:
-	  static void Init(v8::Local<v8::Object> exports);
-	  static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
-	
-	 private:
-	
-	  ${className}() {
-	  }
-	
-	  ~${className}() {
-	  }
-	
-	  static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-	  static void Hello(const v8::FunctionCallbackInfo<v8::Value>& args);
-	  static v8::Persistent<v8::Function> constructor;
-	
-	};
-	
-	}
-	}
-	#endif
+#define DV8_${className}_H
+
+#include <dv8.h>
+
+namespace dv8 {
+
+namespace ${name} {
+
+class ${className} : public dv8::ObjectWrap {
+	public:
+		static void Init(v8::Local<v8::Object> exports);
+		static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	private:
+
+		${className}() {
+		}
+
+		~${className}() {
+		}
+
+		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Hello(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static v8::Persistent<v8::Function> constructor;
+
+};
+
+}
+}
+#endif
 `
 }
 
