@@ -20,6 +20,7 @@ static void on_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t* buf) {
         bytes += nread;
     } else if (nread < 0) {
         fprintf(stderr, "read_error: %li\n", nread);
+        uv_close((uv_handle_t*)_stdin, on_close);
     }
 }
 

@@ -1,18 +1,34 @@
-/*
-A very crappy repl so you can inspect some of the builtins
-*/
-const tty = module('tty', {})
-const { TTY } = tty
-const b = new Buffer()
-b.alloc(64 * 1024)
-stdin = new TTY(0, len => {
-    const text = b.pull(0, len)
-    const res = `${JSON.stringify(eval(text), null, '  ')}\n`
-    b.push(res, 0)
-    const r = stdout.write(res.length)
+require('./lib/base.js')
+const { UV_TTY_MODE_NORMAL, TTY } = module('tty', {})
+
+const BUFFER_SIZE = 64 * 1024
+const MAX_BUFFER = 4 * BUFFER_SIZE
+const stdin = new TTY(0)
+const buf = createBuffer(BUFFER_SIZE)
+
+stdin.setup(buf, UV_TTY_MODE_NORMAL)
+stdin.onRead(len => {
+    const source = buf.read(0, len)
+    const result = eval(source)
+    let payload = `${JSON.stringify(result, null, 2)}\n`
+    if (!result) payload = '(null)\n'
+    if (!payload) payload = '(null)\n'
+    if (payload == undefined) payload = '(undefined)\n'
+    let r = stdout.write(buf.write(payload, 0))
     if (r < 0) return stdout.close()
-}, () => stdin.close(), () => stdout.close())
-stdout = new TTY(1, () => {}, () => stdin.resume(), e => { print(`write error: ${e}`) })
-stdin.setup(b)
-stdout.setup(b)
-stdin.resume()
+    r = stdout.write(buf.write('> ', 0))
+    if (r < 0) return stdout.close()
+    if (r < len && stdout.queueSize() >= MAX_BUFFER) stdin.pause()
+})
+stdin.onEnd(() => stdin.close())
+stdin.onClose(() => stdout.close())
+
+const stdout = new TTY(1)
+stdout.setup(buf, UV_TTY_MODE_NORMAL)
+stdout.onDrain(() => stdin.resume())
+stdout.onError((e, message) => print(`stdout.error:\n${e.toString()}\n${message}`))
+if (stdout.write(buf.write('> ', 0)) < 0) {
+    stdout.close()
+} else {
+    stdin.resume()
+}

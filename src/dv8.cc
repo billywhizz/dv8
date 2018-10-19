@@ -3,38 +3,29 @@
 namespace dv8
 {
 
+using dv8::builtins::Environment;
+using v8::HeapSpaceStatistics;
+
 using InitializerCallback = void (*)(Local<Object> exports);
 
-void SingnalHandler() {
-  signalHandle = new uv_signal_t;
-  int r = uv_signal_init(uv_default_loop(), signalHandle);
-  fprintf(stderr, "uv_signal_init: %i\n", r);
-  r = uv_signal_start(signalHandle, OnSignal, 15 | 2);
-  fprintf(stderr, "uv_signal_start: %i\n", r);
-}
-
-void OnSignal(uv_signal_t* handle, int signum) {
-  fprintf(stderr, "signal: %i\n", signum);
-  int r = uv_signal_stop(handle);
-  fprintf(stderr, "uv_signal_stop: %i\n", r);
-  uv_stop(uv_default_loop());
-}
-
-void on_handle_close(uv_handle_t* h) {
+void on_handle_close(uv_handle_t *h)
+{
   free(h);
 }
 
-void shutdown() {
-  uv_walk(uv_default_loop(), [](uv_handle_t* handle, void* arg) {
+void shutdown(uv_loop_t *loop)
+{
+  uv_walk(loop, [](uv_handle_t *handle, void *arg) {
     fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
     uv_close(handle, on_handle_close);
     //void* close_cb = reinterpret_cast<void*>(handle->close_cb);
-  }, NULL);
+  },
+          NULL);
 }
 
 void Shutdown(const FunctionCallbackInfo<Value> &args)
 {
-  shutdown();
+  shutdown(uv_default_loop());
 }
 
 void ReportException(Isolate *isolate, TryCatch *try_catch)
@@ -118,7 +109,8 @@ void Version(const FunctionCallbackInfo<Value> &args)
 MaybeLocal<String> ReadFile(Isolate *isolate, const char *name)
 {
   FILE *file = fopen(name, "rb");
-  if (file == NULL) {
+  if (file == NULL)
+  {
     isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Bad File", v8::NewStringType::kNormal).ToLocalChecked()));
     return v8::MaybeLocal<v8::String>();
   }
@@ -177,13 +169,15 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   Local<Object> exports;
-  if (success != 0) {
+  if (success != 0)
+  {
     fprintf(stderr, "uv_dlopen failed: %i\n", success);
     args.GetReturnValue().Set(exports);
     return;
   }
   bool ok = args[1]->ToObject(context).ToLocal(&exports);
-  if (!ok) {
+  if (!ok)
+  {
     fprintf(stderr, "convert args to local failed\n");
     args.GetReturnValue().Set(exports);
     return;
@@ -192,7 +186,8 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   snprintf(register_name, 128, "_register_%s", module_name);
   void *address;
   success = uv_dlsym(&lib, register_name, &address);
-  if (success != 0) {
+  if (success != 0)
+  {
     fprintf(stderr, "uv_dlsym failed: %i\n", success);
     args.GetReturnValue().Set(exports);
     return;
@@ -204,7 +199,8 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   uv_dlclose(&lib);
 }
 
-MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer) {
+MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer)
+{
   HandleScope handle_scope(context->GetIsolate());
   return MaybeLocal<Module>();
 }
@@ -213,6 +209,36 @@ void CollectGarbage(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+}
+
+void EnvVars(const FunctionCallbackInfo<Value> &args)
+{
+  //TODO: not thread safe
+  Isolate *isolate = args.GetIsolate();
+  HandleScope handleScope(isolate);
+  int size = 0;
+  while (environ[size])
+    size++;
+  Local<v8::Array> envarr = v8::Array::New(isolate);
+  for (int i = 0; i < size; ++i)
+  {
+    const char *var = environ[i];
+    envarr->Set(i, String::NewFromUtf8(isolate, var, v8::String::kNormalString, strlen(var)));
+  }
+  args.GetReturnValue().Set(envarr);
+}
+
+void OnExit(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  if (args[0]->IsFunction())
+  {
+    Local<Function> onExit = Local<Function>::Cast(args[0]);
+    env->onExit.Reset(isolate, onExit);
+  }
 }
 
 void Require(const FunctionCallbackInfo<Value> &args)
@@ -255,7 +281,8 @@ void Require(const FunctionCallbackInfo<Value> &args)
   {
     String::Utf8Value utf8string(args.GetIsolate(), source_text);
     Maybe<bool> ok = module->InstantiateModule(context, OnModuleInstantiate);
-    if (!ok.ToChecked()) {
+    if (!ok.ToChecked())
+    {
       fprintf(stderr, "instantiate module failed\n");
       args.GetReturnValue().Set(Null(args.GetIsolate()));
       return;
@@ -274,6 +301,8 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
   global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
+  global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
+  global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
   return Context::New(isolate, NULL, global);
 }
 
