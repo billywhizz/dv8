@@ -122,7 +122,6 @@ class Socket : public dv8::ObjectWrap
 public:
   // initialisation
   static void Init(v8::Local<v8::Object> exports);
-  //static void NewInstance(const v8::FunctionCallbackInfo<v8::Value> &args);
 
   // persistent pointers to JS callbacks
   v8::Persistent<v8::Function> _onConnect;
@@ -177,9 +176,6 @@ private:
   static void onClose(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket closes
   static void onEnd(const v8::FunctionCallbackInfo<v8::Value> &args);     // when a read socket gets EOF
   static void onDrain(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket write buffers have flushed
-
-  // persistent reference to JS Socket constructor
-  //static v8::Persistent<v8::Function> constructor;
 };
 
 } // namespace socket

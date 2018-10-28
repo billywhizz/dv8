@@ -20,8 +20,6 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
-//Persistent<Function> Timer::constructor;
-
 void Timer::Init(Local<Object> exports)
 {
     Isolate *isolate = exports->GetIsolate();
@@ -33,7 +31,6 @@ void Timer::Init(Local<Object> exports)
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", Timer::Start);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stop", Timer::Stop);
 
-    //constructor.Reset(isolate, tpl->GetFunction());
     DV8_SET_EXPORT(isolate, tpl, "Timer", exports);
 }
 
@@ -41,34 +38,15 @@ void Timer::New(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
-    if (args.IsConstructCall())
-    {
+    if (args.IsConstructCall()) {
         Timer *obj = new Timer();
         obj->handle = (uv_timer_t *)calloc(1, sizeof(uv_timer_t));
         obj->handle->data = obj;
         obj->Wrap(args.This());
         args.GetReturnValue().Set(args.This());
     }
-    else
-    {
-        //Local<Function> cons = Local<Function>::New(isolate, constructor);
-        //Local<Context> context = isolate->GetCurrentContext();
-        //Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
-        //args.GetReturnValue().Set(instance);
-    }
 }
-/*
-void Timer::NewInstance(const FunctionCallbackInfo<Value> &args)
-{
-    Isolate *isolate = args.GetIsolate();
-    const unsigned argc = 2;
-    Local<Value> argv[argc] = {args[0], args[1]};
-    Local<Function> cons = Local<Function>::New(isolate, constructor);
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-    args.GetReturnValue().Set(instance);
-}
-*/
+
 void Timer::Start(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();

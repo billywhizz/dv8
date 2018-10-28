@@ -1,5 +1,3 @@
-require('./lib/base.js')
-
 const ANSI_RED='\u001b[31m'
 const ANSI_MAGENTA='\u001b[35m'
 const ANSI_DEFAULT='\u001b[0m'

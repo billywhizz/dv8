@@ -8,7 +8,6 @@ const million = BigInt(1000000)
 onExit(() => print('exiting main'))
 
 function threadTest() {
-    require('./lib/base.js')
     const timer = setTimeout(() => {
         print(JSON.stringify(memoryUsage()))
         print(JSON.stringify(args))
@@ -34,7 +33,6 @@ function spawn() {
         print(`${thread.id.toString().padEnd(5, ' ')} : ${(finish - start) / thousand} usec`)
         const ready = dv.getBigUint64(0)
         print(`boot: ${(ready - start) / thousand} usec`)
-
     }, thread.buffer)
 }
 

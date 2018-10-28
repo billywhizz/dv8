@@ -41,7 +41,6 @@ void Buffer::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Buffer::Write);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "copy", Buffer::Copy);
 
-  //constructor.Reset(isolate, tpl->GetFunction());
   DV8_SET_EXPORT(isolate, tpl, "Buffer", exports);
 }
 
@@ -49,32 +48,13 @@ void Buffer::New(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   HandleScope handle_scope(isolate);
-  if (args.IsConstructCall())
-  {
+  if (args.IsConstructCall()) {
     Buffer *obj = new Buffer();
     obj->Wrap(args.This());
     args.GetReturnValue().Set(args.This());
   }
-  else
-  {
-    //Local<Function> cons = Local<Function>::New(isolate, constructor);
-    //Local<Context> context = isolate->GetCurrentContext();
-    //Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
-    //args.GetReturnValue().Set(instance);
-  }
 }
-/*
-void Buffer::NewInstance(const FunctionCallbackInfo<Value> &args)
-{
-  Isolate *isolate = args.GetIsolate();
-  const unsigned argc = 2;
-  Local<Value> argv[argc] = {args[0], args[1]};
-  Local<Function> cons = Local<Function>::New(isolate, constructor);
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-  args.GetReturnValue().Set(instance);
-}
-*/
+
 void Buffer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   Isolate *isolate = data.GetIsolate();
   v8::HandleScope handleScope(isolate);

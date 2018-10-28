@@ -53,7 +53,6 @@ class TTY : public dv8::ObjectWrap
 {
 public:
   static void Init(v8::Local<v8::Object> exports);
-  //static void NewInstance(const v8::FunctionCallbackInfo<v8::Value> &args);
   uv_tty_t *handle;
   callbacks_t callbacks;      // pointers to JS callbacks
   char *in;
@@ -94,8 +93,6 @@ private:
   static void onClose(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket closes
   static void onEnd(const v8::FunctionCallbackInfo<v8::Value> &args);     // when a read socket gets EOF
   static void onDrain(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket write buffers have flushed
-
-  //static v8::Persistent<v8::Function> constructor;
 };
 
 } // namespace tty
