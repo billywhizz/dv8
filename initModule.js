@@ -66,8 +66,6 @@ namespace ${name} {
 	using v8::Array;
 	using dv8::builtins::Environment;
 
-	Persistent<Function> ${className}::constructor;
-
 	void ${className}::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
@@ -77,7 +75,6 @@ namespace ${name} {
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hello", ${className}::Hello);
 	
-		constructor.Reset(isolate, tpl->GetFunction());
 		DV8_SET_EXPORT(isolate, tpl, "${className}", exports);
 	}
 
@@ -88,22 +85,7 @@ namespace ${name} {
 			${className}* obj = new ${className}();
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
-		} else {
-			Local<Function> cons = Local<Function>::New(isolate, constructor);
-			Local<Context> context = isolate->GetCurrentContext();
-			Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
-			args.GetReturnValue().Set(instance);
 		}
-	}
-
-	void ${className}::NewInstance(const FunctionCallbackInfo<Value>& args) {
-		Isolate* isolate = args.GetIsolate();
-		const unsigned argc = 2;
-		Local<Value> argv[argc] = { args[0], args[1] };
-		Local<Function> cons = Local<Function>::New(isolate, constructor);
-		Local<Context> context = isolate->GetCurrentContext();
-		Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-		args.GetReturnValue().Set(instance);
 	}
 
 	void ${className}::Hello(const FunctionCallbackInfo<Value> &args)
@@ -134,7 +116,6 @@ namespace ${name} {
 class ${className} : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
-		static void NewInstance(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	private:
 
@@ -146,7 +127,6 @@ class ${className} : public dv8::ObjectWrap {
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Hello(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static v8::Persistent<v8::Function> constructor;
 
 };
 
