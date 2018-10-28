@@ -8,13 +8,20 @@ namespace dv8
 
 namespace builtins
 {
+
+v8::MaybeLocal<v8::Object> NewBuffer(v8::Isolate* isolate, char* data, size_t length);
+
 class Buffer : public dv8::ObjectWrap
 {
 public:
   static void Init(v8::Local<v8::Object> exports);
-  static void NewInstance(const v8::FunctionCallbackInfo<v8::Value> &args);
+  void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
   char *_data;
   size_t _length;
+  Buffer(char* data, size_t length) {
+    this->_data = data;
+    this->_length = length;
+  }
 
 private:
   Buffer()
@@ -24,7 +31,7 @@ private:
   ~Buffer()
   {
   }
-
+  
   static void New(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Alloc(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Free(const v8::FunctionCallbackInfo<v8::Value> &args);
@@ -32,8 +39,6 @@ private:
   static void Write(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Copy(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Length(const v8::FunctionCallbackInfo<v8::Value> &args);
-
-  static v8::Persistent<v8::Function> constructor;
 };
 
 } // namespace builtins

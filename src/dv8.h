@@ -107,12 +107,10 @@ inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate)
 
 inline void OnFatalError(const char *location, const char *message)
 {
-  if (location)
-  {
+  if (location) {
     fprintf(stderr, "FATAL ERROR: %s %s\n", location, message);
   }
-  else
-  {
+  else {
     fprintf(stderr, "FATAL ERROR: %s\n", message);
   }
   fflush(stderr);

@@ -8,39 +8,31 @@ using v8::HeapSpaceStatistics;
 
 using InitializerCallback = void (*)(Local<Object> exports);
 
-void on_handle_close(uv_handle_t *h)
-{
+void on_handle_close(uv_handle_t *h) {
   free(h);
 }
 
-void shutdown(uv_loop_t *loop)
-{
+void shutdown(uv_loop_t *loop) {
   uv_walk(loop, [](uv_handle_t *handle, void *arg) {
     fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
     uv_close(handle, on_handle_close);
-    //void* close_cb = reinterpret_cast<void*>(handle->close_cb);
-  },
-          NULL);
+  }, NULL);
 }
 
-void Shutdown(const FunctionCallbackInfo<Value> &args)
-{
+void Shutdown(const FunctionCallbackInfo<Value> &args) {
   shutdown(uv_default_loop());
 }
 
-void ReportException(Isolate *isolate, TryCatch *try_catch)
-{
+void ReportException(Isolate *isolate, TryCatch *try_catch) {
   HandleScope handle_scope(isolate);
   fprintf(stderr, "exception\n");
   String::Utf8Value exception(isolate, try_catch->Exception());
   const char *exception_string = *exception;
   Local<Message> message = try_catch->Message();
-  if (message.IsEmpty())
-  {
+  if (message.IsEmpty()) {
     fprintf(stderr, "%s\n", exception_string);
   }
-  else
-  {
+  else {
     String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
     Local<Context> context(isolate->GetCurrentContext());
     const char *filename_string = *filename;
@@ -50,8 +42,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch)
     const char *sourceline_string = *sourceline;
     fprintf(stderr, "%s\n", sourceline_string);
     int start = message->GetStartColumn(context).FromJust();
-    for (int i = 0; i < start; i++)
-    {
+    for (int i = 0; i < start; i++) {
       fprintf(stderr, " ");
     }
     int end = message->GetEndColumn(context).FromJust();
@@ -279,7 +270,7 @@ void Require(const FunctionCallbackInfo<Value> &args)
   }
   else
   {
-    String::Utf8Value utf8string(args.GetIsolate(), source_text);
+    //String::Utf8Value utf8string(args.GetIsolate(), source_text);
     Maybe<bool> ok = module->InstantiateModule(context, OnModuleInstantiate);
     if (!ok.ToChecked())
     {

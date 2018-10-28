@@ -1,4 +1,3 @@
-require('./lib/base.js')
 const { UV_TTY_MODE_NORMAL, TTY } = module('tty', {})
 
 const BUFFER_SIZE = 64 * 1024
@@ -6,10 +5,14 @@ const MAX_BUFFER = 4 * BUFFER_SIZE
 const stdin = new TTY(0)
 const buf = createBuffer(BUFFER_SIZE)
 
+function parse(obj){
+    return Function('"use strict";return (' + obj + ')')();
+}
+
 stdin.setup(buf, UV_TTY_MODE_NORMAL)
 stdin.onRead(len => {
     const source = buf.read(0, len)
-    const result = eval(source)
+    const result = parse(source)
     let payload = `${JSON.stringify(result, null, 2)}\n`
     if (!result) payload = '(null)\n'
     if (!payload) payload = '(null)\n'

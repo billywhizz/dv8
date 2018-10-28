@@ -7,7 +7,16 @@ const million = BigInt(1000000)
 
 onExit(() => print('exiting main'))
 
-function spawn(fname) {
+function threadTest() {
+    require('./lib/base.js')
+    const timer = setTimeout(() => {
+        print(JSON.stringify(memoryUsage()))
+        print(JSON.stringify(args))
+        print(JSON.stringify(env))
+    }, parseInt(args[3] || '5') * 1000)        
+}
+
+function spawn() {
     const start = hrtime()
     const thread = new Thread()
     thread.buffer = createBuffer(BUFFER_SIZE)
@@ -20,7 +29,7 @@ function spawn(fname) {
     thread.buffer.write(envJSON, 5)
     dv.setUint32(envJSON.length + 5, argsJSON.length)
     thread.buffer.write(argsJSON, envJSON.length + 9)
-    thread.start(fname, () => {
+    thread.start(threadTest, () => {
         const finish = hrtime()
         print(`${thread.id.toString().padEnd(5, ' ')} : ${(finish - start) / thousand} usec`)
         const ready = dv.getBigUint64(0)
@@ -29,8 +38,8 @@ function spawn(fname) {
     }, thread.buffer)
 }
 
-const WORKERS = parseInt(args[3] || '4', 10)
+const WORKERS = parseInt(args[2] || '4', 10)
 let i = WORKERS
 while(i--) {
-    spawn(args[2])
+    spawn()
 }

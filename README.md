@@ -55,6 +55,50 @@ docker build -t uv-build .
 docker build -t dv8-sdk -f Dockerfile.sdk .
 ## build runtime only docker image
 docker build -t dv8 -f Dockerfile.runtime .
+## build debugger (lldb)
+docker build -t dv8-debug -f Dockerfile.debug .
+```
+
+## Debug a core dump
+```bash
+## debug build
+./build-all.sh debug
+## run debug container
+./run.sh debug
+## inside container
+lldb /usr/local/bin/dv8 -c core
+## inside lldb
+bt
+```
+
+## example backtrace
+```
+* thread #1, name = 'dv8', stop reason = signal SIGILL
+  * frame #0: 0x000055a363f2b1f9 dv8`v8::base::OS::Abort() at platform-posix.cc:395
+    frame #1: 0x000055a363f26c49 dv8`V8_Fatal(char const*, int, char const*, ...) at logging.cc:171
+    frame #2: 0x000055a3639c815a dv8`v8::Isolate::RequestGarbageCollectionForTesting(v8::Isolate::GarbageCollectionType) at api.cc:8134
+    frame #3: 0x000055a3639ab4cd dv8`dv8::CollectGarbage(args=0x00007ffdefbaa7d0) at dv8.cc:202
+    frame #4: 0x000055a363f5c566 dv8`::HandleApiCallHelper<false>() [inlined] v8::internal::FunctionCallbackArguments::Call(v8::internal::CallHandlerInfo*) at api-arguments-inl.h:140
+    frame #5: 0x000055a363f5c434 dv8`::HandleApiCallHelper<false>() at builtins-api.cc:109
+    frame #6: 0x000055a363f5d568 dv8`v8::internal::Builtin_HandleApiCall(int, v8::internal::Object**, v8::internal::Isolate*) [inlined] Builtin_Impl_HandleApiCall at builtins-api.cc:139
+    frame #7: 0x000055a363f5d4d7 dv8`v8::internal::Builtin_HandleApiCall(int, v8::internal::Object**, v8::internal::Isolate*) at builtins-api.cc:127
+    frame #8: 0x000055a363ebe02e dv8`Builtins_CEntry_Return1_DontSaveFPRegs_ArgvOnStack_NoBuiltinExit + 78
+    frame #9: 0x00001dc57db081ae
+    frame #10: 0x000055a363e2f7e3 dv8`Builtins_JSEntryTrampoline + 99
+    frame #11: 0x00001dc57db059de
+    frame #12: 0x000055a363b0ad79 dv8`v8::internal::Execution::Call(v8::internal::Isolate*, v8::internal::Handle<v8::internal::Object>, v8::internal::Handle<v8::internal::Object>, int, v8::internal::Handle<v8::internal::Object>*) [inlined] v8::internal::GeneratedCode<v8::internal::Object*, v8::internal::Object*, v8::internal::Object*, v8::internal::Object*, int, v8::internal::Object***>::Call(v8::internal::Object*, v8::internal::Object*, v8::internal::Object*, int, v8::internal::Object***) at simulator.h:113
+    frame #13: 0x000055a363b0ad60 dv8`v8::internal::Execution::Call(v8::internal::Isolate*, v8::internal::Handle<v8::internal::Object>, v8::internal::Handle<v8::internal::Object>, int, v8::internal::Handle<v8::internal::Object>*) [inlined] Invoke at execution.cc:155
+    frame #14: 0x000055a363b0ac91 dv8`v8::internal::Execution::Call(v8::internal::Isolate*, v8::internal::Handle<v8::internal::Object>, v8::internal::Handle<v8::internal::Object>, int, v8::internal::Handle<v8::internal::Object>*) [inlined] CallInternal at execution.cc:193
+    frame #15: 0x000055a363b0ac89 dv8`v8::internal::Execution::Call(v8::internal::Isolate*, v8::internal::Handle<v8::internal::Object>, v8::internal::Handle<v8::internal::Object>, int, v8::internal::Handle<v8::internal::Object>*) at execution.cc:203
+    frame #16: 0x000055a3639da4e6 dv8`v8::Function::Call(v8::Local<v8::Context>, v8::Local<v8::Value>, int, v8::Local<v8::Value>*) at api.cc:5018
+    frame #17: 0x000055a3639da6a1 dv8`v8::Function::Call(v8::Local<v8::Value>, int, v8::Local<v8::Value>*) at api.cc:5028
+    frame #18: 0x00007fd3dac871a1 timer.so`dv8::timer::Timer::OnTimeout(handle=0x000055a365809900) at timer.cc:116
+    frame #19: 0x000055a36429a575 dv8`uv__run_timers(loop=0x000055a3647008e0) at timer.c:174
+    frame #20: 0x000055a36428ad04 dv8`uv_run(loop=0x000055a3647008e0, mode=UV_RUN_DEFAULT) at core.c:361
+    frame #21: 0x000055a3639a5d76 dv8`main(argc=2, argv=0x00007ffdefbab1c8) at dv8_main.cc:63
+    frame #22: 0x00007fd3db0b0ad6 ld-musl-x86_64.so.1`__libc_start_main + 54
+    frame #23: 0x000055a3639a5102 dv8`_start_c(p=<unavailable>) at crt1.c:17
+    frame #24: 0x000055a3639a50da dv8`_start + 22
 ```
 
 ### Build runtime and standard libs from source
@@ -228,58 +272,6 @@ docker push billywhizz/dv8-sdk:$DV8_VERSION
   "Buffer"
 ]
 ```
-## Roadmap/TODO
-- goal is to be small and fast and as close to metal as possible in JS
-- easy to build other abstractions on top of this
-- core is all C++, no JS
-  - maybe an optional js bootstrap that can be compiled in at build time
-- no event emitters
-- no streams
-- no big abtractions - only the base api's in core
-- standard library should not cause mark/sweep gc
-- return codes, not exceptions as much as possible
-- module interop - in c++ - how?
-  - modules need to be able to inherit from each other
-  - need to be able to wrap a module (e.g. socket) and implement on top of it (e.g. tls)
-- Metrics in core - exposed in standard format
-  - recorded in buffers in c++ land
-  - JS land can read the metrics whenever it needs to
-  - DataViews?
-- secure, small, fast
-- iOT support - arm build
-- static modules for packaged binary
-- require only supports local filesystem
-- module only support local filesystem
-- AtExit support
-- standardize exception handling
-- better hooks for modules
-- expose event loop to js
-- expose as much of libuv as possible to js
-- die on uncaught errors
-- sane threading support
-- hot reloading of contexts - maintain connections/handles. investigate
-- benchmarks
-- releases in sync with v8?
-- sane mechanism for ref'ing handles
-- minimal abstractions - no common streams library - make api's for each
-- figure out how to do the sockets module better - Socket instance for each connection, no fd's
-
-# 10 October 2018
-
-## NEXT
-
-- command line args - DONE
-- environment variables - DONE
-- standardise stream/backpressure handling in socket and tty modules
-- idle handler/nexttick
-- fork/exec
-- libuv - loop inspection - handles
-- thread.global functions for gc/shutdown
-- atexit/onexit support - DONE
-- inspector PoC
-- thread stop - shutdown loop
-- builtin js startup
-
 # API
 
 ## JS
@@ -367,42 +359,3 @@ dd if=/dev/zero count=100000 bs=65536 | dv8 netcat.js
 rm -f /tmp/pipe.sock & socat unix-listen:/tmp/pipe.sock - | cat 1> /dev/null
 
 ```
-
-testing pipecat/netcat/count
-
-rm -f /tmp/pipe.sock
-dv8 pipecat.js | dv8 count.js
-dd if=/dev/zero count=300000 bs=65536 | dv8 netcat.js
-
-
-netcat test
-
-assert(stdout.written === stdin.read)
-assert(stdout.incomplete + stdout.full + stdout.eagain === stdin.data)
-assert(stdin.pause === stdin.resume - 1)
-assert(stdin.close === 1)
-assert(stdin.error === 0)
-assert(stdin.end === 1)
-assert(stdout.close === 1)
-assert(stdout.error === 0)
-assert(stdout.alloc === stdout.free)
-
-
-pipecat test
-
-stdin.read === netcat.stdout.written
-
-
-being able to make a prediction about what will happen in a given
-scenario is probably the most import aspect of programming. if the code
-is too complex it's very hard to make these predictions and to verify them
-
-tests
-
-dd if=/dev/urandom of=test.bin count=10000 bs=65536
-cat test.bin | dv8 count.js
-verify bytes
-md5 check
-crc check
-
-counts the bytes in a 6.5 GB file in 2.5 seconds - 20Gb/sec

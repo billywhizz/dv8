@@ -3,11 +3,17 @@ A PoC base module which exposes timers and memoryUsage
 */
 const { Process } = module('process', {})
 const { Timer } = module('timer', {})
+const { Thread } = module('thread', {})
 
 const process = new Process()
 const mem = new Float64Array(16)
 const cpu = new Float64Array(2)
 const time = new BigInt64Array(1)
+let next = 1
+const thousand = BigInt(1000)
+const million = BigInt(1000000)
+
+const THREAD_BUFFER_SIZE = env.THREAD_BUFFER_SIZE || (4 * 1024)
 
 const heap = [
     new Float64Array(4),
@@ -83,6 +89,30 @@ function createBuffer(size) {
     return buf
 }
 
+function spawn(fun, onComplete) {
+    const start = hrtime()
+    const thread = new Thread()
+    thread.buffer = createBuffer(THREAD_BUFFER_SIZE)
+    const dv = new DataView(thread.buffer.bytes)
+    thread.dv = dv
+    thread.id = next++
+    dv.setUint8(0, thread.id)
+    const envJSON = JSON.stringify(env)
+    const argsJSON = JSON.stringify(args)
+    dv.setUint32(1, envJSON.length)
+    thread.buffer.write(envJSON, 5)
+    dv.setUint32(envJSON.length + 5, argsJSON.length)
+    thread.buffer.write(argsJSON, envJSON.length + 9)
+    thread.start(fun, () => {
+        const finish = hrtime()
+        const ready = dv.getBigUint64(0)
+        thread.time = (finish - start) / thousand
+        thread.boot = (ready - start) / thousand
+        onComplete(thread)
+    }, thread.buffer)
+    return thread
+}
+
 global.setTimeout = setTimeout
 global.setInterval = setInterval
 global.clearTimeout = clearTimeout
@@ -92,11 +122,23 @@ global.heapUsage = heapUsage
 global.cpuUsage = cpuUsage
 global.hrtime = hrtime
 global.createBuffer = createBuffer
-
-global.threadId = 0
+global.createThread = spawn
 
 if (global.workerData) {
-    const bytes = new Uint8Array(global.workerData)
-    global.threadId = bytes[0]
+    global.workerData.bytes = global.workerData.alloc()
+    const dv = new DataView(global.workerData.bytes)
+    global.threadId = dv.getUint8(0)
+    const envLength = dv.getUint32(1)
+    const envJSON = global.workerData.read(5, envLength)
+    global.env = JSON.parse(envJSON)
+    const argsLength = dv.getUint32(5 + envLength)
+    const argsJSON = global.workerData.read(9 + envLength, argsLength)
+    global.args = JSON.parse(argsJSON)
+    // set the boot time
+    dv.setBigUint64(0, BigInt(hrtime()))
+} else {
+    global.env = env().map(entry => entry.split('=')).reduce((env, pair) => { env[pair[0]] = pair[1]; return env }, {})
+    global.threadId = 0
 }
+
 module.exports = {}

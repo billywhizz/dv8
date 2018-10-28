@@ -1,4 +1,3 @@
-require('./lib/base.js')
 const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
 const { start, stop } = require('./lib/meter.js')
 

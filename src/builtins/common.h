@@ -59,7 +59,6 @@ class ObjectWrap
         return handle_;
     }
 
-  protected:
     inline void Wrap(v8::Local<v8::Object> handle)
     {
         assert(persistent().IsEmpty());
@@ -69,9 +68,15 @@ class ObjectWrap
         MakeWeak();
     }
 
+
+  protected:
     inline void MakeWeak(void)
     {
         persistent().SetWeak(this, WeakCallback, v8::WeakCallbackType::kParameter);
+    }
+
+    virtual void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+
     }
 
     virtual void Ref()
@@ -97,6 +102,7 @@ class ObjectWrap
     {
         ObjectWrap *wrap = data.GetParameter();
         assert(wrap->refs_ == 0);
+        wrap->Destroy(data);
         wrap->handle_.Reset();
         delete wrap;
     }

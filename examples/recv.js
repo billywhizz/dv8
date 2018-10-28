@@ -1,4 +1,3 @@
-require('./lib/base.js')
 const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
 const { Socket, UNIX } = module('socket', {})
 const { start, stop } = require('./lib/meter.js')
@@ -29,7 +28,7 @@ sock.onConnect(fd => {
     stdout.onDrain(() => stdin.resume())
     stdout.onClose(() => stop(stdout))
     stdout.onError((err, message) => print(`stdout.error: ${err}\n${message}`))
-    sock.close()
+    //sock.close()
     start(stdin)
     start(stdout)
 })

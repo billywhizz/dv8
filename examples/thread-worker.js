@@ -1,8 +1,7 @@
-require('./lib/base.js')
 const start = Date.now()
 const dv = new DataView(workerData)
 const threadId = dv.getUint8(0)
-const duration = dv.getUint8(1)
+const duration = dv.getUint8(1) || 5
 print(`thread: ${threadId} running for ${duration} seconds`)
 const timer = setInterval(() => {
     dv.setBigUint64(2, BigInt(Date.now()))

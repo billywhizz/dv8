@@ -1,0 +1,1 @@
+./build-all.sh debug

@@ -1,4 +1,3 @@
-require('./lib/base.js')
 const { Thread } = module('thread', {})
 
 const BUFFER_SIZE = 64 * 1024

@@ -10,6 +10,10 @@ COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/out/Release/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
 COPY build/module.sh /build/module.sh
+RUN xxd -i src/base.js > src/builtins.h && \
+    sed -i 's/unsigned char/static const char/g' src/builtins.h && \
+    sed -i 's/unsigned int/static unsigned int/g' src/builtins.h && \
+    sed -i 's/examples_//g' src/builtins.h
 RUN ./platform.sh && \
     ./module.sh os && \
     ./module.sh process && \
