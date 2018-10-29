@@ -163,6 +163,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   if (success != 0)
   {
     fprintf(stderr, "uv_dlopen failed: %i\n", success);
+    fprintf(stderr, "%s\n", uv_dlerror(&lib));
     args.GetReturnValue().Set(exports);
     return;
   }

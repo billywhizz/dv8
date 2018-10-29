@@ -7,6 +7,7 @@ namespace httpParser
 {
 using dv8::builtins::Buffer;
 using dv8::builtins::Environment;
+using dv8::socket::Socket;
 using v8::Array;
 using v8::Context;
 using v8::Function;
@@ -260,19 +261,32 @@ void HTTPParser::New(const FunctionCallbackInfo<Value> &args)
 void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args)
 {
 	Isolate *isolate = args.GetIsolate();
-	Local<Context> context = isolate->GetCurrentContext();
 	HTTPParser *obj = ObjectWrap::Unwrap<HTTPParser>(args.Holder());
 	v8::HandleScope handleScope(isolate);
-	uint32_t mode = args[0]->Uint32Value(context).ToChecked();
-	http_parser_init(obj->context->parser, (http_parser_type)mode);
+	int argc = args.Length();
 
-	Buffer *b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
+	Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
 	obj->context->base = b->_data;
-	obj->context->parser_mode = mode;
 
-	b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
+	b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
 	obj->context->buf = b->_data;
 	obj->context->workBufferLength = b->_length;
+
+}
+
+uint32_t on_read_data(uint32_t nread, void* data) {
+	_context* context = (_context*)data;
+	ssize_t np = http_parser_execute(context->parser, &settings, context->base, nread);
+	if (np != nread) {
+		if (context->parser->http_errno == HPE_PAUSED) {
+			uint8_t *lastByte = (uint8_t *)(context->base + np);
+			context->lastByte = *lastByte;
+		}
+		else {
+			return np;
+		}
+	}
+	return 0;
 }
 
 void HTTPParser::Reset(const FunctionCallbackInfo<Value> &args)
@@ -281,8 +295,16 @@ void HTTPParser::Reset(const FunctionCallbackInfo<Value> &args)
 	Local<Context> context = isolate->GetCurrentContext();
 	HTTPParser *obj = ObjectWrap::Unwrap<HTTPParser>(args.Holder());
 	v8::HandleScope handleScope(isolate);
+	int argc = args.Length();
 	uint32_t mode = args[0]->Uint32Value(context).ToChecked();
 	http_parser_init(obj->context->parser, (http_parser_type)mode);
+	obj->context->parser_mode = mode;
+	if (argc > 1) {
+		Socket* sock = ObjectWrap::Unwrap<Socket>(args[1].As<v8::Object>());
+		sock->callbacks.onPluginRead = 1;
+		sock->onPluginRead = &on_read_data;
+		sock->pluginData = obj->context;
+	}
 }
 
 void HTTPParser::Execute(const FunctionCallbackInfo<Value> &args)
@@ -293,21 +315,17 @@ void HTTPParser::Execute(const FunctionCallbackInfo<Value> &args)
 	HTTPParser *obj = ObjectWrap::Unwrap<HTTPParser>(args.Holder());
 	uint32_t nread = args[0]->Uint32Value(context).ToChecked();
 	ssize_t np = http_parser_execute(obj->context->parser, &settings, obj->context->base, nread);
-	if (np != nread)
-	{
-		if (obj->context->parser->http_errno == HPE_PAUSED)
-		{
+	if (np != nread) {
+		if (obj->context->parser->http_errno == HPE_PAUSED) {
 			uint8_t *lastByte = (uint8_t *)(obj->context->base + np);
 			obj->context->lastByte = *lastByte;
 		}
-		else
-		{
+		else {
 			Local<Value> argv[2] = {Number::New(isolate, obj->context->parser->http_errno), String::NewFromUtf8(isolate, http_errno_description((http_errno)obj->context->parser->http_errno), v8::String::kNormalString)};
 			Local<Function> onError = Local<Function>::New(isolate, obj->_onError);
 			onError->Call(context->Global(), 2, argv);
 		}
 	}
-
 	args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 

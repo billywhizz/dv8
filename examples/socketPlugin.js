@@ -16,13 +16,12 @@ function createContext() {
     const context = {
         in: createBuffer(BUFFER_SIZE),
         out: createBuffer(BUFFER_SIZE),
-        work: createBuffer(BUFFER_SIZE)
+        work: createBuffer(BUFFER_SIZE),
+        parser: new HTTPParser()
     }
     context.in.bytes = new Uint8Array(context.in.bytes)
     context.dv = new DataView(context.work.bytes)
-    const parser = new HTTPParser()
-    parser.setup(REQUEST, context.in, context.work)
-    context.parser = parser
+    context.parser.setup(context.in, context.work)
     return context
 }
 
@@ -32,7 +31,6 @@ function freeContext(context) {
 
 function onClient(fd) {
     const client = new Socket(TCP)
-    client.fd = fd
     const context = createContext()
     const { parser } = context
     parser.onRequest(() => {
@@ -41,22 +39,15 @@ function onClient(fd) {
         if (r < r200len && client.queueSize() >= MAX_BUFFER) return client.pause()
         if (r < 0) client.close()
     })
-    parser.onError((errno, message) => {
-        print(`parser error: ${errno} ${message}`)
-        client.close()
-    })
-    parser.reset(REQUEST)
-    context.out.write(r200, 0)
+    parser.onError((errno, message) => client.close())
+    parser.reset(REQUEST, client)
     client.setup(fd, context.in, context.out)
-    client.onRead(len => parser.execute(len))
     client.onDrain(() => client.resume())
     client.onClose(() => freeContext(context))
-    client.onError(err => {
-        print(`client.error: ${err} ${client.error(err)}`)
-    })
+    //client.onError(err => print(`client.error: ${err} ${client.error(err)}`))
     client.onEnd(() => client.close())
     client.setNoDelay(false)
-    client.setKeepAlive(1, 5)
+    context.out.write(r200, 0)
 }
 
 sock.onConnect(onClient)

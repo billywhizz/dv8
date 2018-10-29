@@ -2,6 +2,7 @@
 #define DV8_HTTPParser_H
 
 #include <dv8.h>
+#include <socket.h>
 #include "http_parser.h"
 
 namespace dv8 {
@@ -18,6 +19,7 @@ int header_value_cb(http_parser *p, const char *buf, size_t len);
 int body_cb(http_parser *p, const char *buf, size_t len);
 int headers_complete_cb(http_parser *p);
 int message_complete_cb(http_parser *p);
+static uint32_t on_read_data(uint32_t nread, void* data);
 
 struct _request {
   uint8_t headerCount; // no. of http headers

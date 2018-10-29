@@ -51,10 +51,12 @@ typedef struct
   uint8_t onError;
   uint8_t onDrain;
   uint8_t onEnd;
+  uint8_t onPluginRead;
 } callbacks_t;
 typedef struct _context _context;
 
 // typedefs for http parser callbacks
+typedef uint32_t (*on_read_data)(uint32_t len, void* data);
 typedef int (*on_data)(_context *, const char *at, size_t len);
 typedef int (*cb)(_context *);
 
@@ -136,6 +138,8 @@ public:
   callbacks_t callbacks;      // pointers to JS callbacks
   uv_stream_t* _stream;
   _context* context;
+  on_read_data onPluginRead;
+  void* pluginData;
 
 private:
   Socket()
