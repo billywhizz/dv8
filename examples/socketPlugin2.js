@@ -23,7 +23,18 @@ function createContext() {
         work: w,
         parser: new HTTPParser(),
         bytes: new Uint8Array(w.bytes),
-        dv: new DataView(w.bytes)
+        dv: new DataView(w.bytes),
+        request: {
+            major: 1,
+            minor: 1,
+            method: 1,
+            upgrade: 0,
+            keepalive: 1,
+            headers: [['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['',''],['','']],
+            body: [],
+            url: '',
+            hostname: ''
+        }
     }
     context.parser.setup(context.in, context.work)
     return context
@@ -36,8 +47,42 @@ function freeContext(context) {
 function onClient(fd) {
     const client = new Socket(TCP)
     const context = createContext()
+    const { bytes, dv, work, request } = context
     const { parser } = context
+    parser.onBody(len => request.body.push(work.read(0, len)))
+    parser.onHeaders(() => {
+        request.body = []
+        request.major = bytes[0]
+        request.minor = bytes[1]
+        const headerCount = bytes[2]
+        request.method = bytes[3]
+        request.upgrade = bytes[4]
+        request.keepalive = bytes[5]
+        const urlLength = dv.getUint32(8)
+        const headerStart = 12 + urlLength
+        let off = headerStart
+        let nh = headerCount
+        let len = 0
+        const headers = request.headers
+        request.url = work.read(12, urlLength)
+        let curr = 0
+        let k
+        let v
+        while (nh--) {
+            len = dv.getUint16(off)
+            off += 2
+            k = headers[curr][0] = work.read(off, len)
+            off += len
+            len = dv.getUint16(off)
+            off += 2
+            v = headers[curr][1] = work.read(off, len)
+            if (k.toLowerCase() === 'host') request.hostname = v
+            off += len
+            curr++
+        }
+    })
     parser.onRequest(() => {
+        //print(JSON.stringify(request, null, '  '))
         const r = client.write(r200len)
         if (r === r200len) return
         if (r < r200len && client.queueSize() >= MAX_BUFFER) return client.pause()
