@@ -28,69 +28,44 @@ int message_begin_cb(http_parser *p)
 	ctx->request->headerCount = 0;
 	ctx->request->urllength = 0;
 	uint8_t *rr = (uint8_t *)ctx->buf + 8;
-	rr[0] = 0;
-	rr[1] = 0;
-	rr[2] = 0;
-	rr[3] = 0;
 	ctx->request->lastel = NONE;
 	ctx->index = 12;
-	ctx->request->fieldlen = 0;
+	ctx->soff = 128;
 	return 0;
 }
 
 int url_cb(http_parser *p, const char *buf, size_t len)
 {
 	_context *ctx = (_context *)p->data;
-	if (ctx->index + len > ctx->workBufferLength)
-	{
-		return -1;
-	}
-	uint8_t *rr = (uint8_t *)ctx->buf + ctx->index;
+	uint8_t *rr = (uint8_t *)ctx->buf + ctx->soff;
 	memcpy(rr, buf, len);
-	ctx->index += len;
+	ctx->soff += len;
 	ctx->request->urllength += len;
-	ctx->request->fieldlenp = ctx->index;
 	return 0;
 }
 
 int header_field_cb(http_parser *p, const char *buf, size_t len)
 {
 	_context *ctx = (_context *)p->data;
-	if (ctx->request->lastel != FIELD)
-	{
-		// new field
-		if (ctx->index + len + 2 > ctx->workBufferLength)
-		{
-			return -1;
-		}
-		//TODO: check for max headers
+	if (ctx->request->lastel != FIELD) {
 		ctx->request->headerCount++;
 		uint8_t *rr = (uint8_t *)ctx->buf + ctx->index;
-		ctx->request->fieldlen = len;
-		ctx->request->fieldlenp = ctx->index;
 		rr[0] = 0xff & (len >> 8);
 		rr[1] = 0xff & len;
-		rr = (uint8_t *)ctx->buf + ctx->index + 2;
-		//TODO: buffer overrun - check for end of headers buffer
-		ctx->request->key = (char *)rr;
+		rr = (uint8_t *)ctx->buf + ctx->soff;
 		memcpy(rr, buf, len);
-		ctx->index += (len + 2);
+		ctx->index += 2;
+		ctx->soff += len;
 	}
-	else
-	{
-		// existing field
-		if (ctx->index + len > ctx->workBufferLength)
-		{
-			return -1;
-		}
-		ctx->request->fieldlen += len;
-		uint8_t *rr = (uint8_t *)ctx->buf + ctx->request->fieldlenp;
-		rr[0] = 0xff & (ctx->request->fieldlen >> 8);
-		rr[1] = 0xff & ctx->request->fieldlen;
-		rr = (uint8_t *)ctx->buf + ctx->index;
-		//TODO: buffer overrun - check for end of headers buffer
+	else {
+		uint8_t *rr = (uint8_t *)ctx->buf + ctx->index - 2;
+		uint16_t fsize = (rr[0] << 8) + rr[1];
+		fsize += len;
+		rr[0] = 0xff & (fsize >> 8);
+		rr[1] = 0xff & fsize;
+		rr = (uint8_t *)ctx->buf + ctx->soff;
 		memcpy(rr, buf, len);
-		ctx->index += len;
+		ctx->soff += len;
 	}
 	ctx->request->lastel = FIELD;
 	return 0;
@@ -99,40 +74,23 @@ int header_field_cb(http_parser *p, const char *buf, size_t len)
 int header_value_cb(http_parser *p, const char *buf, size_t len)
 {
 	_context *ctx = (_context *)p->data;
-	if (ctx->request->lastel != VALUE)
-	{
-		// new field
-		if (ctx->index + len + 2 > ctx->workBufferLength)
-		{
-			return -1;
-		}
-		uint8_t *rr = (uint8_t *)ctx->buf + ctx->index;
-		ctx->request->fieldlen = len;
-		ctx->request->fieldlenp = ctx->index;
-		rr[0] = 0xff & (len >> 8);
-		rr[1] = 0xff & len;
-		rr = (uint8_t *)ctx->buf + ctx->index + 2;
-		ctx->request->val = (char *)rr;
-		//TODO: buffer overrun - check for end of headers buffer
-		memcpy(rr, buf, len);
-		ctx->index += (len + 2);
+	uint8_t *rr = (uint8_t *)ctx->buf + ctx->index - 2;
+	uint16_t fsize = 0;
+	if (ctx->request->lastel != VALUE) {
+		fsize = (rr[0] << 8) + rr[1];
+		fsize += 2;
 	}
-	else
-	{
-		// existing field
-		if (ctx->index + len > ctx->workBufferLength)
-		{
-			return -1;
-		}
-		ctx->request->fieldlen += len;
-		uint8_t *rr = (uint8_t *)ctx->buf + ctx->request->fieldlenp;
-		rr[0] = 0xff & (ctx->request->fieldlen >> 8);
-		rr[1] = 0xff & ctx->request->fieldlen;
-		rr = (uint8_t *)ctx->buf + ctx->index;
-		//TODO: buffer overrun - check for end of headers buffer
-		memcpy(rr, buf, len);
-		ctx->index += len;
+	fsize += len;
+	rr[0] = 0xff & (fsize >> 8);
+	rr[1] = 0xff & fsize;
+	rr = (uint8_t *)ctx->buf + ctx->soff;
+	if (ctx->request->lastel != VALUE) {
+		memcpy(rr, ": ", 2);
+		rr += 2;
+		ctx->soff += 2;
 	}
+	memcpy(rr, buf, len);
+	ctx->soff += len;
 	ctx->request->lastel = VALUE;
 	return 0;
 }
@@ -144,14 +102,9 @@ int body_cb(http_parser *p, const char *buf, size_t len)
 		Isolate *isolate = Isolate::GetCurrent();
 		v8::HandleScope handleScope(isolate);
 		_context *ctx = (_context *)p->data;
-		if (len > ctx->workBufferLength)
-		{
-			return -1;
-		}
 		HTTPParser *parser = (HTTPParser *)ctx->data;
 		if (parser->callbacks.onBody == 1) {
 			uint8_t *rr = (uint8_t *)ctx->buf;
-			//TODO: buffer overrun - check for end of headers buffer
 			memcpy(rr, buf, len);
 			Local<Value> argv[1] = {Integer::New(isolate, len)};
 			Local<Function> onBody = Local<Function>::New(isolate, parser->_onBody);
@@ -170,22 +123,20 @@ int headers_complete_cb(http_parser *p)
 	uint8_t *rr = (uint8_t *)ctx->buf;
 	rr[0] = p->http_major;
 	rr[1] = p->http_minor;
-	rr[2] = ctx->request->headerCount;
-	if (ctx->parser_mode == 0)
-	{
-		rr[3] = 0xff & (http_method)p->method;
-		rr[4] = p->upgrade;
+	if (ctx->parser_mode == 0) {
+		rr[2] = 0xff & (http_method)p->method;
+		rr[3] = p->upgrade;
 	}
-	else
-	{
-		rr[3] = 0xff & (p->status_code >> 8);
-		rr[4] = 0xff & p->status_code;
+	else {
+		rr[2] = 0xff & (p->status_code >> 8);
+		rr[3] = 0xff & p->status_code;
 	}
-	rr[5] = http_should_keep_alive(p);
-	rr[8] = 0xff & (ctx->request->urllength >> 24);
-	rr[9] = 0xff & (ctx->request->urllength >> 16);
-	rr[10] = 0xff & (ctx->request->urllength >> 8);
-	rr[11] = 0xff & ctx->request->urllength;
+	rr[4] = http_should_keep_alive(p);
+	rr[5] = ctx->request->headerCount;
+	rr[6] = 0xff & (ctx->request->urllength >> 24);
+	rr[7] = 0xff & (ctx->request->urllength >> 16);
+	rr[8] = 0xff & (ctx->request->urllength >> 8);
+	rr[9] = 0xff & ctx->request->urllength;
 	if (parser->callbacks.onHeaders == 1) {
 		Local<Value> argv[1] = {Integer::New(isolate, ctx->index)};
 		Local<Function> onHeaders = Local<Function>::New(isolate, parser->_onHeaders);
@@ -200,8 +151,7 @@ int message_complete_cb(http_parser *p)
 	v8::HandleScope handleScope(isolate);
 	_context *ctx = (_context *)p->data;
 	HTTPParser *parser = (HTTPParser *)ctx->data;
-	if (ctx->parser_mode == 0 && parser->callbacks.onRequest == 1)
-	{
+	if (ctx->parser_mode == 0 && parser->callbacks.onRequest == 1) {
 		Local<Value> argv[0] = {};
 		Local<Function> onRequest = Local<Function>::New(isolate, parser->_onRequest);
 		onRequest->Call(isolate->GetCurrentContext()->Global(), 0, argv);
@@ -240,8 +190,7 @@ void HTTPParser::New(const FunctionCallbackInfo<Value> &args)
 {
 	Isolate *isolate = args.GetIsolate();
 	HandleScope handle_scope(isolate);
-	if (args.IsConstructCall())
-	{
+	if (args.IsConstructCall()) {
 		HTTPParser *obj = new HTTPParser();
 		obj->Wrap(args.This());
 		obj->context = (_context *)calloc(sizeof(_context), 1);

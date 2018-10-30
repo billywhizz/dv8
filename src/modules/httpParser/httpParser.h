@@ -43,6 +43,7 @@ struct _context {
   uint8_t lastByte;
   void* data;
   uint8_t parser_mode;
+  uint32_t soff;
 };
 
 typedef struct

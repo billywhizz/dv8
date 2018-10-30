@@ -35,6 +35,7 @@ int main(int argc, char *argv[])
       // create the context
       v8::Local<v8::Context> context = dv8::CreateContext(isolate);
       v8::Context::Scope context_scope(context);
+      context->AllowCodeGenerationFromStrings(false);
 
       // initialise an environment with reference to event loop for the context
       dv8::builtins::Environment *env = new dv8::builtins::Environment();
@@ -65,28 +66,35 @@ int main(int argc, char *argv[])
         v8::False(isolate), 
         v8::True(isolate));
       v8::Local<v8::Module> module;
+      v8::TryCatch try_catch(isolate);
       v8::ScriptCompiler::Source basescript(base.ToLocalChecked(), baseorigin);
-      v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module);
+      if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
+        dv8::ReportException(isolate, &try_catch);
+        return 1;
+      }
       v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
-      v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
+      if (!ok.ToChecked()) {
+        dv8::ReportException(isolate, &try_catch);
+        return 1;
+      }
+      module->Evaluate(context);
 
       // Load main script
       const char *str = argv[1];
-      v8::TryCatch try_catch(isolate);
       v8::MaybeLocal<v8::String> source = dv8::ReadFile(isolate, str);
       if (try_catch.HasCaught()) {
-        dv8::DecorateErrorStack(isolate, try_catch);
+        dv8::ReportException(isolate, &try_catch);
         return 1;
       }
       v8::ScriptOrigin origin(v8::String::NewFromUtf8(isolate, str, v8::NewStringType::kNormal).ToLocalChecked());
       v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source.ToLocalChecked(), &origin);
       if (try_catch.HasCaught()) {
-        dv8::DecorateErrorStack(isolate, try_catch);
+        dv8::ReportException(isolate, &try_catch);
         return 1;
       }
       script.ToLocalChecked()->Run(context);
       if (try_catch.HasCaught()) {
-        dv8::DecorateErrorStack(isolate, try_catch);
+        dv8::ReportException(isolate, &try_catch);
         return 1;
       }
 
@@ -107,7 +115,7 @@ int main(int argc, char *argv[])
         v8::TryCatch try_catch(isolate);
         onExit->Call(globalInstance, 0, argv);
         if (try_catch.HasCaught()) {
-          dv8::DecorateErrorStack(isolate, try_catch);
+          dv8::ReportException(isolate, &try_catch);
         }
       }
 
