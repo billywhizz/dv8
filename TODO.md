@@ -1,5 +1,20 @@
 ## NEXT
 
+epoll
+tls
+expose event loop
+native linux only everything
+
+
+(lldb) bt
+* thread #1, name = 'dv8', stop reason = signal SIGSEGV
+  * frame #0: 0x00007f205433a11a
+    frame #1: 0x00007f2043532fa6
+    frame #2: 0x0000555733d4cd4f dv8`uv_os_homedir(buffer=" ZsC \x7f", size=0x0000555736fffce0) at core.c:1070
+(lldb)
+
+
+
 bultin bootstrap.js - replacable by embedders
 pass a function to a thread handler instead of a file name
 

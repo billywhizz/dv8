@@ -135,11 +135,14 @@ public:
   v8::Persistent<v8::Function> _onEnd;
 
   socket_type socktype = TCP; // 0 = tcp socket, 1 = Unix Domain Socket/Named Pipe
-  callbacks_t callbacks;      // pointers to JS callbacks
+  callbacks_t callbacks;
   uv_stream_t* _stream;
   _context* context;
   on_read_data onPluginRead;
   void* pluginData;
+
+protected:
+  void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 private:
   Socket()

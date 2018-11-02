@@ -1,0 +1,1 @@
+docker run -it --rm --name=wrk -v $(pwd):/foo williamyeh/wrk -c 2000 -t 2 -d 30 -s /foo/bench.lua http://172.17.0.1:3000/

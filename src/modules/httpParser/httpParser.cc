@@ -137,6 +137,9 @@ int headers_complete_cb(http_parser *p)
 	rr[7] = 0xff & (ctx->request->urllength >> 16);
 	rr[8] = 0xff & (ctx->request->urllength >> 8);
 	rr[9] = 0xff & ctx->request->urllength;
+	uint16_t stringlen = ctx->soff - 128;
+	rr[10] = 0xff & (stringlen >> 8);
+	rr[11] = 0xff & stringlen;
 	if (parser->callbacks.onHeaders == 1) {
 		Local<Value> argv[1] = {Integer::New(isolate, ctx->index)};
 		Local<Function> onHeaders = Local<Function>::New(isolate, parser->_onHeaders);
@@ -205,6 +208,14 @@ void HTTPParser::New(const FunctionCallbackInfo<Value> &args)
     	obj->callbacks.onResponse = 0;
 		args.GetReturnValue().Set(args.This());
 	}
+}
+
+void HTTPParser::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  HTTPParser* parser = static_cast<HTTPParser *>(wrap);
+  //fprintf(stderr, "HTTPParser::Destroy\n");
 }
 
 void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args)

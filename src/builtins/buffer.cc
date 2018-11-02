@@ -61,6 +61,7 @@ void Buffer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   ObjectWrap *wrap = data.GetParameter();
   Buffer* b = static_cast<Buffer *>(wrap);
   isolate->AdjustAmountOfExternalAllocatedMemory((int64_t)b->_length * -1);
+  //fprintf(stderr, "Buffer::Destroy\n");
   free(b->_data);
 }
 

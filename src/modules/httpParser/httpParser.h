@@ -25,9 +25,7 @@ struct _request {
   uint8_t headerCount; // no. of http headers
   uint8_t maxHeaders; // maximum number of headers
   uint8_t setHeaders; // should we copy the headers to js structures or not
-  uint16_t fieldlen; // length of current parser field
-  uint32_t fieldlenp; // pointer in buffer to current chunk of parser field
-  uint32_t urllength; // length of http url
+  uint16_t urllength; // length of http url
   char *key; // holds current header key
   char *val; // holds current header value
   header_element_type lastel; // flag for http parser
@@ -66,6 +64,9 @@ class HTTPParser : public dv8::ObjectWrap {
 		v8::Persistent<v8::Function> _onRequest;
 		v8::Persistent<v8::Function> _onResponse;
 		v8::Persistent<v8::Function> _onError;
+
+	protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 	private:
 

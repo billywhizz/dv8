@@ -139,7 +139,7 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         // nread = 0, we got an EAGAIN or EWOULDBLOCK
     }
     if (try_catch.HasCaught()) {
-        DecorateErrorStack(isolate, try_catch);
+        dv8::ReportException(isolate, &try_catch);
     }
 }
 

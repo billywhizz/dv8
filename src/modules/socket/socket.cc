@@ -211,9 +211,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   } else {
       // nread = 0, we got an EAGAIN or EWOULDBLOCK
   }
-  if (try_catch.HasCaught())
-  {
-    DecorateErrorStack(isolate, try_catch);
+  if (try_catch.HasCaught()) {
+			dv8::ReportException(isolate, &try_catch);
   }
 }
 
@@ -307,6 +306,14 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "UNIX", exports);
 }
 
+void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  Socket* sock = static_cast<Socket *>(wrap);
+  //fprintf(stderr, "Socket::Destroy\n");
+}
+
 void Socket::QueueSize(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
@@ -393,24 +400,22 @@ void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
   v8::HandleScope handleScope(isolate);
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   struct sockaddr_storage address;
-  if (args.Length() > 0)
+  _context *ctx = s->context;
+  int addrlen = sizeof(address);
+  int r = uv_tcp_getpeername((uv_tcp_t *)ctx->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
+  if (r)
   {
-    _context *ctx = s->context;
-    int addrlen = sizeof(address);
-    int r = uv_tcp_getpeername((uv_tcp_t *)ctx->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
-    if (r)
-    {
-      return;
-    }
-    const sockaddr *addr = reinterpret_cast<const sockaddr *>(&address);
-    char ip[INET6_ADDRSTRLEN];
-    const sockaddr_in *a4;
-    a4 = reinterpret_cast<const sockaddr_in *>(addr);
-    int len = sizeof ip;
-    uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
-    args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
     return;
   }
+  const sockaddr *addr = reinterpret_cast<const sockaddr *>(&address);
+  char ip[INET_ADDRSTRLEN];
+  const sockaddr_in *a4;
+  a4 = reinterpret_cast<const sockaddr_in *>(addr);
+  int len = sizeof ip;
+  uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
+  len = strlen(ip);
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
+  return;
 }
 
 void Socket::Close(const FunctionCallbackInfo<Value> &args)
@@ -789,7 +794,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
         args.GetReturnValue().Set(Integer::New(isolate, status));
         return;
       }
-      status = uv_listen((uv_stream_t *)sock, 1024, on_connection);
+      status = uv_listen((uv_stream_t *)sock, SOMAXCONN, on_connection);
       if (status)
       {
         args.GetReturnValue().Set(Integer::New(isolate, status));

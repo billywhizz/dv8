@@ -85,13 +85,20 @@ void start_context(uv_work_t *req)
 			v8::False(isolate), 
 			v8::True(isolate));
 		v8::Local<v8::Module> module;
+		v8::TryCatch try_catch(isolate);
 		v8::ScriptCompiler::Source basescript(base.ToLocalChecked(), baseorigin);
-		v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module);
+		if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
+			dv8::ReportException(isolate, &try_catch);
+			return;
+		}
 		v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
-		v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
+		if (!ok.ToChecked()) {
+			dv8::ReportException(isolate, &try_catch);
+			return;
+		}
+		module->Evaluate(context);
 
 		// Load main script
-		v8::TryCatch try_catch(isolate);
 		v8::MaybeLocal<v8::String> source;
 		if (th->isFile == 1) {
 			// if we are loading a file from disk
@@ -101,17 +108,17 @@ void start_context(uv_work_t *req)
 			source = v8::String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal, static_cast<int>(th->size));
 		}
 		if (try_catch.HasCaught()) {
-			dv8::DecorateErrorStack(isolate, try_catch);
+			dv8::ReportException(isolate, &try_catch);
 			return;
 		}
 		v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source.ToLocalChecked());
 		if (try_catch.HasCaught()) {
-			dv8::DecorateErrorStack(isolate, try_catch);
+			dv8::ReportException(isolate, &try_catch);
 			return;
 		}
 		script.ToLocalChecked()->Run(context);
 		if (try_catch.HasCaught()) {
-			dv8::DecorateErrorStack(isolate, try_catch);
+			dv8::ReportException(isolate, &try_catch);
 			return;
 		}
 
@@ -132,7 +139,7 @@ void start_context(uv_work_t *req)
 			v8::TryCatch try_catch(isolate);
 			onExit->Call(globalInstance, 0, argv);
 			if (try_catch.HasCaught()) {
-				dv8::DecorateErrorStack(isolate, try_catch);
+				dv8::ReportException(isolate, &try_catch);
 			}
 		}
 		int r = uv_loop_close(loop);
@@ -155,9 +162,8 @@ void on_context_complete(uv_work_t *req, int status)
 	Local<Function> foo = Local<Function>::New(isolate, t->onComplete);
 	v8::TryCatch try_catch(isolate);
 	foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
-	if (try_catch.HasCaught())
-	{
-		DecorateErrorStack(isolate, try_catch);
+	if (try_catch.HasCaught()) {
+		dv8::ReportException(isolate, &try_catch);
 	}
 }
 

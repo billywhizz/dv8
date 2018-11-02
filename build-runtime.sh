@@ -1,3 +1,4 @@
+# convert base js into c byte array so it can be built into binary
 xxd -i src/base.js > src/builtins.h
 sed -i 's/unsigned char/static const char/g' src/builtins.h
 sed -i 's/unsigned int/static unsigned int/g' src/builtins.h

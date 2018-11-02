@@ -15,13 +15,15 @@ class Buffer : public dv8::ObjectWrap
 {
 public:
   static void Init(v8::Local<v8::Object> exports);
-  void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
   char *_data;
   size_t _length;
   Buffer(char* data, size_t length) {
     this->_data = data;
     this->_length = length;
   }
+
+protected:
+  void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 private:
   Buffer()
