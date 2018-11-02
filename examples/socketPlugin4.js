@@ -23,6 +23,11 @@ function createContext() {
     return context
 }
 
+function splitHeader(header) {
+    const first = header.indexOf(':')
+    return [header.substring(0, first).trim(), header.substring(first + 1).trim()]
+}
+
 function parseHeaders(context) {
     const { client, bytes, view, work, request } = context
     request.address = client.address
@@ -36,6 +41,7 @@ function parseHeaders(context) {
     const str = work.read(STRING_START, STRING_START + urlLength + headerLength)
     request.url = str.substring(0, urlLength)
     request.headers = str.substring(urlLength, urlLength + headerLength)
+    //request.headers = str.substring(urlLength, urlLength + headerLength).split('\r\n').map(splitHeader)
 }
 
 function onRequest(context) {
@@ -50,8 +56,8 @@ function onClient(fd) {
     const client = new Socket(TCP)
     const context = createContext()
     const { work, parser } = context
-    context.client = client
     const body = []
+    context.client = client
     parser.onBody(len => body.push(work.read(0, len)))
     parser.onHeaders(() => parseHeaders(context))
     parser.onRequest(() => onRequest(context))
@@ -64,8 +70,8 @@ function onClient(fd) {
     client.setNoDelay(false)
 }
 
-buffers.out.write(r200, 0)
 const server = new Socket(TCP)
+buffers.out.write(r200, 0)
 server.onConnect(onClient)
 const r = server.listen(HTTPD_LISTEN_ADDRESS || '0.0.0.0', parseInt(HTTPD_LISTEN_PORT || 3000, 10))
 if (r !== 0) throw new Error(`Listen Error: ${r} ${server.error(r)}`)
