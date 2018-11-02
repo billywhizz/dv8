@@ -9,6 +9,8 @@ namespace dv8 {
 
 namespace httpParser {
 
+#define STRING_OFFSET 16
+
 enum header_element_type { NONE = 0, FIELD, VALUE };
 static http_parser_settings settings;
 
@@ -23,17 +25,13 @@ static uint32_t on_read_data(uint32_t nread, void* data);
 
 struct _request {
   uint8_t headerCount; // no. of http headers
-  uint8_t maxHeaders; // maximum number of headers
-  uint8_t setHeaders; // should we copy the headers to js structures or not
   uint16_t urllength; // length of http url
-  char *key; // holds current header key
-  char *val; // holds current header value
+  uint16_t headerLength; // length of headers (max 64k)
   header_element_type lastel; // flag for http parser
 };
 
 struct _context {
   uint32_t workBufferLength; // size of read buffer
-  uint32_t index; // position in buffer
   char* buf; // work buffer
   char* base; // read buffer
   http_parser *parser; // http parser instance

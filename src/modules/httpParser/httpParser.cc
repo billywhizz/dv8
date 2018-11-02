@@ -5,9 +5,6 @@ namespace dv8
 
 namespace httpParser
 {
-using dv8::builtins::Buffer;
-using dv8::builtins::Environment;
-using dv8::socket::Socket;
 using v8::Array;
 using v8::Context;
 using v8::Function;
@@ -18,162 +15,128 @@ using v8::Isolate;
 using v8::Local;
 using v8::Number;
 using v8::Object;
-using v8::Persistent;
 using v8::String;
 using v8::Value;
+using dv8::builtins::Buffer;
+using dv8::socket::Socket;
 
-int message_begin_cb(http_parser *p)
-{
-	_context *ctx = (_context *)p->data;
-	ctx->request->headerCount = 0;
-	ctx->request->urllength = 0;
-	uint8_t *rr = (uint8_t *)ctx->buf + 8;
-	ctx->request->lastel = NONE;
-	ctx->index = 12;
-	ctx->soff = 128;
+int message_begin_cb(http_parser *parser) {
+	_context *context = (_context *)parser->data;
+	context->request->urllength = 0;
+	context->request->headerLength = 0;
+	context->request->lastel = NONE;
+	context->soff = STRING_OFFSET;
 	return 0;
 }
 
-int url_cb(http_parser *p, const char *buf, size_t len)
-{
-	_context *ctx = (_context *)p->data;
-	uint8_t *rr = (uint8_t *)ctx->buf + ctx->soff;
-	memcpy(rr, buf, len);
-	ctx->soff += len;
-	ctx->request->urllength += len;
+int url_cb(http_parser *parser, const char *buf, size_t len) {
+	_context *context = (_context *)parser->data;
+	uint8_t *work = (uint8_t *)context->buf + context->soff;
+	memcpy(work, buf, len);
+	context->soff += len;
+	context->request->urllength += len;
 	return 0;
 }
 
-int header_field_cb(http_parser *p, const char *buf, size_t len)
-{
-	_context *ctx = (_context *)p->data;
-	if (ctx->request->lastel != FIELD) {
-		ctx->request->headerCount++;
-		uint8_t *rr = (uint8_t *)ctx->buf + ctx->index;
-		rr[0] = 0xff & (len >> 8);
-		rr[1] = 0xff & len;
-		rr = (uint8_t *)ctx->buf + ctx->soff;
-		memcpy(rr, buf, len);
-		ctx->index += 2;
-		ctx->soff += len;
+int header_field_cb(http_parser *parser, const char *buf, size_t len) {
+	_context *context = (_context *)parser->data;
+	uint8_t *work = (uint8_t *)context->buf + context->soff;
+	if (context->request->lastel == VALUE) {
+		memcpy(work, "\r\n", 2);
+		work += 2;
+		context->request->headerLength += 2;
+		context->soff += 2;
 	}
-	else {
-		uint8_t *rr = (uint8_t *)ctx->buf + ctx->index - 2;
-		uint16_t fsize = (rr[0] << 8) + rr[1];
-		fsize += len;
-		rr[0] = 0xff & (fsize >> 8);
-		rr[1] = 0xff & fsize;
-		rr = (uint8_t *)ctx->buf + ctx->soff;
-		memcpy(rr, buf, len);
-		ctx->soff += len;
-	}
-	ctx->request->lastel = FIELD;
+	context->request->headerLength += len;
+	memcpy(work, buf, len);
+	context->soff += len;
+	context->request->lastel = FIELD;
 	return 0;
 }
 
-int header_value_cb(http_parser *p, const char *buf, size_t len)
-{
-	_context *ctx = (_context *)p->data;
-	uint8_t *rr = (uint8_t *)ctx->buf + ctx->index - 2;
-	uint16_t fsize = 0;
-	if (ctx->request->lastel != VALUE) {
-		fsize = (rr[0] << 8) + rr[1];
-		fsize += 2;
+int header_value_cb(http_parser *parser, const char *buf, size_t len) {
+	_context *context = (_context *)parser->data;
+	uint8_t *work = (uint8_t *)context->buf + context->soff;
+	if (context->request->lastel != VALUE) {
+		memcpy(work, ": ", 2);
+		work += 2;
+		context->request->headerLength += 2;
+		context->soff += 2;
 	}
-	fsize += len;
-	rr[0] = 0xff & (fsize >> 8);
-	rr[1] = 0xff & fsize;
-	rr = (uint8_t *)ctx->buf + ctx->soff;
-	if (ctx->request->lastel != VALUE) {
-		memcpy(rr, ": ", 2);
-		rr += 2;
-		ctx->soff += 2;
-	}
-	memcpy(rr, buf, len);
-	ctx->soff += len;
-	ctx->request->lastel = VALUE;
+	memcpy(work, buf, len);
+	context->request->headerLength += len;
+	context->soff += len;
+	context->request->lastel = VALUE;
 	return 0;
 }
 
-int body_cb(http_parser *p, const char *buf, size_t len)
-{
-	if (len > 0)
-	{
+int body_cb(http_parser *parser, const char *buf, size_t len) {
+	if (len > 0) {
 		Isolate *isolate = Isolate::GetCurrent();
 		v8::HandleScope handleScope(isolate);
-		_context *ctx = (_context *)p->data;
-		HTTPParser *parser = (HTTPParser *)ctx->data;
-		if (parser->callbacks.onBody == 1) {
-			uint8_t *rr = (uint8_t *)ctx->buf;
-			memcpy(rr, buf, len);
+		_context *context = (_context *)parser->data;
+		HTTPParser *obj = (HTTPParser *)context->data;
+		if (obj->callbacks.onBody == 1) {
+			uint8_t *work = (uint8_t *)context->buf;
+			memcpy(work, buf, len);
 			Local<Value> argv[1] = {Integer::New(isolate, len)};
-			Local<Function> onBody = Local<Function>::New(isolate, parser->_onBody);
+			Local<Function> onBody = Local<Function>::New(isolate, obj->_onBody);
 			onBody->Call(isolate->GetCurrentContext()->Global(), 1, argv);
 		}
 	}
 	return 0;
 }
 
-int headers_complete_cb(http_parser *p)
-{
+int headers_complete_cb(http_parser *parser) {
 	Isolate *isolate = Isolate::GetCurrent();
 	v8::HandleScope handleScope(isolate);
-	_context *ctx = (_context *)p->data;
-	HTTPParser *parser = (HTTPParser *)ctx->data;
-	uint8_t *rr = (uint8_t *)ctx->buf;
-	rr[0] = p->http_major;
-	rr[1] = p->http_minor;
-	if (ctx->parser_mode == 0) {
-		rr[2] = 0xff & (http_method)p->method;
-		rr[3] = p->upgrade;
+	_context *context = (_context *)parser->data;
+	HTTPParser *obj = (HTTPParser *)context->data;
+	uint8_t *work = (uint8_t *)context->buf;
+	work[0] = parser->http_major;
+	work[1] = parser->http_minor;
+	if (context->parser_mode == 0) {
+		work[2] = 0xff & (http_method)parser->method;
+		work[3] = parser->upgrade;
+	} else {
+		work[2] = 0xff & (parser->status_code >> 8);
+		work[3] = 0xff & parser->status_code;
 	}
-	else {
-		rr[2] = 0xff & (p->status_code >> 8);
-		rr[3] = 0xff & p->status_code;
-	}
-	rr[4] = http_should_keep_alive(p);
-	rr[5] = ctx->request->headerCount;
-	rr[6] = 0xff & (ctx->request->urllength >> 24);
-	rr[7] = 0xff & (ctx->request->urllength >> 16);
-	rr[8] = 0xff & (ctx->request->urllength >> 8);
-	rr[9] = 0xff & ctx->request->urllength;
-	uint16_t stringlen = ctx->soff - 128;
-	rr[10] = 0xff & (stringlen >> 8);
-	rr[11] = 0xff & stringlen;
-	if (parser->callbacks.onHeaders == 1) {
-		Local<Value> argv[1] = {Integer::New(isolate, ctx->index)};
-		Local<Function> onHeaders = Local<Function>::New(isolate, parser->_onHeaders);
-		onHeaders->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+	work[4] = http_should_keep_alive(parser);
+	work[5] = 0xff & (context->request->urllength >> 8);
+	work[6] = 0xff & context->request->urllength;
+	work[7] = 0xff & (context->request->headerLength >> 8);
+	work[8] = 0xff & context->request->headerLength;
+	if (obj->callbacks.onHeaders == 1) {
+		Local<Value> argv[0] = {};
+		Local<Function> onHeaders = Local<Function>::New(isolate, obj->_onHeaders);
+		onHeaders->Call(isolate->GetCurrentContext()->Global(), 0, argv);
 	}
 	return 0;
 }
 
-int message_complete_cb(http_parser *p)
-{
+int message_complete_cb(http_parser *parser) {
 	Isolate *isolate = Isolate::GetCurrent();
 	v8::HandleScope handleScope(isolate);
-	_context *ctx = (_context *)p->data;
-	HTTPParser *parser = (HTTPParser *)ctx->data;
-	if (ctx->parser_mode == 0 && parser->callbacks.onRequest == 1) {
+	_context *context = (_context *)parser->data;
+	HTTPParser *obj = (HTTPParser *)context->data;
+	if (context->parser_mode == 0 && obj->callbacks.onRequest == 1) {
 		Local<Value> argv[0] = {};
-		Local<Function> onRequest = Local<Function>::New(isolate, parser->_onRequest);
+		Local<Function> onRequest = Local<Function>::New(isolate, obj->_onRequest);
 		onRequest->Call(isolate->GetCurrentContext()->Global(), 0, argv);
-	} else if (ctx->parser_mode == 1 && parser->callbacks.onResponse == 1) {
+	} else if (context->parser_mode == 1 && obj->callbacks.onResponse == 1) {
 		Local<Value> argv[0] = {};
-		Local<Function> onResponse = Local<Function>::New(isolate, parser->_onResponse);
+		Local<Function> onResponse = Local<Function>::New(isolate, obj->_onResponse);
 		onResponse->Call(isolate->GetCurrentContext()->Global(), 0, argv);
 	}
 	return 0;
 }
 
-void HTTPParser::Init(Local<Object> exports)
-{
+void HTTPParser::Init(Local<Object> exports) {
 	Isolate *isolate = exports->GetIsolate();
 	Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-
 	tpl->SetClassName(String::NewFromUtf8(isolate, "HTTPParser"));
 	tpl->InstanceTemplate()->SetInternalFieldCount(1);
-
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", HTTPParser::Setup);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", HTTPParser::Reset);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "execute", HTTPParser::Execute);
@@ -182,15 +145,12 @@ void HTTPParser::Init(Local<Object> exports)
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRequest", HTTPParser::onRequest);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onResponse", HTTPParser::onResponse);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", HTTPParser::onError);
-
 	DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 0), "REQUEST", exports);
 	DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 1), "RESPONSE", exports);
-
 	DV8_SET_EXPORT(isolate, tpl, "HTTPParser", exports);
 }
 
-void HTTPParser::New(const FunctionCallbackInfo<Value> &args)
-{
+void HTTPParser::New(const FunctionCallbackInfo<Value> &args) {
 	Isolate *isolate = args.GetIsolate();
 	HandleScope handle_scope(isolate);
 	if (args.IsConstructCall()) {
@@ -214,43 +174,32 @@ void HTTPParser::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   Isolate *isolate = data.GetIsolate();
   v8::HandleScope handleScope(isolate);
   ObjectWrap *wrap = data.GetParameter();
-  HTTPParser* parser = static_cast<HTTPParser *>(wrap);
-  //fprintf(stderr, "HTTPParser::Destroy\n");
+  HTTPParser* obj = static_cast<HTTPParser *>(wrap);
 }
 
-void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args)
-{
+void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args) {
 	Isolate *isolate = args.GetIsolate();
 	HTTPParser *obj = ObjectWrap::Unwrap<HTTPParser>(args.Holder());
 	v8::HandleScope handleScope(isolate);
 	int argc = args.Length();
-
-	Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
-	obj->context->base = b->_data;
-
-	b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
-	obj->context->buf = b->_data;
-	obj->context->workBufferLength = b->_length;
-
+	Buffer *buf = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
+	obj->context->base = buf->_data;
+	buf = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
+	obj->context->buf = buf->_data;
+	obj->context->workBufferLength = buf->_length;
 }
 
 uint32_t on_read_data(uint32_t nread, void* data) {
 	_context* context = (_context*)data;
 	ssize_t np = http_parser_execute(context->parser, &settings, context->base, nread);
-	if (np != nread) {
-		if (context->parser->http_errno == HPE_PAUSED) {
-			uint8_t *lastByte = (uint8_t *)(context->base + np);
-			context->lastByte = *lastByte;
-		}
-		else {
-			return np;
-		}
+	if (np != nread && context->parser->http_errno == HPE_PAUSED) {
+		uint8_t *lastByte = (uint8_t *)(context->base + np);
+		context->lastByte = *lastByte;
 	}
 	return 0;
 }
 
-void HTTPParser::Reset(const FunctionCallbackInfo<Value> &args)
-{
+void HTTPParser::Reset(const FunctionCallbackInfo<Value> &args) {
 	Isolate *isolate = args.GetIsolate();
 	Local<Context> context = isolate->GetCurrentContext();
 	HTTPParser *obj = ObjectWrap::Unwrap<HTTPParser>(args.Holder());
@@ -279,8 +228,7 @@ void HTTPParser::Execute(const FunctionCallbackInfo<Value> &args)
 		if (obj->context->parser->http_errno == HPE_PAUSED) {
 			uint8_t *lastByte = (uint8_t *)(obj->context->base + np);
 			obj->context->lastByte = *lastByte;
-		}
-		else {
+		} else {
 			Local<Value> argv[2] = {Number::New(isolate, obj->context->parser->http_errno), String::NewFromUtf8(isolate, http_errno_description((http_errno)obj->context->parser->http_errno), v8::String::kNormalString)};
 			Local<Function> onError = Local<Function>::New(isolate, obj->_onError);
 			onError->Call(context->Global(), 2, argv);
