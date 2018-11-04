@@ -9,6 +9,7 @@ const STRING_START = 16
 const r200 = 'HTTP/1.1 200 OK\r\nServer: foo\r\nContent-Length: 0\r\n\r\n'
 const r200len = r200.length
 const contexts = []
+const requests = []
 const buffers = { in: createBuffer(IN_BUFFER_SIZE), out: createBuffer(OUT_BUFFER_SIZE) }
 
 function Request(address, major, minor, method, upgrade, keepalive, url, headers) {
@@ -31,6 +32,27 @@ Request.prototype.keepalive = 0
 Request.prototype.url = ''
 Request.prototype.headers = ''
 
+function createRequest(context) {
+    const { client, bytes, view, work } = context
+    const { address } = client
+    const urlLength = view.getUint16(5)
+    const headerLength = view.getUint16(7)
+    const str = work.read(STRING_START, STRING_START + urlLength + headerLength)
+    if (requests.length) {
+        const request = requests.shift()
+        request.address = address
+        request.major = bytes[0]
+        request.minor = bytes[1]
+        request.method = bytes[2]
+        request.upgrade = bytes[3]
+        request.keepalive = bytes[4]
+        request.url = str.substring(0, urlLength)
+        request.headers = str.substring(urlLength, urlLength + headerLength)
+        return request
+    }
+    return new Request(address, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], str.substring(0, urlLength), str.substring(urlLength, urlLength + headerLength))
+}
+
 function createContext() {
     if (contexts.length) return contexts.shift()
     const work = createBuffer(WORK_BUFFER_SIZE)
@@ -43,18 +65,14 @@ function createContext() {
 }
 
 function onHeaders(context) {
-    const { client, bytes, view, work, queue } = context
-    const { address } = client
-    const urlLength = view.getUint16(5)
-    const headerLength = view.getUint16(7)
-    const str = work.read(STRING_START, STRING_START + urlLength + headerLength)
-    queue.push(new Request(client.address, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], str.substring(0, urlLength), str.substring(urlLength, urlLength + headerLength)))
+    context.queue.push(createRequest(context))
 }
 
 function onRequest(context) {
     const { client } = context
     const request = context.queue.shift()
     //print(JSON.stringify(request, null, '  '))
+    requests.push(request)
     const r = client.write(r200len)
     if (r === r200len) return
     if (r < r200len) return client.pause()
@@ -79,9 +97,10 @@ function onClient(fd) {
     client.setNoDelay(false)
 }
 
-setInterval(() => {
-    print(JSON.stringify(cpuUsage()))
+const timer = setInterval(() => {
+    print(JSON.stringify({ requests: requests.length, contexts: contexts.length }))
 }, 1000)
+
 const server = new Socket(TCP)
 buffers.out.write(r200, 0)
 server.onConnect(onClient)

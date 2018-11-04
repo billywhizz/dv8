@@ -5,6 +5,7 @@ namespace dv8
 
 using dv8::builtins::Environment;
 using v8::HeapSpaceStatistics;
+using v8::Exception;
 
 using InitializerCallback = void (*)(Local<Object> exports);
 
@@ -25,40 +26,98 @@ void Shutdown(const FunctionCallbackInfo<Value> &args) {
 
 void ReportException(Isolate *isolate, TryCatch *try_catch) {
   HandleScope handle_scope(isolate);
-  fprintf(stderr, "exception\n");
-  String::Utf8Value exception(isolate, try_catch->Exception());
-  const char *exception_string = *exception;
+  Local<Context> context(isolate->GetCurrentContext());
+  Local<Object> globalInstance = context->Global();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+
+  Local<Value> er = try_catch->Exception();
   Local<Message> message = try_catch->Message();
   if (message.IsEmpty()) {
-    fprintf(stderr, "%s\n", exception_string);
+    message = Exception::CreateMessage(isolate, er);
   }
-  else {
-    String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
-    Local<Context> context(isolate->GetCurrentContext());
-    const char *filename_string = *filename;
-    int linenum = message->GetLineNumber(context).FromJust();
-    fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
-    String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
-    const char *sourceline_string = *sourceline;
-    fprintf(stderr, "%s\n", sourceline_string);
-    int start = message->GetStartColumn(context).FromJust();
-    for (int i = 0; i < start; i++) {
-      fprintf(stderr, " ");
-    }
-    int end = message->GetEndColumn(context).FromJust();
-    for (int i = start; i < end; i++)
-    {
-      fprintf(stderr, "^");
-    }
-    fprintf(stderr, "\n");
-    Local<Value> stack_trace_string;
-    if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0)
-    {
-      String::Utf8Value stack_trace(isolate, stack_trace_string);
-      const char *stack_trace_string = *stack_trace;
-      fprintf(stderr, "%s\n", stack_trace_string);
-    }
+  String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
+  Local<Value> func = globalInstance->Get(String::NewFromUtf8(isolate, "onUncaughtException", NewStringType::kNormal).ToLocalChecked());
+  Local<Function> onUncaughtException = Local<Function>::Cast(func);
+  Local<Object> err_obj = er->ToObject(context).ToLocalChecked();
+  env->err.Reset(isolate, err_obj);
+  Local<Value> argv[1] = { err_obj };
+  onUncaughtException->Call(globalInstance, 1, argv);
+/*
+  v8::ValueSerializer* _serializer = new v8::ValueSerializer(isolate);
+  _serializer->WriteHeader();
+  _serializer->WriteValue(context, err_obj);
+  std::pair<uint8_t*, size_t> pair = _serializer->Release();
+  env->error->bytes = pair.first;
+  env->error->len = pair.second;
+*/
+  env->error->hasError = 1;
+  String::Utf8Value exception(isolate, er);
+  char *exception_string = *exception;
+  char *filename_string = *filename;
+  int linenum = message->GetLineNumber(context).FromJust();
+  env->error->linenum = linenum;
+
+  env->error->filename = (char*)calloc(strlen(filename_string), 1);
+  memcpy(env->error->filename, filename_string, strlen(filename_string));
+
+  env->error->exception = (char*)calloc(strlen(exception_string), 1);
+  memcpy(env->error->exception, exception_string, strlen(exception_string));
+
+  String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
+  char *sourceline_string = *sourceline;
+
+  env->error->sourceline = (char*)calloc(strlen(sourceline_string), 1);
+  memcpy(env->error->sourceline, sourceline_string, strlen(sourceline_string));
+
+  Local<Value> stack_trace_string;
+  if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0)
+  {
+    String::Utf8Value stack_trace(isolate, stack_trace_string);
+    char *stack_trace_string = *stack_trace;
+    env->error->stack = (char*)calloc(strlen(stack_trace_string), 1);
+    memcpy(env->error->stack, stack_trace_string, strlen(stack_trace_string));
   }
+
+
+
+/*
+  env->js_error.message = pair.first;
+
+  _data->_data.reset(pair.first);
+  _data->_size = pair.second;
+
+  pair->
+*/
+
+
+/*
+  Local<Value> er = try_catch->Exception();
+  String::Utf8Value exception(isolate, er);
+  const char *exception_string = *exception;
+  const char *filename_string = *filename;
+  int linenum = message->GetLineNumber(context).FromJust();
+  fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
+  String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
+  const char *sourceline_string = *sourceline;
+  fprintf(stderr, "%s\n", sourceline_string);
+  int start = message->GetStartColumn(context).FromJust();
+  for (int i = 0; i < start; i++) {
+    fprintf(stderr, " ");
+  }
+  int end = message->GetEndColumn(context).FromJust();
+  for (int i = start; i < end; i++)
+  {
+    fprintf(stderr, "^");
+  }
+  fprintf(stderr, "\n");
+  Local<Value> stack_trace_string;
+  if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0)
+  {
+    String::Utf8Value stack_trace(isolate, stack_trace_string);
+    const char *stack_trace_string = *stack_trace;
+    fprintf(stderr, "%s\n", stack_trace_string);
+  }
+*/
 }
 
 bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bool report_exceptions)

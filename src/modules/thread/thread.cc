@@ -50,7 +50,9 @@ void start_context(uv_work_t *req)
 		// set up context and environment
 		v8::Local<v8::Context> context = Context::New(isolate, NULL, global);
 		dv8::builtins::Environment *env = new dv8::builtins::Environment();
+		env->error = &th->error;
 		env->AssignToContext(context);
+		env->err.Reset();
 
 		// get context global instance and initialise it
 		v8::Local<v8::Object> globalInstance = context->Global();
@@ -75,7 +77,7 @@ void start_context(uv_work_t *req)
 
 		// compile and run the base module
 		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
-		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "./lib/base.js", v8::NewStringType::kNormal).ToLocalChecked(), 
+		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, th->name, v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
 			v8::Integer::New(isolate, 0), 
 			v8::False(isolate), 
@@ -157,13 +159,43 @@ void on_context_complete(uv_work_t *req, int status)
 	Thread *t = (Thread *)th->object;
 	Isolate *isolate = Isolate::GetCurrent();
 	v8::HandleScope handleScope(isolate);
-	const unsigned int argc = 0;
-	Local<Value> argv[argc] = {};
+    Local<Context> context = isolate->GetCurrentContext();
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
 	Local<Function> foo = Local<Function>::New(isolate, t->onComplete);
-	v8::TryCatch try_catch(isolate);
-	foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
-	if (try_catch.HasCaught()) {
-		dv8::ReportException(isolate, &try_catch);
+	Local<Value> errObj;
+	if (env->err.IsEmpty()) {
+		errObj = Null(isolate);
+	} else {
+		errObj = Local<Object>::New(isolate, env->err);
+	}
+	js_error* jsError = &th->error;
+	if (jsError->hasError == 1) {
+
+        //v8::ValueDeserializer* _deserializer = new v8::ValueDeserializer(isolate, jsError->bytes, jsError->len);
+		Local<Object> o = Object::New(isolate);
+		o->Set(String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
+		o->Set(String::NewFromUtf8(isolate, "filename", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->filename, v8::NewStringType::kNormal).ToLocalChecked());
+		o->Set(String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->exception, v8::NewStringType::kNormal).ToLocalChecked());
+		o->Set(String::NewFromUtf8(isolate, "sourceline", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->sourceline, v8::NewStringType::kNormal).ToLocalChecked());
+		o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
+		free(jsError->filename);
+		free(jsError->exception);
+		free(jsError->sourceline);
+		free(jsError->stack);
+		//MaybeLocal<Value> ret = _deserializer->ReadValue(context);
+		Local<Value> argv[2] = { o, Integer::New(isolate, status) };
+		v8::TryCatch try_catch(isolate);
+		foo->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+		if (try_catch.HasCaught()) {
+			dv8::ReportException(isolate, &try_catch);
+		}
+	} else {
+		Local<Value> argv[2] = { v8::Null(isolate), Integer::New(isolate, status) };
+		v8::TryCatch try_catch(isolate);
+		foo->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+		if (try_catch.HasCaught()) {
+			dv8::ReportException(isolate, &try_catch);
+		}
 	}
 }
 
@@ -228,16 +260,18 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 			th->length = 0;
 		}
 		th->object = (void *)obj;
+		th->error.hasError = 0;
 		const char *fname = *str;
 		char *lib_name = (char *)calloc(128, 1);
 		snprintf(lib_name, 128, "%s", *str);
-		th->source = lib_name;
+		th->name = lib_name;
 		th->isFile = 1;
 		obj->handle->data = (void *)th;
 		uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	} else {
 		Local<Function> threadFunc = Local<Function>::Cast(args[0]);
+		String::Utf8Value function_name(args.GetIsolate(), threadFunc->GetName());
 		Local<Function> onComplete = Local<Function>::Cast(args[1]);
 		Local<String> sourceString = threadFunc->ToString(isolate);
 		String::Utf8Value source(isolate, sourceString);
@@ -253,6 +287,8 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 		else {
 			th->length = 0;
 		}
+		th->name = *function_name;
+		th->error.hasError = 0;
 		th->object = (void *)obj;
 		int len = strlen(*source);
 		int first = 0;

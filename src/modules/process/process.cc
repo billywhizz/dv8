@@ -1,10 +1,8 @@
 #include <process.h>
 
-namespace dv8
-{
+namespace dv8 {
 
-namespace process
-{
+namespace process {
 using dv8::builtins::Environment;
 using v8::Array;
 using v8::BigUint64Array;
@@ -24,25 +22,20 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
-void Process::Init(Local<Object> exports)
-{
+void Process::Init(Local<Object> exports) {
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-
   tpl->SetClassName(String::NewFromUtf8(isolate, "Process"));
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
-
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pid", Process::PID);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "memoryUsage", Process::MemoryUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "heapUsage", Process::HeapSpaceUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cpuUsage", Process::CPUUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hrtime", Process::HRTime);
-
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
 }
 
-void Process::New(const FunctionCallbackInfo<Value> &args)
-{
+void Process::New(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handle_scope(isolate);
   if (args.IsConstructCall()) {
@@ -52,15 +45,13 @@ void Process::New(const FunctionCallbackInfo<Value> &args)
   }
 }
 
-void Process::PID(const FunctionCallbackInfo<Value> &args)
-{
+void Process::PID(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   args.GetReturnValue().Set(Integer::New(isolate, uv_os_getpid()));
 }
 
-void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args)
-{
+void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
@@ -69,12 +60,10 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args)
   size_t number_of_heap_spaces = isolate->NumberOfHeapSpaces();
   Local<Object> o = Object::New(isolate);
   size_t argc = args.Length();
-  if (argc < number_of_heap_spaces)
-  {
+  if (argc < number_of_heap_spaces) {
     number_of_heap_spaces = argc;
   }
-  for (size_t i = 0; i < number_of_heap_spaces; i++)
-  {
+  for (size_t i = 0; i < number_of_heap_spaces; i++) {
     isolate->GetHeapSpaceStatistics(&s, i);
     Local<Float64Array> array = args[i].As<Float64Array>();
     Local<ArrayBuffer> ab = array->Buffer();
@@ -88,16 +77,13 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args)
   args.GetReturnValue().Set(o);
 }
 
-void Process::MemoryUsage(const FunctionCallbackInfo<Value> &args)
-{
+void Process::MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   size_t rss;
   int err = uv_resident_set_memory(&rss);
-  if (err)
-  {
-    fprintf(stderr, "uv_error: %i", err);
-    return;
+  if (err) {
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
   }
   HeapStatistics v8_heap_stats;
   isolate->GetHeapStatistics(&v8_heap_stats);
@@ -120,14 +106,12 @@ void Process::MemoryUsage(const FunctionCallbackInfo<Value> &args)
   fields[13] = isolate->AdjustAmountOfExternalAllocatedMemory(0);
 }
 
-void Process::CPUUsage(const FunctionCallbackInfo<Value> &args)
-{
+void Process::CPUUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   uv_rusage_t rusage;
   int err = uv_getrusage(&rusage);
-  if (err)
-  {
+  if (err) {
     return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
   }
   Local<Float64Array> array = args[0].As<Float64Array>();
@@ -137,8 +121,7 @@ void Process::CPUUsage(const FunctionCallbackInfo<Value> &args)
   fields[1] = MICROS_PER_SEC * rusage.ru_stime.tv_sec + rusage.ru_stime.tv_usec;
 }
 
-void Process::HRTime(const FunctionCallbackInfo<Value> &args)
-{
+void Process::HRTime(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<ArrayBuffer> ab = args[0].As<BigUint64Array>()->Buffer();

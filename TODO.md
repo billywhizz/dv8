@@ -1,5 +1,15 @@
 ## NEXT
 
+use dv8 itself to create the build scripts and run the build (shell to docker) for modules, based on a json config
+
+all you need is:
+docker
+docker pull dv8
+docker pull dv8-sdk
+
+- pass args to thread function
+    - receive result/messages from thread function
+    - serdes
 - refactor - read v8/libuv docs. handle all errors
 - thread signals
 - thread messaging

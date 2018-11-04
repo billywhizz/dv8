@@ -14,8 +14,10 @@ typedef struct
 	void *object;
 	size_t length;
 	uint8_t isFile;
-	void *source;
 	size_t size;
+	char* source;
+	char* name;
+	js_error error;
 } thread_handle;
 
 class Thread : public dv8::ObjectWrap

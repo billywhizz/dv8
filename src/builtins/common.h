@@ -7,6 +7,18 @@
 namespace dv8
 {
 
+typedef struct
+{
+	uint8_t hasError;
+    int linenum;
+    char* filename;
+    char* exception;
+    char* sourceline;
+    char* stack;
+    uint8_t* bytes;
+    size_t len;
+} js_error;
+
 class ObjectWrap
 {
   public:

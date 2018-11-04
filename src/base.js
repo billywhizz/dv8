@@ -22,7 +22,7 @@ const heap = [
     new Float64Array(4),
     new Float64Array(4),
     new Float64Array(4),
-    new Float64Array(4),
+    new Float64Array(4)
 ]
 
 function cpuUsage() {
@@ -103,14 +103,23 @@ function spawn(fun, onComplete) {
     thread.buffer.write(envJSON, 5)
     dv.setUint32(envJSON.length + 5, argsJSON.length)
     thread.buffer.write(argsJSON, envJSON.length + 9)
-    thread.start(fun, () => {
+    thread.start(fun, (err, status) => {
         const finish = hrtime()
         const ready = dv.getBigUint64(0)
         thread.time = (finish - start) / thousand
         thread.boot = (ready - start) / thousand
-        onComplete(thread)
+        onComplete({ err, thread, status })
     }, thread.buffer)
     return thread
+}
+
+function dumpError(err) {
+    print(
+`Error
+${err.message}
+Stack
+${err.stack}
+`)
 }
 
 global.setTimeout = setTimeout
@@ -124,6 +133,11 @@ global.hrtime = hrtime
 global.createBuffer = createBuffer
 global.createThread = spawn
 
+global.onUncaughtException = err => {
+    // log a trace?
+    throw(err)
+}
+
 if (global.workerData) {
     global.workerData.bytes = global.workerData.alloc()
     const dv = new DataView(global.workerData.bytes)
@@ -135,7 +149,8 @@ if (global.workerData) {
     const argsJSON = global.workerData.read(9 + envLength, argsLength)
     global.args = JSON.parse(argsJSON)
     // set the boot time
-    dv.setBigUint64(0, BigInt(hrtime()))
+    // TODO: why is this casting to bigint? isn't it returned as a bigint?
+    dv.setBigUint64(0, hrtime())
 } else {
     global.env = env().map(entry => entry.split('=')).reduce((env, pair) => { env[pair[0]] = pair[1]; return env }, {})
     global.threadId = 0

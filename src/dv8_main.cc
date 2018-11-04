@@ -41,6 +41,8 @@ int main(int argc, char *argv[])
       dv8::builtins::Environment *env = new dv8::builtins::Environment();
       env->AssignToContext(context);
       env->loop = uv_default_loop();
+      env->error = (dv8::js_error*)calloc(sizeof(dv8::js_error), 1);
+      env->error->hasError = 0;
 
       // store the command line arguments
       v8::Local<v8::Array> arguments = v8::Array::New(isolate);
@@ -101,6 +103,7 @@ int main(int argc, char *argv[])
       // initialize the event loop
       int alive;
       do {
+        v8::platform::PumpMessageLoop(platform.get(), isolate);
         uv_run(uv_default_loop(), UV_RUN_DEFAULT);
         alive = uv_loop_alive(uv_default_loop());
         if (alive != 0) {
