@@ -19,6 +19,7 @@ RUN ./platform.sh && \
     ./module.sh thread && \
     ./module.sh timer && \
     ./module.sh tty && \
+    ./module.sh loop && \
     ./http-parser.sh && \
     ./openssl.sh
 CMD ["/bin/sh"]
