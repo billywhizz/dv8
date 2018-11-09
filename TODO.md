@@ -27,9 +27,7 @@ docker pull dv8-sdk
         - Pipes
         - Timers
 - figure out freeing buffer memory
-- idle handler/nexttick
 - fork/exec
-- libuv - loop inspection - handles
 - thread.global functions for gc/shutdown
 - segfault stack trace: https://github.com/ddopson/node-segfault-handler/blob/master/src/segfault-handler.cpp
 - ssl/tls for sockets

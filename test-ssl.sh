@@ -1,0 +1,1 @@
+openssl s_client -showcerts -state -debug -msg -no_ssl3 -no_tls1 -no_tls1_1 -connect 172.17.0.1:3000

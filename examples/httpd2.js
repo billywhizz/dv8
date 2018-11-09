@@ -1,11 +1,9 @@
 const { Socket, TCP } = module('socket', {})
-const { HTTPParser, REQUEST } = module('httpParser', {})
 
 const { HTTPD_LISTEN_ADDRESS, HTTPD_LISTEN_PORT } = env
 const IN_BUFFER_SIZE = 64 * 1024
 const OUT_BUFFER_SIZE = 4 * 1024
 const WORK_BUFFER_SIZE = 4 * 1024
-const STRING_START = 16
 const r200 = 'HTTP/1.1 200 OK\r\nServer: foo\r\nContent-Length: 0\r\n\r\n'
 const r200len = r200.length
 const contexts = []

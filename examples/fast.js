@@ -11,54 +11,13 @@ const r200len = r200.length
 const contexts = []
 const buffers = { in: createBuffer(IN_BUFFER_SIZE), out: createBuffer(OUT_BUFFER_SIZE) }
 
-function Request(address, major, minor, method, upgrade, keepalive, url, headers) {
-    this.address = address
-    this.major = major
-    this.minor = minor
-    this.method = method
-    this.upgrade = upgrade
-    this.keepalive = keepalive
-    this.url = url
-    this.headers = headers
-}
-
-Request.prototype.address = ''
-Request.prototype.major = 0
-Request.prototype.minor = 0
-Request.prototype.method = 0
-Request.prototype.upgrade = 0
-Request.prototype.keepalive = 0
-Request.prototype.url = ''
-Request.prototype.headers = ''
-
 function createContext() {
     if (contexts.length) return contexts.shift()
     const work = createBuffer(WORK_BUFFER_SIZE)
     const parser = new HTTPParser()
-    const bytes = new Uint8Array(work.bytes)
-    const view = new DataView(work.bytes)
-    const context = { in: buffers.in, out: buffers.out, work, parser, bytes, view, queue: [] }
+    const context = { in: buffers.in, out: buffers.out, work, parser }
     context.parser.setup(context.in, work)
     return context
-}
-
-function onHeaders(context) {
-    const { client, bytes, view, work, queue } = context
-    const { address } = client
-    const urlLength = view.getUint16(5)
-    const headerLength = view.getUint16(7)
-    const str = work.read(STRING_START, STRING_START + urlLength + headerLength)
-    queue.push(new Request(client.address, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], str.substring(0, urlLength), str.substring(urlLength, urlLength + headerLength)))
-}
-
-function onRequest(context) {
-    const { client } = context
-    const request = context.queue.shift()
-    //print(JSON.stringify(request, null, '  '))
-    const r = client.write(r200len)
-    if (r === r200len) return
-    if (r < r200len) return client.pause()
-    if (r < 0) client.close()
 }
 
 function onClient(fd) {
@@ -68,8 +27,12 @@ function onClient(fd) {
     const body = []
     context.client = client
     parser.onBody(len => body.push(work.read(0, len)))
-    parser.onHeaders(() => onHeaders(context))
-    parser.onRequest(() => onRequest(context))
+    parser.onRequest(() => {
+        const r = client.write(r200len)
+        if (r === r200len) return
+        if (r < r200len) return client.pause()
+        if (r < 0) client.close()
+    })
     parser.reset(REQUEST, client)
     client.setup(fd, context.in, context.out)
     client.address = client.remoteAddress()
