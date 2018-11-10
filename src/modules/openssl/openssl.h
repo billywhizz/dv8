@@ -9,8 +9,25 @@
 #include <openssl/conf.h>
 #include <openssl/engine.h>
 
+namespace dv8 {
+
+namespace openssl {
+
+typedef struct
+{
+  uint8_t onWrite;
+  uint8_t onRead;
+  uint8_t onError;
+} callbacks_t;
+
+enum socket_type
+{
+  SERVER_SOCKET = 0,
+  CLIENT_SOCKET
+};
+
 /* SSL debug */
-#define SSL_WHERE_INFO(ssl, w, flag, msg) {                \
+#define WHERE_INFO(ssl, w, flag, msg) {                \
     if(w & flag) {                                         \
       printf("+ %s: ", name);                              \
       printf("%20.20s", msg);                              \
@@ -20,47 +37,31 @@
     }                                                      \
   } 
 
-namespace dv8 {
-
-namespace openssl {
-
 static uint32_t on_read_data(uint32_t nread, void* data);
-enum sslstatus { SSLSTATUS_OK, SSLSTATUS_WANT_IO, SSLSTATUS_FAIL};
 
-static void krx_ssl_info_callback(const SSL* ssl, int where, int ret, const char* name) {
- 
+static void ssl_info_callback(const SSL* ssl, int where, int ret, const char* name) {
   if(ret == 0) {
-    printf("-- krx_ssl_info_callback: error occured.\n");
+    printf("ssl_info_callback, error occured.\n");
     return;
   }
- 
-  SSL_WHERE_INFO(ssl, where, SSL_CB_LOOP, "LOOP");
-  SSL_WHERE_INFO(ssl, where, SSL_CB_HANDSHAKE_START, "HANDSHAKE START");
-  SSL_WHERE_INFO(ssl, where, SSL_CB_HANDSHAKE_DONE, "HANDSHAKE DONE");
+  WHERE_INFO(ssl, where, SSL_CB_LOOP, "LOOP");
+  WHERE_INFO(ssl, where, SSL_CB_EXIT, "EXIT");
+  WHERE_INFO(ssl, where, SSL_CB_READ, "READ");
+  WHERE_INFO(ssl, where, SSL_CB_WRITE, "WRITE");
+  WHERE_INFO(ssl, where, SSL_CB_ALERT, "ALERT");
+  WHERE_INFO(ssl, where, SSL_CB_HANDSHAKE_DONE, "HANDSHAKE DONE");
 }
 
-static void krx_ssl_server_info_callback(const SSL* ssl, int where, int ret) {
-  krx_ssl_info_callback(ssl, where, ret, "server");
+static void ssl_server_info_callback(const SSL* ssl, int where, int ret) {
+  ssl_info_callback(ssl, where, ret, "server");
 }
 
-static void krx_ssl_client_info_callback(const SSL* ssl, int where, int ret) {
-  krx_ssl_info_callback(ssl, where, ret, "client");
+static void ssl_client_info_callback(const SSL* ssl, int where, int ret) {
+  ssl_info_callback(ssl, where, ret, "client");
 }
  
-static enum sslstatus get_sslstatus(SSL* ssl, int n)
-{
-  switch (SSL_get_error(ssl, n))
-  {
-    case SSL_ERROR_NONE:
-      return SSLSTATUS_OK;
-    case SSL_ERROR_WANT_WRITE:
-    case SSL_ERROR_WANT_READ:
-      return SSLSTATUS_WANT_IO;
-    case SSL_ERROR_ZERO_RETURN:
-    case SSL_ERROR_SYSCALL:
-    default:
-      return SSLSTATUS_FAIL;
-  }
+static void ssl_msg_callback(int writep, int version, int contentType, const void* buf, size_t len, SSL* ssl, void *arg) {
+  fprintf(stderr, "\tMessage callback with length: %zu\n", len);
 }
 
 class SecureContext : public dv8::ObjectWrap {
@@ -83,11 +84,15 @@ class SecureContext : public dv8::ObjectWrap {
 class SecureSocket : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
+    v8::Persistent<v8::Function> _onWrite;
+    v8::Persistent<v8::Function> _onRead;
+    v8::Persistent<v8::Function> _onError;
 		SecureContext* context;
 		dv8::socket::Socket* socket;
 		SSL* ssl;
 		BIO *output_bio;
 		BIO *input_bio;
+    callbacks_t callbacks;
 
 	private:
 
@@ -99,6 +104,9 @@ class SecureSocket : public dv8::ObjectWrap {
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Finish(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void OnRead(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

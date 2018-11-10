@@ -174,14 +174,14 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   if (nread > 0) {
     ctx->stats.in.read += (uint64_t)nread;
     ctx->stats.in.data++;
-    if (s->callbacks.onPluginRead == 1) {
-      uint32_t r = s->onPluginRead(nread, s->pluginData);
-    }
     if (s->callbacks.onRead == 1)
     {
       Local<Value> argv[1] = {Number::New(isolate, nread)};
       Local<Function> onRead = Local<Function>::New(isolate, s->_onRead);
       onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    }
+    if (s->callbacks.onPluginRead == 1) {
+      uint32_t r = s->onPluginRead(nread, s->pluginData);
     }
   }
   else if (nread == UV_EOF) {
