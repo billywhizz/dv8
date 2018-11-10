@@ -94,8 +94,8 @@ namespace openssl {
 			SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
 			// Turn off sessions
 			SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
-			SSL_CTX_set_info_callback(ctx, ssl_server_info_callback);
-			SSL_CTX_set_msg_callback(ctx, ssl_msg_callback);
+			//SSL_CTX_set_info_callback(ctx, ssl_server_info_callback);
+			//SSL_CTX_set_msg_callback(ctx, ssl_msg_callback);
 			String::Utf8Value certPath(args.GetIsolate(), args[0]);
 			const char *crtf = *certPath;
 			String::Utf8Value keyPath(args.GetIsolate(), args[1]);
@@ -152,10 +152,10 @@ namespace openssl {
 
 	void cycleOut(SecureSocket* secure, uv_stream_t* stream, char* buf, size_t len) {
 		int pending = BIO_ctrl_pending(secure->output_bio);
-		fprintf(stderr, "pending output: %i\n", pending);
+		//fprintf(stderr, "pending output: %i\n", pending);
 		if (pending > 0) {
 			int n = BIO_read(secure->output_bio, buf, len);
-			fprintf(stderr, "BIO_read_output: %i\n", n);
+			//fprintf(stderr, "BIO_read_output: %i\n", n);
 			uv_buf_t uvb;
 			uvb.base = buf;
 			uvb.len = n;
@@ -166,19 +166,18 @@ namespace openssl {
 				fprintf(stderr, "try_write_fail\n");
 			} else if (r < n) {
 				fprintf(stderr, "try_write_partial\n");
-
 			} else {
-				fprintf(stderr, "try_write_ok\n");
+				//fprintf(stderr, "try_write_ok\n");
 			}
 		}
 	}
 
 	void cycleIn(SecureSocket* secure, uv_stream_t* stream, char* buf, size_t len) {
 		int pending = BIO_ctrl_pending(secure->input_bio);
-		fprintf(stderr, "pending input: %i\n", pending);	
+		//fprintf(stderr, "pending input: %i\n", pending);	
 		if (pending > 0) {
 			int n = SSL_read(secure->ssl, buf, len);
-			fprintf(stderr, "SSL_read: %i\n", n);
+			//fprintf(stderr, "SSL_read: %i\n", n);
 			if (secure->callbacks.onRead == 1) {
 				Isolate *isolate = Isolate::GetCurrent();
 				v8::HandleScope handleScope(isolate);
@@ -201,22 +200,22 @@ namespace openssl {
 		int n = BIO_write(secure->input_bio, in, nread);
 		int pending = 0;
 		n = SSL_is_init_finished(secure->ssl);
-		fprintf(stderr, "SSL_is_init_finished: %i\n", n);
+		//fprintf(stderr, "SSL_is_init_finished: %i\n", n);
 		if (!n) {
 			n = SSL_do_handshake(secure->ssl);
-			fprintf(stderr, "SSL_do_handshake: %i\n", n);
+			//fprintf(stderr, "SSL_do_handshake: %i\n", n);
 			if (n == 0) {
 				fprintf(stderr, "handshake failed\n");
 			} else if (n == 1) {
-				fprintf(stderr, "handshake ok\n");
+				//fprintf(stderr, "handshake ok\n");
 				cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
 				return 0;
 			} else if (n < 0) {
-				fprintf(stderr, "handshake error\n");
+				//fprintf(stderr, "handshake error\n");
 				n = SSL_get_error(secure->ssl, n);
-				fprintf(stderr, "SSL_get_error: %i\n", n);
+				//fprintf(stderr, "SSL_get_error: %i\n", n);
 				if (n == SSL_ERROR_WANT_READ) {
-					fprintf(stderr, "SSL_ERROR_WANT_READ\n");
+					//fprintf(stderr, "SSL_ERROR_WANT_READ\n");
 					cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
 				}
 				else if (n == SSL_ERROR_WANT_WRITE) {
@@ -225,10 +224,12 @@ namespace openssl {
 				else if (n == SSL_ERROR_SSL) {
 					fprintf(stderr, "SSL_ERROR_SSL\n");
 					fprintf(stderr, "%s\n", ERR_error_string(ERR_get_error(), NULL));
+				} else {
+					fprintf(stderr, "Unknown SSL Error: %i\n", n);
 				}
 			}
 		} else {
-			fprintf(stderr, "handshake finished\n");
+			//fprintf(stderr, "handshake finished\n");
 			cycleIn(secure, (uv_stream_t *)context->handle, in, inlen);
 		}
 		return 0;
@@ -249,20 +250,23 @@ namespace openssl {
 			out += off;
 		}
 		int n = SSL_write(secure->ssl, out, len);
-		fprintf(stderr, "SSL_write: %i\n", n);
+		//fprintf(stderr, "SSL_write: %i\n", n);
 		while (n < 0) {
 			int r = SSL_get_error(secure->ssl, n);
-			fprintf(stderr, "SSL_get_error: %i\n", r);
+			//fprintf(stderr, "SSL_get_error: %i\n", r);
 			if (r == SSL_ERROR_WANT_READ) {
-				fprintf(stderr, "SSL_ERROR_WANT_READ\n");
+				//fprintf(stderr, "SSL_ERROR_WANT_READ\n");
 				cycleIn(secure, (uv_stream_t *)ctx->handle, ctx->in.base, ctx->in.len);
 				n = SSL_write(secure->ssl, out, len);
 			}
 			else if (n == SSL_ERROR_SSL) {
+				fprintf(stderr, "SSL_ERROR_SSL\n");
+				fprintf(stderr, "%s\n", ERR_error_string(ERR_get_error(), NULL));
 				args.GetReturnValue().Set(Integer::New(isolate, -1));
 				return;
 			}
 			else {
+				fprintf(stderr, "Unknown SSL Error: %i\n", n);
 				args.GetReturnValue().Set(Integer::New(isolate, -1));
 				return;
 			}

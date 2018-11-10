@@ -18,12 +18,15 @@
 - openssl supports absolute minimal set of secure protocols and ciphers
 - uses platform openssl
 - uses platform stdlib
+- openssl library must pass ssl tests, qualsys etc.
 
 
 ## NEXT
 
 - http parser with tls - plugin model
 - tls client
+- fix server onClose handler
+- implement openssl.Hash and openssl.Hmac
 - optimise/refactor everything
 - update examples
 - comment code

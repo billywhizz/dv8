@@ -145,6 +145,16 @@ void on_close(uv_handle_t *peer)
 
 void on_close2(uv_handle_t *peer)
 {
+  Isolate *isolate = Isolate::GetCurrent();
+  v8::HandleScope handleScope(isolate);
+  Socket *s = (Socket *)peer->data;
+  if (s->callbacks.onClose == 1)
+  {
+    fprintf(stderr, "on_close2\n");
+    Local<Value> argv[0] = {};
+    Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
+    onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+  }
   free(peer);
 }
 
