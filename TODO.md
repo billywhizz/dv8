@@ -1,4 +1,34 @@
+## rules of dv8
+- docker only
+- alpine docker only
+- nothing in core binary but essentials
+- everything else is a module
+- binary goes in /usr/local/bin
+- modules go in /usr/local/lib
+- imports can be anywhere on local filesystem
+- standard libraries as modules in monorepo
+- standard libraries are shared objects dynamically loaded
+- no module caching
+- no cross platform - initially at least
+- smallest possible code base - easy to grok
+- use c over c++ where possible
+- no complex abstractions
+- no exceptions unless necessary
+- core and standard libraries will not allocate on the heap 
+- openssl supports absolute minimal set of secure protocols and ciphers
+- uses platform openssl
+- uses platform stdlib
+
+
 ## NEXT
+
+- http parser with tls - plugin model
+- tls client
+- optimise/refactor everything
+- update examples
+- comment code
+- write docs
+- release 0.5
 
 use dv8 itself to create the build scripts and run the build (shell to docker) for modules, based on a json config
 

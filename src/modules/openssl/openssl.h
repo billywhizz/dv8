@@ -78,6 +78,7 @@ class SecureContext : public dv8::ObjectWrap {
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Finish(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

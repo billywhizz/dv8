@@ -27,6 +27,7 @@ namespace openssl {
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", SecureContext::Setup);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "finish", SecureContext::Finish);
 	
 		DV8_SET_EXPORT(isolate, tpl, "SecureContext", exports);
 	}
@@ -39,6 +40,14 @@ namespace openssl {
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
 		}
+	}
+
+	void SecureContext::Finish(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		SecureContext *s = ObjectWrap::Unwrap<SecureContext>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		SSL_CTX_free(s->ssl_context);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
 	void SecureContext::Setup(const FunctionCallbackInfo<Value> &args)
@@ -71,7 +80,7 @@ namespace openssl {
 			// Save RAM by releasing read and write buffers when they're empty. (SSL3 and
 			// TLS only.)  "Released" buffers are put onto a free-list in the context
 			// or just freed (depending on the context's setting for freelist_max_len).
-			SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
+			//SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
 			SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 			SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
 			// Allow SSL_write(..., n) to return r with 0 < r < n (i.e. report success
@@ -266,7 +275,6 @@ namespace openssl {
 		Isolate *isolate = args.GetIsolate();
 		SecureSocket *s = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
 		v8::HandleScope handleScope(isolate);
-		SSL_CTX_free(s->context->ssl_context);
 		SSL_free(s->ssl);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
