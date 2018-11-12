@@ -40,43 +40,42 @@ namespace openssl {
 	}
 
 	int TLSExtStatusCallback(SSL* s, void* arg) {
-		fprintf(stderr, "TLSExtStatusCallback\n");
 		return SSL_TLSEXT_ERR_OK;
 	}
 
 	int SelectSNIContextCallback(SSL* ssl, int* ad, void* arg) {
 		SecureSocket* sock = static_cast<SecureSocket*>(SSL_get_app_data(ssl));
 		const char* servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-		if (sock->callbacks.onHost == 1) {
-			Isolate *isolate = Isolate::GetCurrent();
-			v8::HandleScope handleScope(isolate);
-			MaybeLocal<Value> ret;
-			if (servername) {
-				Local<Value> argv[1] = { String::NewFromUtf8(isolate, servername, v8::String::kNormalString) };
-				Local<Function> onHost = Local<Function>::New(isolate, sock->_onHost);
-				ret = onHost->Call(isolate->GetCurrentContext()->Global(), 1, argv);
-			} else {
-				Local<Value> argv[0] = {};
-				Local<Function> onHost = Local<Function>::New(isolate, sock->_onHost);
-				ret = onHost->Call(isolate->GetCurrentContext()->Global(), 0, argv);
-			}
-			if (ret.IsEmpty()) {
-				return SSL_TLSEXT_ERR_OK;
-			}
-			Local<Value> ctx;
-  			if (ret.ToLocal(&ctx)) {
-				if (ctx->IsNullOrUndefined()) {
-					return SSL_TLSEXT_ERR_OK;
-				}
-				if (ctx->IsFalse()) {
-					return SSL_TLSEXT_ERR_NOACK;
-				} else {
-					SecureContext *secureContext = ObjectWrap::Unwrap<SecureContext>(ctx.As<v8::Object>());
-					sock->context = secureContext;
-					SSL_set_SSL_CTX(ssl, secureContext->ssl_context);
-				}			
-			}
+		if (sock->callbacks.onHost == 0) {
+			return SSL_TLSEXT_ERR_OK;
 		}
+		Isolate *isolate = Isolate::GetCurrent();
+		v8::HandleScope handleScope(isolate);
+		MaybeLocal<Value> ret;
+		Local<Function> onHost = Local<Function>::New(isolate, sock->_onHost);
+		if (servername) {
+			Local<Value> argv[1] = { String::NewFromUtf8(isolate, servername, v8::String::kNormalString) };
+			ret = onHost->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+		} else {
+			Local<Value> argv[0] = {};
+			ret = onHost->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+		}
+		if (ret.IsEmpty()) {
+			return SSL_TLSEXT_ERR_OK;
+		}
+		Local<Value> ctx;
+		if (!ret.ToLocal(&ctx)) {
+			return SSL_TLSEXT_ERR_NOACK;
+		}
+		if (ctx->IsNullOrUndefined()) {
+			return SSL_TLSEXT_ERR_OK;
+		}
+		if (ctx->IsFalse()) {
+			return SSL_TLSEXT_ERR_NOACK;
+		}
+		SecureContext *secureContext = ObjectWrap::Unwrap<SecureContext>(ctx.As<v8::Object>());
+		sock->context = secureContext;
+		SSL_set_SSL_CTX(ssl, secureContext->ssl_context);
 		return SSL_TLSEXT_ERR_OK;
 	}
 
@@ -141,10 +140,10 @@ namespace openssl {
 				return;
 			}
 			args.GetReturnValue().Set(Integer::New(isolate, 0));
-		} else {
-			fprintf(stderr, "Client Secure Socket Not Implemented\n");
-			args.GetReturnValue().Set(Integer::New(isolate, -1));
+			return;
 		}
+		fprintf(stderr, "Client Secure Socket Not Implemented\n");
+		args.GetReturnValue().Set(Integer::New(isolate, -1));
 	}
 
 	void SecureSocket::Init(Local<Object> exports) {
@@ -186,6 +185,7 @@ namespace openssl {
 			uvb.base = buf;
 			uvb.len = n;
 			int r = uv_try_write(stream, &uvb, 1);
+			//TODO
 			if (r == UV_EAGAIN || r == UV_ENOSYS) {
 				fprintf(stderr, "try_write_again\n");
 			} else if (r < 0) {
@@ -224,44 +224,47 @@ namespace openssl {
 		size_t inlen = context->in.len;
 		int n = BIO_write(secure->input_bio, in, nread);
 		int pending = 0;
-		n = SSL_is_init_finished(secure->ssl);
-		if (!n) {
-			n = SSL_do_handshake(secure->ssl);
-			if (n == 0) {
-				fprintf(stderr, "handshake failed\n");
-			} else if (n == 1) {
-				cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
-				return 0;
-			} else if (n < 0) {
-				n = SSL_get_error(secure->ssl, n);
-				if (n == SSL_ERROR_WANT_READ) {
-					cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
-				}
-				else if (n == SSL_ERROR_WANT_WRITE) {
-					fprintf(stderr, "SSL_ERROR_WANT_WRITE\n");
-				}
-				else if (n == SSL_ERROR_SSL) {
-					fprintf(stderr, "SSL_ERROR_SSL\n");
-					if (secure->callbacks.onError == 1) {
-						Isolate *isolate = Isolate::GetCurrent();
-						v8::HandleScope handleScope(isolate);
-						Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
-						Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-						onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
-					}
-				} else {
-					fprintf(stderr, "Unknown SSL Error: %i\n", n);
-					if (secure->callbacks.onError == 1) {
-						Isolate *isolate = Isolate::GetCurrent();
-						v8::HandleScope handleScope(isolate);
-						Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
-						Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-						onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
-					}
-				}
-			}
-		} else {
+		if (SSL_is_init_finished(secure->ssl)) {
+			// TODO: check return codes etc.
 			cycleIn(secure, (uv_stream_t *)context->handle, in, inlen);
+			return 0;
+		}
+		n = SSL_do_handshake(secure->ssl);
+		if (n == 0) {
+			if (secure->callbacks.onError == 1) {
+				Isolate *isolate = Isolate::GetCurrent();
+				v8::HandleScope handleScope(isolate);
+				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
+				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+			}
+			return n;
+		}
+		if (n == 1) {
+			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
+			return 0;
+		}
+		n = SSL_get_error(secure->ssl, n);
+		if (n == SSL_ERROR_WANT_READ) {
+			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
+			return 0;
+		}
+		if (n == SSL_ERROR_SSL) {
+			if (secure->callbacks.onError == 1) {
+				Isolate *isolate = Isolate::GetCurrent();
+				v8::HandleScope handleScope(isolate);
+				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
+				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+			}
+			return n;
+		}
+		if (secure->callbacks.onError == 1) {
+			Isolate *isolate = Isolate::GetCurrent();
+			v8::HandleScope handleScope(isolate);
+			Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+			Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
+			onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
 		}
 		return 0;
 	}
@@ -288,13 +291,15 @@ namespace openssl {
 				n = SSL_write(secure->ssl, out, len);
 			}
 			else if (n == SSL_ERROR_SSL) {
-				fprintf(stderr, "SSL_ERROR_SSL\n");
-				fprintf(stderr, "%s\n", ERR_error_string(ERR_get_error(), NULL));
+				// TODO: lastError() method that returns last error so client can check when they get a bad status
+				//fprintf(stderr, "SSL_ERROR_SSL\n");
+				//fprintf(stderr, "%s\n", ERR_error_string(ERR_get_error(), NULL));
 				args.GetReturnValue().Set(Integer::New(isolate, -1));
 				return;
 			}
 			else {
-				fprintf(stderr, "Unknown SSL Error: %i\n", n);
+				//TODO: handle other return codes
+				//fprintf(stderr, "Unknown SSL Error: %i\n", n);
 				args.GetReturnValue().Set(Integer::New(isolate, -1));
 				return;
 			}
@@ -380,7 +385,6 @@ namespace openssl {
 		SSL_set_app_data(ssl, obj);
 		obj->context = secureContext;
 		obj->ssl = ssl;
-
 		Socket* sock = ObjectWrap::Unwrap<Socket>(args[1].As<v8::Object>());
 		obj->socket = sock;
 		dv8::socket::socket_plugin* plugin = (dv8::socket::socket_plugin*)calloc(1, sizeof(dv8::socket::socket_plugin));
@@ -396,7 +400,6 @@ namespace openssl {
 		obj->plugin = plugin;
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
-
 
 }
 }	

@@ -14,8 +14,7 @@ const pipe = (src, dst) => {
 }
 
 const onConnect = fd => {
-    const dst = new Socket(TCP)
-    const src = new Socket(TCP)
+    const [ src, dst ] = [ new Socket(TCP), new Socket(TCP) ]
     const [ rb, wb ] = [ createBuffer(16384), createBuffer(16384) ]
     src.setup(fd, rb, wb)
     src.pause()
