@@ -1,4 +1,5 @@
 const { Socket, TCP } = module('socket', {})
+const { setSecure, addContext } = require('./lib/tls.js')
 
 const pipe = (src, dst) => {
     src.onRead(len => {
@@ -22,11 +23,13 @@ const onConnect = fd => {
     pipe(dst, src)
     dst.onConnect(fd => {
         dst.setup(fd, wb, rb)
+        setSecure(src)
         src.resume()
     })
     if (dst.connect('127.0.0.1', 3000) !== 0) dst.close()
 }
 
+addContext('dv8.billywhizz.io', true)
 const server = new Socket(TCP)
 server.onConnect(onConnect)
 server.listen('0.0.0.0', 3001)

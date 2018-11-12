@@ -1,6 +1,6 @@
 const { Socket, TCP } = module('socket', {})
 const { HTTPParser, REQUEST } = module('httpParser', {})
-const { SecureContext, SecureSocket } = module('openssl', {})
+const { setSecure, addContext } = require('./lib/tls.js')
 
 const createContext = () => {
     if (contexts.length) return contexts.shift()
@@ -27,33 +27,30 @@ const onHeaders = context => {
 }
 
 const onRequest = context => {
-    const { client, out } = context
+    const { client, out, request } = context
+    print(JSON.stringify(request, null, '  '))
     const len = out.write(r200, 0)
     const r = client.write(len)
-    if (r === len) return
-    if (r < len) return client.pause()
+    if (r === len) {
+        if (request.keepalive === 1) return
+        if (client.queueSize() === 0) {
+            return client.close()
+        }
+        client.onDrain(() => {
+            client.close()
+        })
+        return client.pause()
+    }
+    //TODO: this is not right. we need some way of stopping any further writes
+    if (r >=0 && r < len) {
+        if (request.keepalive === 1) return client.pause()
+        if (client.queueSize() === 0) {
+            return client.close()
+        }
+        client.onDrain(() => client.close())
+        return
+    }
     if (r < 0) client.close()
-}
-
-const setSecure = (sock, context) => {
-    const secureClient = new SecureSocket()
-    secureClient.setup(defaultContext, sock)
-    secureClient.onHost(hostname => {
-        if (!hostname) return
-        const context = secureContexts[hostname]
-        if (!context) return false
-        if (context.hostname === defaultContext.hostname) return
-        return context
-    })
-    secureClient.onError((code, message) => {
-        print(`SSL Error (${code}): ${message}`)
-        sock.close()
-    })
-    sock.onClose(() => {
-        contexts.push(context)
-        secureClient.finish()
-    })
-    sock.write = len => secureClient.write(len)
 }
 
 const onClient = fd => {
@@ -67,27 +64,21 @@ const onClient = fd => {
     parser.onRequest(() => onRequest(context))
     client.setup(fd, context.in, context.out)
     client.address = client.remoteAddress()
-    client.onDrain(() => client.resume())
-    client.onClose(() => contexts.push(context))
+    client.onClose(() => {
+        print('onClose')
+        contexts.push(context)
+    })
     client.onEnd(() => client.close())
     client.setNoDelay(true)
     client.setKeepAlive(true, 3000)
-    setSecure(client, context)
+    //TODO: this is ugly. we need a(n efficient) way of chaining event handlers
+    //setSecure(client, () => contexts.push(context))
+    setSecure(client)
     parser.reset(REQUEST, client)
 }
 
-const createSecureContext = (hostname, cert, key) => {
-    const secureContext = new SecureContext()
-    secureContext.setup(cert, key)
-    secureContext.hostname = hostname
-    return secureContext
-}
-
-const secureContexts = {
-    'dv8.billywhizz.io': createSecureContext('dv8.billywhizz.io', './dv8.billywhizz.io.cert.pem', './dv8.billywhizz.io.key.pem'),
-    'foo.billywhizz.io': createSecureContext('foo.billywhizz.io', './foo.billywhizz.io.cert.pem', './foo.billywhizz.io.key.pem')
-}
-const defaultContext = secureContexts['dv8.billywhizz.io']
+addContext('dv8.billywhizz.io')
+addContext('foo.billywhizz.io')
 
 let r200 = `HTTP/1.1 200 OK\r\nServer: dv8\r\nDate: ${(new Date()).toUTCString()}\r\nContent-Length: 0\r\n\r\n`
 const timer = setInterval(() => (r200 = `HTTP/1.1 200 OK\r\nServer: dv8\r\nDate: ${(new Date()).toUTCString()}\r\nContent-Length: 0\r\n\r\n`), 1000)

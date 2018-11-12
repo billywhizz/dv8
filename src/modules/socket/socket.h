@@ -148,6 +148,7 @@ public:
   _context* context;
   dv8::socket::socket_plugin* first = 0;
   dv8::socket::socket_plugin* last = 0;
+  bool isServer = true;
 
 protected:
   void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);

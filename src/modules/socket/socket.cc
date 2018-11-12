@@ -640,6 +640,7 @@ void Socket::Connect(const FunctionCallbackInfo<Value> &args)
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
   Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  s->isServer = false;
   if (s->socktype == TCP)
   {
     String::Utf8Value str(args.GetIsolate(), args[0]);
@@ -783,6 +784,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  s->isServer = true;
   if (args[0]->IsNumber())
   { // we have been passed a socket handle that has already been bound
     Local<Context> context = isolate->GetCurrentContext();

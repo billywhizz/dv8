@@ -20,7 +20,14 @@
 - uses platform stdlib
 
 ## NEXT
+- socket plugin handles overriding onRead/onClose/onError
+    - each plugin in chain has reference to previous callbacks
 - ssl client support
+- certificate verification
+- OCSP stapling
+- ALPN support
+- Best Practice/Secure OpenSSL defaults
+- methods for overriding SSL defaults
 - thread safe openssl with isolates in threads
 - openssl library must pass ssl tests, qualsys etc.
 - implement openssl.Hash and openssl.Hmac
@@ -42,6 +49,25 @@
 - just use stringify/parse for now
 - look into v8 serdes
 - articles - intro and deep dive for core, intro and deep dive for each module
+- debugger
+- articles
+    - networking overview
+    - networking deep dive
+    - openssl overview
+    - openssl deepdive
+    - tty overview
+    - tty deep dive
+    - core overview
+    - core deep dive
+    - building, debugging & testing
+    - benchmarks
+    - signals, garbage collection
+    - file system
+    - socket overview
+    - socket deepdive
+    - thread overview
+    - thread deepdive
+
 
 use dv8 itself to create the build scripts and run the build (shell to docker) for modules, based on a json config
 

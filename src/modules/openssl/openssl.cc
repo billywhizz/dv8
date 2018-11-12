@@ -36,6 +36,7 @@ namespace openssl {
 	}
 	
 	int VerifyCallback(int preverify_ok, X509_STORE_CTX* ctx) {
+		fprintf(stderr, "Verify\n");
 		return SSL_TLSEXT_ERR_OK;
 	}
 
@@ -65,6 +66,7 @@ namespace openssl {
 		}
 		Local<Value> ctx;
 		if (!ret.ToLocal(&ctx)) {
+			// TODO: this doesn't seem to stop the session being established
 			return SSL_TLSEXT_ERR_NOACK;
 		}
 		if (ctx->IsNullOrUndefined()) {
@@ -88,8 +90,8 @@ namespace openssl {
 		SecureContext* obj = ObjectWrap::Unwrap<SecureContext>(args.Holder());
 		int sockType = SERVER_SOCKET;
 		int argc = args.Length();
-		if (argc > 2) {
-			sockType = args[2]->Int32Value(context).ToChecked();
+		if (argc > 0) {
+			sockType = args[0]->Int32Value(context).ToChecked();
 		}
 		if (sockType == SERVER_SOCKET) {
 			const SSL_METHOD* meth = TLSv1_2_server_method();
@@ -100,30 +102,25 @@ namespace openssl {
 				return;
 			}
 			obj->ssl_context = ctx;
-			String::Utf8Value certPath(args.GetIsolate(), args[0]);
-			String::Utf8Value keyPath(args.GetIsolate(), args[1]);
+			SSL_CTX_set_app_data(ctx, obj);
+			String::Utf8Value certPath(args.GetIsolate(), args[1]);
+			String::Utf8Value keyPath(args.GetIsolate(), args[2]);
 			const char *key = *keyPath;
 			const char *crtf = *certPath;
-			long options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+			long options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_NO_COMPRESSION | SSL_OP_SINGLE_DH_USE;
+			long mode = SSL_MODE_RELEASE_BUFFERS | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER | SSL_MODE_AUTO_RETRY | SSL_MODE_ENABLE_PARTIAL_WRITE;
 			SSL_CTX_set_options(ctx, options);
-			SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
-			SSL_CTX_set_options(ctx, SSL_OP_NO_COMPRESSION);
-			SSL_CTX_set_options(ctx, SSL_OP_SINGLE_DH_USE);
-			SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
-			SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-			SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
-			SSL_CTX_set_mode(ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+			SSL_CTX_set_mode(ctx, mode);
 			SSL_CTX_set_read_ahead(ctx, 1);
 			SSL_CTX_set_max_send_fragment(ctx, 1300);
-			SSL_CTX_set_app_data(ctx, obj);
 			SSL_CTX_set_tlsext_servername_callback(ctx, dv8::openssl::SelectSNIContextCallback);
 			SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
-			//SSL_CTX_set_info_callback(ctx, ssl_server_info_callback);
+			//SSL_CTX_set_cipher_list(ctx, "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
+			//SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, dv8::openssl::VerifyCallback);
 			//SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, dv8::openssl::VerifyCallback);
 			//SSL_CTX_set_tlsext_status_cb(ctx, dv8::openssl::TLSExtStatusCallback);
 			//SSL_CTX_set_tlsext_status_arg(ctx, nullptr);
 			//SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
-			//SSL_CTX_set_msg_callback(ctx, ssl_msg_callback);
 			r = SSL_CTX_use_certificate_file(ctx, crtf, SSL_FILETYPE_PEM);
 			if (r != 1) {
 				args.GetReturnValue().Set(Integer::New(isolate, 4));
@@ -142,8 +139,31 @@ namespace openssl {
 			args.GetReturnValue().Set(Integer::New(isolate, 0));
 			return;
 		}
-		fprintf(stderr, "Client Secure Socket Not Implemented\n");
-		args.GetReturnValue().Set(Integer::New(isolate, -1));
+		const SSL_METHOD* meth = TLSv1_2_client_method();
+		int r = 0;
+		SSL_CTX* ctx = SSL_CTX_new(meth);
+		if (!ctx) {
+			args.GetReturnValue().Set(Integer::New(isolate, -1));
+			return;
+		}
+		obj->ssl_context = ctx;
+		SSL_CTX_set_app_data(ctx, obj);
+		long options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_NO_COMPRESSION | SSL_OP_SINGLE_DH_USE;
+		long mode = SSL_MODE_RELEASE_BUFFERS | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER | SSL_MODE_AUTO_RETRY | SSL_MODE_ENABLE_PARTIAL_WRITE;
+		SSL_CTX_set_options(ctx, options);
+		SSL_CTX_set_mode(ctx, mode);
+		SSL_CTX_set_read_ahead(ctx, 1);
+		SSL_CTX_set_max_send_fragment(ctx, 1300);
+		SSL_CTX_set_tlsext_servername_callback(ctx, dv8::openssl::SelectSNIContextCallback);
+		SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
+		SSL_CTX_set_cipher_list(ctx, "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
+		//SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, dv8::openssl::VerifyCallback);
+		//TODO: this will trust all certs
+		SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, dv8::openssl::VerifyCallback);
+		//SSL_CTX_set_tlsext_status_cb(ctx, dv8::openssl::TLSExtStatusCallback);
+		//SSL_CTX_set_tlsext_status_arg(ctx, nullptr);
+		//SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
 	void SecureSocket::Init(Local<Object> exports) {
@@ -156,10 +176,12 @@ namespace openssl {
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", SecureSocket::Setup);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", SecureSocket::Write);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "finish", SecureSocket::Finish);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", SecureSocket::Start);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRead", SecureSocket::OnRead);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", SecureSocket::OnError);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onWrite", SecureSocket::OnWrite);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onHost", SecureSocket::OnHost);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onSecure", SecureSocket::OnSecure);
 	
 		DV8_SET_EXPORT(isolate, tpl, "SecureSocket", exports);
 	}
@@ -200,15 +222,22 @@ namespace openssl {
 		int pending = BIO_ctrl_pending(secure->input_bio);
 		if (pending > 0) {
 			int n = SSL_read(secure->ssl, buf, len);
-			if (secure->callbacks.onRead == 1) {
-				Isolate *isolate = Isolate::GetCurrent();
-				v8::HandleScope handleScope(isolate);
-				Local<Value> argv[1] = {Number::New(isolate, n)};
-				Local<Function> onRead = Local<Function>::New(isolate, secure->_onRead);
-				onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+			if (n <= 0) {
+				n = SSL_get_error(secure->ssl, n);
+				//fprintf(stderr, "SSL_read: %i\n", n);
+				return;
 			}
-			if (secure->plugin->next) {
-				uint32_t r = secure->plugin->next->onRead(n, secure->plugin->next);
+			if (n > 0) {
+				if (secure->callbacks.onRead == 1) {
+					Isolate *isolate = Isolate::GetCurrent();
+					v8::HandleScope handleScope(isolate);
+					Local<Value> argv[1] = {Number::New(isolate, n)};
+					Local<Function> onRead = Local<Function>::New(isolate, secure->_onRead);
+					onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+				}
+				if (secure->plugin->next) {
+					uint32_t r = secure->plugin->next->onRead(n, secure->plugin->next);
+				}
 			}
 		}
 	}
@@ -229,44 +258,7 @@ namespace openssl {
 			cycleIn(secure, (uv_stream_t *)context->handle, in, inlen);
 			return 0;
 		}
-		n = SSL_do_handshake(secure->ssl);
-		if (n == 0) {
-			if (secure->callbacks.onError == 1) {
-				Isolate *isolate = Isolate::GetCurrent();
-				v8::HandleScope handleScope(isolate);
-				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
-				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
-			}
-			return n;
-		}
-		if (n == 1) {
-			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
-			return 0;
-		}
-		n = SSL_get_error(secure->ssl, n);
-		if (n == SSL_ERROR_WANT_READ) {
-			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
-			return 0;
-		}
-		if (n == SSL_ERROR_SSL) {
-			if (secure->callbacks.onError == 1) {
-				Isolate *isolate = Isolate::GetCurrent();
-				v8::HandleScope handleScope(isolate);
-				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
-				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
-			}
-			return n;
-		}
-		if (secure->callbacks.onError == 1) {
-			Isolate *isolate = Isolate::GetCurrent();
-			v8::HandleScope handleScope(isolate);
-			Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
-			Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-			onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
-		}
-		return 0;
+		return start_ssl(secure);
 	}
 
 	void SecureSocket::Write(const FunctionCallbackInfo<Value> &args) {
@@ -349,6 +341,17 @@ namespace openssl {
 		}
 	}
 
+	void SecureSocket::OnSecure(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		SecureSocket *s = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		if (args[0]->IsFunction()) {
+			Local<Function> onSecure = Local<Function>::Cast(args[0]);
+			s->_onSecure.Reset(isolate, onSecure);
+			s->callbacks.onSecure = 1;
+		}
+	}
+
 	void SecureSocket::OnError(const FunctionCallbackInfo<Value> &args) {
 		Isolate *isolate = args.GetIsolate();
 		SecureSocket *s = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
@@ -361,34 +364,94 @@ namespace openssl {
 		}
 	}
 
+	int start_ssl(SecureSocket* secure) {
+		Isolate *isolate = Isolate::GetCurrent();
+		v8::HandleScope handleScope(isolate);
+		Socket* sock = secure->socket;
+		dv8::socket::_context* context = sock->context;
+		char* in = context->in.base;
+		char* out = context->out.base;
+		size_t outlen = context->out.len;
+		size_t inlen = context->in.len;
+		int n = SSL_do_handshake(secure->ssl);
+		if (n == 0) {
+			if (secure->callbacks.onError == 1) {
+				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
+				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+			}
+			return n;
+		}
+		if (n == 1) {
+			if (secure->callbacks.onSecure == 1) {
+				Local<Value> argv[0] = {};
+				Local<Function> onSecure = Local<Function>::New(isolate, secure->_onSecure);
+				onSecure->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+			}
+			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
+			return 0;
+		}
+		n = SSL_get_error(secure->ssl, n);
+		if (n == SSL_ERROR_WANT_READ) {
+			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
+			return 0;
+		}
+		if (n == SSL_ERROR_SSL) {
+			if (secure->callbacks.onError == 1) {
+				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
+				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+			}
+			return n;
+		}
+		if (secure->callbacks.onError == 1) {
+			Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+			Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
+			onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+		}
+		return n;
+	}
+
+	void SecureSocket::Start(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		SecureSocket *secure = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
+		int r = start_ssl(secure);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
+	}
+
 	void SecureSocket::Setup(const FunctionCallbackInfo<Value> &args) {
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
 		v8::HandleScope handleScope(isolate);
-		SecureSocket* obj = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
+		SecureSocket* secure = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
 		SecureContext *secureContext = ObjectWrap::Unwrap<SecureContext>(args[0].As<v8::Object>());
+		Socket* sock = ObjectWrap::Unwrap<Socket>(args[1].As<v8::Object>());
 		SSL_CTX* ctx = secureContext->ssl_context;
 		SSL *ssl  = SSL_new(ctx);
 		if (!ssl) {
-			args.GetReturnValue().Set(Integer::New(isolate, 2));
+			args.GetReturnValue().Set(Integer::New(isolate, -1));
 			return;
 		}
 		BIO *output_bio = BIO_new(BIO_s_mem());
 		BIO *input_bio = BIO_new(BIO_s_mem());
-		obj->input_bio = input_bio;
-		obj->output_bio = output_bio;
+		secure->input_bio = input_bio;
+		secure->output_bio = output_bio;
 		BIO_set_mem_eof_return(input_bio, -1);		
 		BIO_set_mem_eof_return(output_bio, -1);
 		SSL_set_bio(ssl, input_bio, output_bio);
-		SSL_set_accept_state(ssl);
-		SSL_set_app_data(ssl, obj);
-		obj->context = secureContext;
-		obj->ssl = ssl;
-		Socket* sock = ObjectWrap::Unwrap<Socket>(args[1].As<v8::Object>());
-		obj->socket = sock;
+		if (sock->isServer) {
+			SSL_set_accept_state(ssl);
+		} else {
+			SSL_set_connect_state(ssl);
+		}
+		SSL_set_app_data(ssl, secure);
+		secure->context = secureContext;
+		secure->ssl = ssl;
+		secure->socket = sock;
 		dv8::socket::socket_plugin* plugin = (dv8::socket::socket_plugin*)calloc(1, sizeof(dv8::socket::socket_plugin));
-		plugin->data = obj;
+		plugin->data = secure;
 		plugin->onRead = &on_read_data;
 		if (!sock->first) {
 			sock->last = sock->first = plugin;
@@ -397,7 +460,14 @@ namespace openssl {
 			sock->last = plugin;
 		}
 		plugin->next = 0;
-		obj->plugin = plugin;
+		secure->plugin = plugin;
+		if (sock->callbacks.onRead == 1) {
+			Local<Function> onRead = Local<Function>::New(isolate, sock->_onRead);
+			secure->_onRead.Reset(isolate, onRead);
+			secure->callbacks.onRead = 1;
+			sock->callbacks.onRead = 0;
+			sock->_onRead.Reset();
+		}
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 

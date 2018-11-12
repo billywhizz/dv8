@@ -36,6 +36,7 @@ typedef struct
   uint8_t onRead;
   uint8_t onError;
   uint8_t onHost;
+  uint8_t onSecure;
 } callbacks_t;
 
 enum socket_type
@@ -44,44 +45,7 @@ enum socket_type
   CLIENT_SOCKET
 };
 
-/* SSL debug */
-#define WHERE_INFO(ssl, w, flag, msg) {                \
-    if(w & flag) {                                         \
-      printf("+ %s: ", name);                              \
-      printf("%20.20s", msg);                              \
-      printf(" - %30.30s ", SSL_state_string_long(ssl));   \
-      printf(" - %5.10s ", SSL_state_string(ssl));         \
-      printf("\n");                                        \
-    }                                                      \
-  } 
-
 static uint32_t on_read_data(uint32_t nread, void* data);
-
-static void ssl_info_callback(const SSL* ssl, int where, int ret, const char* name) {
-  if(ret == 0) {
-    printf("ssl_info_callback, error occured.\n");
-    return;
-  }
-  WHERE_INFO(ssl, where, SSL_CB_LOOP, "LOOP");
-  WHERE_INFO(ssl, where, SSL_CB_EXIT, "EXIT");
-  WHERE_INFO(ssl, where, SSL_CB_READ, "READ");
-  WHERE_INFO(ssl, where, SSL_CB_WRITE, "WRITE");
-  WHERE_INFO(ssl, where, SSL_CB_ALERT, "ALERT");
-  WHERE_INFO(ssl, where, SSL_CB_HANDSHAKE_DONE, "HANDSHAKE DONE");
-}
-
-static void ssl_server_info_callback(const SSL* ssl, int where, int ret) {
-  ssl_info_callback(ssl, where, ret, "server");
-}
-
-static void ssl_client_info_callback(const SSL* ssl, int where, int ret) {
-  ssl_info_callback(ssl, where, ret, "client");
-}
- 
-static void ssl_msg_callback(int writep, int version, int contentType, const void* buf, size_t len, SSL* ssl, void *arg) {
-  fprintf(stderr, "\tMessage callback with length: %zu\n", len);
-}
-
 extern int VerifyCallback(int preverify_ok, X509_STORE_CTX* ctx);
 static int TLSExtStatusCallback(SSL* s, void* arg);
 static int SelectSNIContextCallback(SSL* s, int* ad, void* arg);
@@ -112,6 +76,7 @@ class SecureSocket : public dv8::ObjectWrap {
     v8::Persistent<v8::Function> _onRead;
     v8::Persistent<v8::Function> _onError;
     v8::Persistent<v8::Function> _onHost;
+    v8::Persistent<v8::Function> _onSecure;
 		SecureContext* context;
 		dv8::socket::Socket* socket;
 		SSL* ssl;
@@ -132,12 +97,17 @@ class SecureSocket : public dv8::ObjectWrap {
 		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Finish(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Start(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 		static void OnRead(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnWrite(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnError(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnHost(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void OnSecure(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
+
+static int start_ssl(SecureSocket* secure);
 
 }
 }
