@@ -8,6 +8,21 @@
 namespace dv8 {
 
 namespace httpParser {
+using v8::Array;
+using v8::Context;
+using v8::Function;
+using v8::FunctionCallbackInfo;
+using v8::FunctionTemplate;
+using v8::Integer;
+using v8::Isolate;
+using v8::Local;
+using v8::Number;
+using v8::Object;
+using v8::String;
+using v8::Value;
+using dv8::builtins::Buffer;
+using dv8::socket::Socket;
+using dv8::socket::socket_plugin;
 
 #define STRING_OFFSET 16
 
@@ -57,6 +72,7 @@ class HTTPParser : public dv8::ObjectWrap {
 		char *buf;
 		_context* context;
 		callbacks_t callbacks;
+		dv8::socket::socket_plugin* plugin;
 		v8::Persistent<v8::Function> _onHeaders;
 		v8::Persistent<v8::Function> _onBody;
 		v8::Persistent<v8::Function> _onRequest;

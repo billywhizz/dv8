@@ -190,9 +190,14 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       Local<Function> onRead = Local<Function>::New(isolate, s->_onRead);
       onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
+    if (s->first) {
+      uint32_t r = s->first->onRead(nread, s->first);
+    }
+/*    
     if (s->callbacks.onPluginRead == 1) {
       uint32_t r = s->onPluginRead(nread, s->pluginData);
     }
+*/
   }
   else if (nread == UV_EOF) {
     if (s->callbacks.onEnd == 1)
@@ -397,7 +402,6 @@ void Socket::New(const FunctionCallbackInfo<Value> &args)
     obj->callbacks.onDrain = 0;
     obj->callbacks.onEnd = 0;
     obj->callbacks.onConnect = 0;
-    obj->callbacks.onPluginRead = 0;
     obj->_stream = NULL;
     obj->Wrap(args.This());
     args.GetReturnValue().Set(args.This());

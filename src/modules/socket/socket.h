@@ -51,14 +51,22 @@ typedef struct
   uint8_t onError;
   uint8_t onDrain;
   uint8_t onEnd;
-  uint8_t onPluginRead;
 } callbacks_t;
 typedef struct _context _context;
+typedef struct socket_plugin socket_plugin;
 
-// typedefs for http parser callbacks
+// typedefs for plugin  callbacks
 typedef uint32_t (*on_read_data)(uint32_t len, void* data);
 typedef int (*on_data)(_context *, const char *at, size_t len);
 typedef int (*cb)(_context *);
+
+// socket plugin struct
+struct socket_plugin
+{
+  void* data;
+  on_read_data onRead;
+  socket_plugin* next;
+};
 
 // context operations
 void context_init(uv_stream_t *handle, _context *ctx);
@@ -138,8 +146,8 @@ public:
   callbacks_t callbacks;
   uv_stream_t* _stream;
   _context* context;
-  on_read_data onPluginRead;
-  void* pluginData;
+  dv8::socket::socket_plugin* first = 0;
+  dv8::socket::socket_plugin* last = 0;
 
 protected:
   void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);

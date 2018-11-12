@@ -5,21 +5,6 @@ namespace dv8
 
 namespace httpParser
 {
-using v8::Array;
-using v8::Context;
-using v8::Function;
-using v8::FunctionCallbackInfo;
-using v8::FunctionTemplate;
-using v8::Integer;
-using v8::Isolate;
-using v8::Local;
-using v8::Number;
-using v8::Object;
-using v8::String;
-using v8::Value;
-using dv8::builtins::Buffer;
-using dv8::socket::Socket;
-
 int message_begin_cb(http_parser *parser) {
 	_context *context = (_context *)parser->data;
 	context->request->urllength = 0;
@@ -189,12 +174,13 @@ void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args) {
 	obj->context->workBufferLength = buf->_length;
 }
 
-uint32_t on_read_data(uint32_t nread, void* data) {
-	_context* context = (_context*)data;
-	ssize_t np = http_parser_execute(context->parser, &settings, context->base, nread);
-	if (np != nread && context->parser->http_errno == HPE_PAUSED) {
-		uint8_t *lastByte = (uint8_t *)(context->base + np);
-		context->lastByte = *lastByte;
+uint32_t on_read_data(uint32_t nread, void* obj) {
+	socket_plugin* plugin = (socket_plugin*)obj;
+	HTTPParser* parser = (HTTPParser*)plugin->data;
+	ssize_t np = http_parser_execute(parser->context->parser, &settings, parser->context->base, nread);
+	if (np != nread && parser->context->parser->http_errno == HPE_PAUSED) {
+		uint8_t *lastByte = (uint8_t *)(parser->context->base + np);
+		parser->context->lastByte = *lastByte;
 	}
 	return 0;
 }
@@ -210,10 +196,19 @@ void HTTPParser::Reset(const FunctionCallbackInfo<Value> &args) {
 	obj->context->parser_mode = mode;
 	if (argc > 1) {
 		Socket* sock = ObjectWrap::Unwrap<Socket>(args[1].As<v8::Object>());
-		sock->callbacks.onPluginRead = 1;
-		sock->onPluginRead = &on_read_data;
-		sock->pluginData = obj->context;
+		socket_plugin* plugin = (socket_plugin*)calloc(1, sizeof(socket_plugin));
+		plugin->data = obj;
+		plugin->onRead = &on_read_data;
+		if (!sock->first) {
+			sock->last = sock->first = plugin;
+		} else {
+			sock->last->next = plugin;
+			sock->last = plugin;
+		}
+		plugin->next = 0;
+		obj->plugin = plugin;
 	}
+	args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 
 void HTTPParser::Execute(const FunctionCallbackInfo<Value> &args)

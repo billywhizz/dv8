@@ -18,20 +18,30 @@
 - openssl supports absolute minimal set of secure protocols and ciphers
 - uses platform openssl
 - uses platform stdlib
-- openssl library must pass ssl tests, qualsys etc.
-
 
 ## NEXT
-
-- http parser with tls - plugin model
-- tls client
-- fix server onClose handler
+- ssl client support
+- thread safe openssl with isolates in threads
+- openssl library must pass ssl tests, qualsys etc.
 - implement openssl.Hash and openssl.Hmac
+- basic filesystem access
+- get rid of warnings
+- lint
+- automated build and deploy
+- valgrind
+- finalise plugin model
+- fix server onClose handler
 - optimise/refactor everything
-- update examples
 - comment code
 - write docs
 - release 0.5
+- message passing for threads
+- virtual stdio for threads
+- parser/protocol on top of stdio to communicate
+- just use a domain socket as a workaround?
+- just use stringify/parse for now
+- look into v8 serdes
+- articles - intro and deep dive for core, intro and deep dive for each module
 
 use dv8 itself to create the build scripts and run the build (shell to docker) for modules, based on a json config
 

@@ -104,7 +104,7 @@ void start_context(uv_work_t *req)
 		v8::MaybeLocal<v8::String> source;
 		if (th->isFile == 1) {
 			// if we are loading a file from disk
-			source = dv8::ReadFile(isolate, (char*)th->source);
+			source = dv8::ReadFile(isolate, (char*)th->name);
 		} else {
 			// if we have been passed in a function
 			source = v8::String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal, static_cast<int>(th->size));
@@ -174,14 +174,22 @@ void on_context_complete(uv_work_t *req, int status)
         //v8::ValueDeserializer* _deserializer = new v8::ValueDeserializer(isolate, jsError->bytes, jsError->len);
 		Local<Object> o = Object::New(isolate);
 		o->Set(String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
-		o->Set(String::NewFromUtf8(isolate, "filename", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->filename, v8::NewStringType::kNormal).ToLocalChecked());
-		o->Set(String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->exception, v8::NewStringType::kNormal).ToLocalChecked());
-		o->Set(String::NewFromUtf8(isolate, "sourceline", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->sourceline, v8::NewStringType::kNormal).ToLocalChecked());
-		o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
-		free(jsError->filename);
-		free(jsError->exception);
-		free(jsError->sourceline);
-		free(jsError->stack);
+		if (jsError->filename) {
+			o->Set(String::NewFromUtf8(isolate, "filename", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->filename, v8::NewStringType::kNormal).ToLocalChecked());
+			free(jsError->filename);
+		}
+		if (jsError->exception) {
+			o->Set(String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->exception, v8::NewStringType::kNormal).ToLocalChecked());
+			free(jsError->exception);
+		}
+		if (jsError->sourceline) {
+			o->Set(String::NewFromUtf8(isolate, "sourceline", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->sourceline, v8::NewStringType::kNormal).ToLocalChecked());
+			free(jsError->sourceline);
+		}
+		if (jsError->stack) {
+			//o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
+			//free(jsError->stack);
+		}
 		//MaybeLocal<Value> ret = _deserializer->ReadValue(context);
 		Local<Value> argv[2] = { o, Integer::New(isolate, status) };
 		v8::TryCatch try_catch(isolate);

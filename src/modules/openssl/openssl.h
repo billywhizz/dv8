@@ -13,11 +13,29 @@ namespace dv8 {
 
 namespace openssl {
 
+using v8::Context;
+using v8::Function;
+using v8::FunctionCallbackInfo;
+using v8::FunctionTemplate;
+using v8::Isolate;
+using v8::Local;
+using v8::Number;
+using v8::Integer;
+using v8::Object;
+using v8::Persistent;
+using v8::String;
+using v8::Value;
+using v8::Array;
+using dv8::builtins::Environment;
+using dv8::socket::Socket;
+using dv8::socket::socket_plugin;
+
 typedef struct
 {
   uint8_t onWrite;
   uint8_t onRead;
   uint8_t onError;
+  uint8_t onHost;
 } callbacks_t;
 
 enum socket_type
@@ -64,10 +82,15 @@ static void ssl_msg_callback(int writep, int version, int contentType, const voi
   fprintf(stderr, "\tMessage callback with length: %zu\n", len);
 }
 
+extern int VerifyCallback(int preverify_ok, X509_STORE_CTX* ctx);
+static int TLSExtStatusCallback(SSL* s, void* arg);
+static int SelectSNIContextCallback(SSL* s, int* ad, void* arg);
+
 class SecureContext : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
 		SSL_CTX* ssl_context;
+
 	private:
 
 		SecureContext() {
@@ -88,12 +111,14 @@ class SecureSocket : public dv8::ObjectWrap {
     v8::Persistent<v8::Function> _onWrite;
     v8::Persistent<v8::Function> _onRead;
     v8::Persistent<v8::Function> _onError;
+    v8::Persistent<v8::Function> _onHost;
 		SecureContext* context;
 		dv8::socket::Socket* socket;
 		SSL* ssl;
 		BIO *output_bio;
 		BIO *input_bio;
     callbacks_t callbacks;
+		dv8::socket::socket_plugin* plugin;
 
 	private:
 
@@ -108,6 +133,9 @@ class SecureSocket : public dv8::ObjectWrap {
 		static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Finish(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnRead(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void OnWrite(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void OnError(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void OnHost(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

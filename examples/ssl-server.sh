@@ -1,1 +1,0 @@
-openssl s_server -state -debug -msg -no_ssl2 -no_ssl3 -no_tls1 -no_tls1_1 -cert ./cert.pem -key ./key.pem -accept 3000
