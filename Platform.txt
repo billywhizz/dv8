@@ -1,0 +1,6 @@
+- spin up new isolates on newest hosts
+- idle isolates get terminated
+- idle hosts get terminated
+- could run on bare metal alpine linux - don't use containers at all? or only very lightweight containers just used to control resource access using standard tool, e.g. cgroups
+- boot bare metal over tftp with specific host image
+

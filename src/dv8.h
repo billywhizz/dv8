@@ -42,6 +42,15 @@ using v8::String;
 using v8::TryCatch;
 using v8::V8;
 using v8::Value;
+using v8::PromiseRejectMessage;
+using v8::PromiseRejectEvent;
+using dv8::builtins::Environment;
+using v8::HeapSpaceStatistics;
+using v8::Exception;
+using v8::Promise;
+
+using InitializerCallback = void (*)(Local<Object> exports);
+
 
 typedef struct
 {
@@ -52,6 +61,7 @@ typedef struct
 
 typedef void *(*register_plugin)();
 
+void PromiseRejectCallback(PromiseRejectMessage message);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
 bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bool report_exceptions);
 MaybeLocal<String> ReadFile(Isolate *isolate, const char *name);
@@ -67,6 +77,7 @@ void Shutdown(const FunctionCallbackInfo<Value> &args);
 void CollectGarbage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void OnExit(const FunctionCallbackInfo<Value> &args);
+void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback)
 {

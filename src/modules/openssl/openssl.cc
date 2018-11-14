@@ -224,7 +224,7 @@ namespace openssl {
 			int n = SSL_read(secure->ssl, buf, len);
 			if (n <= 0) {
 				n = SSL_get_error(secure->ssl, n);
-				//fprintf(stderr, "SSL_read: %i\n", n);
+				fprintf(stderr, "SSL_read: %i\n", n);
 				return;
 			}
 			if (n > 0) {
@@ -242,7 +242,29 @@ namespace openssl {
 		}
 	}
 
-	uint32_t on_read_data(uint32_t nread, void* obj) {
+	void on_plugin_close(void* obj) {
+		fprintf(stderr, "openssl.on_close\n");
+		socket_plugin* plugin = (socket_plugin*)obj;
+		SecureSocket* secure = (SecureSocket*)plugin->data;
+		Socket* sock = secure->socket;
+		dv8::socket::_context* context = sock->context;
+		char* in = context->in.base;
+		char* out = context->out.base;
+		size_t outlen = context->out.len;
+		size_t inlen = context->in.len;
+		if (SSL_is_init_finished(secure->ssl)) {
+			fprintf(stderr, "openssl.flush\n");
+			// TODO: check return codes etc.
+			cycleIn(secure, (uv_stream_t *)context->handle, in, inlen);
+			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
+		}
+		if (secure->plugin->next) {
+			secure->plugin->next->onClose(secure->plugin->next);
+		}
+		SSL_free(secure->ssl);
+	}
+
+	uint32_t on_plugin_read_data(uint32_t nread, void* obj) {
 		socket_plugin* plugin = (socket_plugin*)obj;
 		SecureSocket* secure = (SecureSocket*)plugin->data;
 		Socket* sock = secure->socket;
@@ -255,6 +277,7 @@ namespace openssl {
 		int pending = 0;
 		if (SSL_is_init_finished(secure->ssl)) {
 			// TODO: check return codes etc.
+			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
 			cycleIn(secure, (uv_stream_t *)context->handle, in, inlen);
 			return 0;
 		}
@@ -281,17 +304,18 @@ namespace openssl {
 			if (r == SSL_ERROR_WANT_READ) {
 				cycleIn(secure, (uv_stream_t *)ctx->handle, ctx->in.base, ctx->in.len);
 				n = SSL_write(secure->ssl, out, len);
+				cycleOut(secure, (uv_stream_t *)ctx->handle, ctx->out.base, ctx->out.len);
 			}
 			else if (n == SSL_ERROR_SSL) {
 				// TODO: lastError() method that returns last error so client can check when they get a bad status
-				//fprintf(stderr, "SSL_ERROR_SSL\n");
-				//fprintf(stderr, "%s\n", ERR_error_string(ERR_get_error(), NULL));
+				fprintf(stderr, "SSL_ERROR_SSL\n");
+				fprintf(stderr, "%s\n", ERR_error_string(ERR_get_error(), NULL));
 				args.GetReturnValue().Set(Integer::New(isolate, -1));
 				return;
 			}
 			else {
 				//TODO: handle other return codes
-				//fprintf(stderr, "Unknown SSL Error: %i\n", n);
+				fprintf(stderr, "Unknown SSL Error: %i\n", n);
 				args.GetReturnValue().Set(Integer::New(isolate, -1));
 				return;
 			}
@@ -452,7 +476,8 @@ namespace openssl {
 		secure->socket = sock;
 		dv8::socket::socket_plugin* plugin = (dv8::socket::socket_plugin*)calloc(1, sizeof(dv8::socket::socket_plugin));
 		plugin->data = secure;
-		plugin->onRead = &on_read_data;
+		plugin->onRead = &on_plugin_read_data;
+		plugin->onClose = &on_plugin_close;
 		if (!sock->first) {
 			sock->last = sock->first = plugin;
 		} else {

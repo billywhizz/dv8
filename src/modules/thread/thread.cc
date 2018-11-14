@@ -37,6 +37,8 @@ void start_context(uv_work_t *req)
 		v8::Isolate::Scope isolate_scope(isolate);
 		v8::HandleScope handle_scope(isolate);
 
+		isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
+
 		// set up global
 		Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
 		global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
@@ -46,6 +48,7 @@ void start_context(uv_work_t *req)
 		global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
 		global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
 		global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
+		global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
 
 		// set up context and environment
 		v8::Local<v8::Context> context = Context::New(isolate, NULL, global);

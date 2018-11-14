@@ -4,7 +4,9 @@ A PoC base module which exposes timers and memoryUsage
 const { Process } = module('process', {})
 const { Timer } = module('timer', {})
 const { Thread } = module('thread', {})
+const { EventLoop, UV_RUN_DEFAULT } = module('loop', {})
 
+const loop = new EventLoop()
 const process = new Process()
 const mem = new Float64Array(16)
 const cpu = new Float64Array(2)
@@ -12,6 +14,7 @@ const time = new BigInt64Array(1)
 let next = 1
 const thousand = BigInt(1000)
 const million = BigInt(1000000)
+const queue = []
 
 const THREAD_BUFFER_SIZE = env.THREAD_BUFFER_SIZE || (4 * 1024)
 
@@ -132,6 +135,21 @@ global.cpuUsage = cpuUsage
 global.hrtime = hrtime
 global.createBuffer = createBuffer
 global.createThread = spawn
+global.runMicroTasks = process.runMicroTasks
+global.PID = process.pid()
+
+global.ticks = 0
+
+global.nextTick = fn => {
+    queue.push(fn)
+    if (queue.length > 1) return
+    loop.onIdle(() => {
+        global.ticks++
+        let len = queue.length
+        while(len--) queue.shift()()
+        if (!queue.length) loop.onIdle()
+    })
+}
 
 global.onUncaughtException = err => {
     // log a trace?

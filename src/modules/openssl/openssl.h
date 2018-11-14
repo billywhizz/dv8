@@ -45,7 +45,9 @@ enum socket_type
   CLIENT_SOCKET
 };
 
-static uint32_t on_read_data(uint32_t nread, void* data);
+static uint32_t on_plugin_read_data(uint32_t nread, void* data);
+static void on_plugin_close(void* obj);
+
 extern int VerifyCallback(int preverify_ok, X509_STORE_CTX* ctx);
 static int TLSExtStatusCallback(SSL* s, void* arg);
 static int SelectSNIContextCallback(SSL* s, int* ad, void* arg);

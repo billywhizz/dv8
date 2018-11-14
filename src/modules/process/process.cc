@@ -32,6 +32,7 @@ void Process::Init(Local<Object> exports) {
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "heapUsage", Process::HeapSpaceUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cpuUsage", Process::CPUUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hrtime", Process::HRTime);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
 }
 
@@ -75,6 +76,11 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
     o->Set(String::NewFromUtf8(isolate, s.space_name(), v8::NewStringType::kNormal).ToLocalChecked(), array);
   }
   args.GetReturnValue().Set(o);
+}
+
+void Process::RunMicroTasks(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  isolate->RunMicrotasks();
 }
 
 void Process::MemoryUsage(const FunctionCallbackInfo<Value> &args) {

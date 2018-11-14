@@ -13,17 +13,14 @@ if (env.MODE === 'tls') {
             if (context.hostname === currentContext.hostname) return
             return context
         })
-        if (onSecure) secureClient.onSecure(onSecure)
         secureClient.onError((code, message) => {
             print(`SSL Error (${code}): ${message}`)
             sock.close()
         })
-        sock.onClose(() => {
-            secureClient.finish()
-        })
         sock.start = () => secureClient.start()
         sock.write = len => secureClient.write(len)
         secureClient.setup(currentContext, sock)
+        if (onSecure) secureClient.onSecure(onSecure)
     }
     
     const addContext = (hostname, isServer = true) => {
@@ -44,5 +41,5 @@ if (env.MODE === 'tls') {
     
     module.exports = { setSecure, addContext, getContext, deleteContext }
 } else {
-    module.exports = { setSecure: () => {}, addContext: () => {}, getContext: () => {}, deleteContext: () => {} }
+    module.exports = { setSecure: (sock, onSecure) => { if (onSecure) onSecure() }, addContext: () => {}, getContext: () => {}, deleteContext: () => {} }
 }

@@ -56,7 +56,8 @@ typedef struct _context _context;
 typedef struct socket_plugin socket_plugin;
 
 // typedefs for plugin  callbacks
-typedef uint32_t (*on_read_data)(uint32_t len, void* data);
+typedef void (*on_plugin_close)(void* obj);
+typedef uint32_t (*on_plugin_read_data)(uint32_t len, void* data);
 typedef int (*on_data)(_context *, const char *at, size_t len);
 typedef int (*cb)(_context *);
 
@@ -64,7 +65,8 @@ typedef int (*cb)(_context *);
 struct socket_plugin
 {
   void* data;
-  on_read_data onRead;
+  on_plugin_read_data onRead;
+  on_plugin_close onClose;
   socket_plugin* next;
 };
 

@@ -36,7 +36,8 @@ int header_value_cb(http_parser *p, const char *buf, size_t len);
 int body_cb(http_parser *p, const char *buf, size_t len);
 int headers_complete_cb(http_parser *p);
 int message_complete_cb(http_parser *p);
-static uint32_t on_read_data(uint32_t nread, void* data);
+static uint32_t on_plugin_read_data(uint32_t nread, void* data);
+static void on_plugin_close(void* obj);
 
 struct _request {
   uint8_t headerCount; // no. of http headers

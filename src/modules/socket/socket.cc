@@ -141,6 +141,9 @@ void on_close(uv_handle_t *peer)
     onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
   }
   context_free(peer);
+  if (s->first) {
+    s->first->onClose(s->first);
+  }
 }
 
 void on_close2(uv_handle_t *peer)

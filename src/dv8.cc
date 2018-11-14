@@ -3,11 +3,33 @@
 namespace dv8
 {
 
-using dv8::builtins::Environment;
-using v8::HeapSpaceStatistics;
-using v8::Exception;
-
-using InitializerCallback = void (*)(Local<Object> exports);
+void PromiseRejectCallback(PromiseRejectMessage message) {
+  Local<Promise> promise = message.GetPromise();
+  Isolate* isolate = promise->GetIsolate();
+  PromiseRejectEvent event = message.GetEvent();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> globalInstance = context->Global();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  if (!env->onUnhandledRejection.IsEmpty()) {
+    const unsigned int argc = 2;
+    Local<Value> value;
+    if (event == v8::kPromiseRejectWithNoHandler) {
+      value = message.GetValue();
+      if (value.IsEmpty()) value = Undefined(isolate);
+    } else if (event == v8::kPromiseHandlerAddedAfterReject) {
+      value = Undefined(isolate);
+    } else {
+      return;
+    }
+    Local<Value> argv[argc] = { promise, value };
+    Local<Function> onUnhandledRejection = Local<Function>::New(isolate, env->onUnhandledRejection);
+    TryCatch try_catch(isolate);
+    onUnhandledRejection->Call(globalInstance, 2, argv);
+    if (try_catch.HasCaught()) {
+      dv8::ReportException(isolate, &try_catch);
+    }
+  }
+}
 
 void on_handle_close(uv_handle_t *h) {
   free(h);
@@ -292,6 +314,19 @@ void OnExit(const FunctionCallbackInfo<Value> &args)
   }
 }
 
+void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  if (args[0]->IsFunction())
+  {
+    Local<Function> onUnhandledRejection = Local<Function>::Cast(args[0]);
+    env->onUnhandledRejection.Reset(isolate, onUnhandledRejection);
+  }
+}
+
 void Require(const FunctionCallbackInfo<Value> &args)
 {
   HandleScope handle_scope(args.GetIsolate());
@@ -354,6 +389,7 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
   global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
   global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
+  global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
   return Context::New(isolate, NULL, global);
 }
 

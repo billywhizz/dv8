@@ -12,9 +12,9 @@ int main(int argc, char *argv[])
     v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
 
     // set the default v8 options for runtime
-    const char *flags = "--optimize-for-size --use-strict --max-old-space-size=8 --no-expose-wasm --predictable --single-threaded --single-threaded-gc";
-    int flaglen = strlen(flags);
-    v8::V8::SetFlagsFromString(flags, flaglen);
+    //const char *flags = "--optimize-for-size --use-strict --max-old-space-size=8 --no-expose-wasm --predictable --single-threaded --single-threaded-gc";
+    //int flaglen = strlen(flags);
+    //v8::V8::SetFlagsFromString(flags, flaglen);
 
     // Disable stdio buffering, it interacts poorly with printf()
     // calls elsewhere in the program (e.g., any logging from V8.)
@@ -36,6 +36,8 @@ int main(int argc, char *argv[])
       v8::Local<v8::Context> context = dv8::CreateContext(isolate);
       v8::Context::Scope context_scope(context);
       context->AllowCodeGenerationFromStrings(false);
+
+      isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
 
       // initialise an environment with reference to event loop for the context
       dv8::builtins::Environment *env = new dv8::builtins::Environment();

@@ -20,9 +20,15 @@
 - uses platform stdlib
 
 ## NEXT
-- socket plugin handles overriding onRead/onClose/onError
-    - each plugin in chain has reference to previous callbacks
-- ssl client support
+- fix segfault in ByteServer when socket closes unexpectedly
+- use pthreads instead of uv_queue_work for threaded isolates - can spin up as many as we need to
+- refactor socket plugins - handle openssl module write correctly - get fetch2 and ByteServer working in TLS mode
+```bash
+## server
+MODE=tls dv8 ByteServe.js
+## client
+MODE=tls dv8 fetch2.js 100000 10
+```
 - certificate verification
 - OCSP stapling
 - ALPN support
@@ -37,14 +43,15 @@
 - automated build and deploy
 - valgrind
 - finalise plugin model
-- fix server onClose handler
+- fix server socket onClose handler
 - optimise/refactor everything
 - comment code
 - write docs
 - release 0.5
 - message passing for threads
 - virtual stdio for threads
-- parser/protocol on top of stdio to communicate
+- parser/protocol on top of stdio/pipe to communicate
+- send fd for pipe from parent to thread
 - just use a domain socket as a workaround?
 - just use stringify/parse for now
 - look into v8 serdes

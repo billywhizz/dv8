@@ -174,13 +174,25 @@ void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args) {
 	obj->context->workBufferLength = buf->_length;
 }
 
-uint32_t on_read_data(uint32_t nread, void* obj) {
+void on_plugin_close(void* obj) {
+	fprintf(stderr, "parser.on_close\n");
+	socket_plugin* plugin = (socket_plugin*)obj;
+	HTTPParser* parser = (HTTPParser*)plugin->data;
+	if (parser->plugin->next) {
+		parser->plugin->next->onClose(parser->plugin->next);
+	}
+}
+
+uint32_t on_plugin_read_data(uint32_t nread, void* obj) {
 	socket_plugin* plugin = (socket_plugin*)obj;
 	HTTPParser* parser = (HTTPParser*)plugin->data;
 	ssize_t np = http_parser_execute(parser->context->parser, &settings, parser->context->base, nread);
 	if (np != nread && parser->context->parser->http_errno == HPE_PAUSED) {
 		uint8_t *lastByte = (uint8_t *)(parser->context->base + np);
 		parser->context->lastByte = *lastByte;
+	}
+	if (parser->plugin->next) {
+		uint32_t r = parser->plugin->next->onRead(nread, parser->plugin->next);
 	}
 	return 0;
 }
@@ -198,7 +210,8 @@ void HTTPParser::Reset(const FunctionCallbackInfo<Value> &args) {
 		Socket* sock = ObjectWrap::Unwrap<Socket>(args[1].As<v8::Object>());
 		socket_plugin* plugin = (socket_plugin*)calloc(1, sizeof(socket_plugin));
 		plugin->data = obj;
-		plugin->onRead = &on_read_data;
+		plugin->onRead = &on_plugin_read_data;
+		plugin->onClose = &on_plugin_close;
 		if (!sock->first) {
 			sock->last = sock->first = plugin;
 		} else {
