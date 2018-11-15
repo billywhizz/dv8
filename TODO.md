@@ -1,3 +1,26 @@
+## platform
+thread ips on domain socket with tls using shared cert passed by master to thread
+at startup, master generates a cert
+it passes cert to threads
+thread use cert to authenticate
+nobody without the cert can use the domain socket
+
+at regular intervals the server sends a ping to each thread
+the thread sends an ack back with latest status
+thread records it's own metrics
+
+to run an "app"
+- git repo
+- yaml config
+- dv8 version number
+- list of dependencies - git repos + version numbers
+- dv8 will build and deploy the app
+- git webhooks for building versions
+- webhooks for deploying releases
+    - red/blue
+    - canary etc.
+
+
 ## rules of dv8
 - docker only
 - alpine docker only

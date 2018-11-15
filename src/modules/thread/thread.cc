@@ -143,6 +143,7 @@ void start_context(uv_work_t *req)
 			v8::Local<v8::Function> onExit = v8::Local<v8::Function>::New(isolate, env->onExit);
 			v8::TryCatch try_catch(isolate);
 			onExit->Call(globalInstance, 0, argv);
+			//TODO: change this to pass the error to onExit if it exists
 			if (try_catch.HasCaught()) {
 				dv8::ReportException(isolate, &try_catch);
 			}
@@ -152,6 +153,7 @@ void start_context(uv_work_t *req)
 			fprintf(stderr, "uv_thread_loop_close: %i\n", r);
 		}
 	}
+	//isolate->Terminate(); ?? when do we use terminate?
 	isolate->Dispose();
 	delete create_params.array_buffer_allocator;
 }
