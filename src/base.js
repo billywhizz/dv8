@@ -4,174 +4,211 @@ A PoC base module which exposes timers and memoryUsage
 const { Process } = module('process', {})
 const { Timer } = module('timer', {})
 const { Thread } = module('thread', {})
-const { EventLoop, UV_RUN_DEFAULT } = module('loop', {})
+const { EventLoop } = module('loop', {})
 
-const loop = new EventLoop()
-const process = new Process()
+/*
+Locals
+*/
 const mem = new Float64Array(16)
 const cpu = new Float64Array(2)
 const time = new BigInt64Array(1)
 let next = 1
 const thousand = BigInt(1000)
-const million = BigInt(1000000)
 const queue = []
-
-const THREAD_BUFFER_SIZE = env.THREAD_BUFFER_SIZE || (4 * 1024)
-
+const threads = {}
 const heap = [
-    new Float64Array(4),
-    new Float64Array(4),
-    new Float64Array(4),
-    new Float64Array(4),
-    new Float64Array(4),
-    new Float64Array(4),
-    new Float64Array(4)
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4)
 ]
 
-function cpuUsage() {
-    process.cpuUsage(cpu)
-    return {
-        user: cpu[0],
-        system: cpu[1]
-    }
+global.onUncaughtException = err => {
+  print('onUncaughtException:')
+  print(err.message)
+  print(err.stack)
+  //global.shutdown(err)
 }
 
-function hrtime() {
-    process.hrtime(time)
-    return time[0]
+global.onUnhandledRejection(err => {
+  print('onUnhandledRejection:')
+  print(err.message)
+  print(err.stack)
+  //global.shutdown(err)
+})
+
+function setTimeout (fn, delay) {
+  const t = new Timer()
+  // the module will make the callback after delay
+  t.start(fn, delay)
+  // return the timer so it can be stopped. no gc/unref handling yet!
+  return t
 }
 
-function heapUsage() {
-    // read the values into the float array
-    return process.heapUsage.call(process, heap)
+function setInterval (fn, repeat) {
+  const t = new Timer()
+  t.start(fn, repeat, repeat)
+  return t
 }
 
-function getMemoryUsage() {
-    // read the values into the float array
-    process.memoryUsage(mem)
-    return {
-        rss: mem[0],
-        total_heap_size: mem[1],
-        used_heap_size: mem[2],
-        external_memory: mem[3],
-        does_zap_garbage: mem[4],
-        heap_size_limit: mem[5],
-        malloced_memory: mem[6],
-        number_of_detached_contexts: mem[7],
-        number_of_native_contexts: mem[8],
-        peak_malloced_memory: mem[9],
-        total_available_size: mem[10],
-        total_heap_size_executable: mem[11],
-        total_physical_size: mem[12],
-        isolate_external: mem[13]
-    }
+function clearTimeout (t) {
+  // this will close the libuv handle for the timer
+  t.stop()
 }
 
-function setTimeout(fn, delay) {
-    const t = new Timer()
-    // the module will make the callback after delay
-    t.start(fn, delay)
-    // return the timer so it can be stopped. no gc/unref handling yet!
-    return t
-}
-
-function setInterval(fn, repeat) {
-    const t = new Timer()
-    t.start(fn, repeat, repeat)
-    return t
-}
-
-function clearTimeout(t) {
-    // this will close the libuv handle for the timer
-    t.stop()
-}
-
-function createBuffer(size) {
-    const buf = new Buffer()
-    buf.bytes = buf.alloc(size) // buf.bytes is an instance of ArrayBuffer
+/*
+Global Buffer instance
+*/
+const GlobalBuffer = global.Buffer
+global.Buffer = {
+  alloc: size => {
+    const buf = new GlobalBuffer()
+    const ab = buf.alloc(size)
+    buf.bytes = ab
     return buf
+  }
 }
 
-function spawn(fun, onComplete) {
-    const start = hrtime()
-    const thread = new Thread()
-    thread.buffer = createBuffer(THREAD_BUFFER_SIZE)
-    const dv = new DataView(thread.buffer.bytes)
-    thread.dv = dv
-    thread.id = next++
-    dv.setUint8(0, thread.id)
-    const envJSON = JSON.stringify(env)
-    const argsJSON = JSON.stringify(args)
-    dv.setUint32(1, envJSON.length)
-    thread.buffer.write(envJSON, 5)
-    dv.setUint32(envJSON.length + 5, argsJSON.length)
-    thread.buffer.write(argsJSON, envJSON.length + 9)
-    thread.start(fun, (err, status) => {
-        const finish = hrtime()
-        const ready = dv.getBigUint64(0)
-        thread.time = (finish - start) / thousand
-        thread.boot = (ready - start) / thousand
-        onComplete({ err, thread, status })
-    }, thread.buffer)
-    return thread
+/*
+Process
+*/
+const _process = new Process()
+const process = {}
+
+/*
+Event Loop
+*/
+const loop = new EventLoop()
+process.loop = loop
+let THREAD_BUFFER_SIZE = 1024
+
+process.cpuUsage = () => {
+  _process.cpuUsage(cpu)
+  return {
+    user: cpu[0],
+    system: cpu[1]
+  }
 }
 
-function dumpError(err) {
-    print(
-`Error
-${err.message}
-Stack
-${err.stack}
-`)
+process.hrtime = () => {
+  _process.hrtime(time)
+  return time[0]
 }
 
+process.heapUsage = () => {
+  // read the values into the float array
+  return _process.heapUsage(heap)
+}
+
+process.memoryUsage = () => {
+  // read the values into the float array
+  _process.memoryUsage(mem)
+  return {
+    rss: mem[0],
+    total_heap_size: mem[1],
+    used_heap_size: mem[2],
+    external_memory: mem[3],
+    does_zap_garbage: mem[4],
+    heap_size_limit: mem[5],
+    malloced_memory: mem[6],
+    number_of_detached_contexts: mem[7],
+    number_of_native_contexts: mem[8],
+    peak_malloced_memory: mem[9],
+    total_available_size: mem[10],
+    total_heap_size_executable: mem[11],
+    total_physical_size: mem[12],
+    isolate_external: mem[13]
+  }
+}
+
+process.spawn = (fun, onComplete) => {
+  const start = process.hrtime()
+  const thread = new Thread()
+  thread.buffer = Buffer.alloc(THREAD_BUFFER_SIZE)
+  const view = new DataView(thread.buffer.bytes)
+  thread.view = view
+  thread.id = next++
+  view.setUint8(0, thread.id)
+  const envJSON = JSON.stringify(process.env)
+  const argsJSON = JSON.stringify(process.args)
+  view.setUint32(1, envJSON.length)
+  thread.buffer.write(envJSON, 5)
+  view.setUint32(envJSON.length + 5, argsJSON.length)
+  thread.buffer.write(argsJSON, envJSON.length + 9)
+  thread.start(fun, (err, status) => {
+    const finish = process.hrtime()
+    const ready = view.getBigUint64(0)
+    thread.time = (finish - start) / thousand
+    thread.boot = (ready - start) / thousand
+    onComplete({ err, thread, status })
+  }, thread.buffer)
+  threads[thread.id] = thread
+  return thread
+}
+
+// JS Globals
 global.setTimeout = setTimeout
 global.setInterval = setInterval
 global.clearTimeout = clearTimeout
 global.clearInterval = clearTimeout
-global.memoryUsage = getMemoryUsage
-global.heapUsage = heapUsage
-global.cpuUsage = cpuUsage
-global.hrtime = hrtime
-global.createBuffer = createBuffer
-global.createThread = spawn
-global.runMicroTasks = process.runMicroTasks
-global.PID = process.pid()
+global.console = { log: global.print }
+global.process = process
 
-global.ticks = 0
-
-global.nextTick = fn => {
-    queue.push(fn)
-    if (queue.length > 1) return
-    loop.onIdle(() => {
-        global.ticks++
-        let len = queue.length
-        while(len--) queue.shift()()
-        if (!queue.length) loop.onIdle()
-    })
+process.runMicroTasks = () => _process.runMicroTasks()
+process.ticks = 0
+process.nextTick = fn => {
+  queue.push(fn)
+  if (queue.length > 1) return
+  loop.onIdle(() => {
+    process.ticks++
+    let len = queue.length
+    while (len--) queue.shift()()
+    if (!queue.length) loop.onIdle()
+  })
 }
 
-global.onUncaughtException = err => {
-    // log a trace?
-    throw(err)
-}
 
+/*
+Initialize Isolate Thread
+
+global.workerData is set from C++ by the thread module and set in
+the global object on the new isolate. it will not exist unless in a
+thread isolate
+global.workerData is an instance of builtin Buffer
+*/
 if (global.workerData) {
-    global.workerData.bytes = global.workerData.alloc()
-    const dv = new DataView(global.workerData.bytes)
-    global.threadId = dv.getUint8(0)
-    const envLength = dv.getUint32(1)
-    const envJSON = global.workerData.read(5, envLength)
-    global.env = JSON.parse(envJSON)
-    const argsLength = dv.getUint32(5 + envLength)
-    const argsJSON = global.workerData.read(9 + envLength, argsLength)
-    global.args = JSON.parse(argsJSON)
-    // set the boot time
-    // TODO: why is this casting to bigint? isn't it returned as a bigint?
-    dv.setBigUint64(0, hrtime())
+  // a thread should be sandboxed even further as it can run untrusted code
+  // we need to remove access to anything that could crash the process or do damage
+  // to the system
+  // this is a hack to get the buffer allocated from main isolate
+  // would be nice to have IPC and heartbeats out of the box with threads
+  // also need to be able to run cpu intensive code in threads which will block the thread event loop
+  // can we ue microTasks somehow to allow v8 to do IPC while isolate thread is busy?
+  global.workerData.bytes = global.workerData.alloc()
+  const dv = new DataView(global.workerData.bytes)
+  process.TID = dv.getUint8(0)
+  process.PID = _process.pid()
+  // read the environment and args from the thread buffer
+  const envLength = dv.getUint32(1)
+  const envJSON = global.workerData.read(5, envLength)
+  process.env = JSON.parse(envJSON)
+  const argsLength = dv.getUint32(5 + envLength)
+  const argsJSON = global.workerData.read(9 + envLength, argsLength)
+  process.args = JSON.parse(argsJSON)
+  // set the boot time
+  dv.setBigUint64(0, process.hrtime())
+  delete global.workerData
 } else {
-    global.env = env().map(entry => entry.split('=')).reduce((env, pair) => { env[pair[0]] = pair[1]; return env }, {})
-    global.threadId = 0
+  process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+  process.PID = _process.pid()
+  process.args = global.args
+  process.threads = threads
+}
+if (process.env.THREAD_BUFFER_SIZE) {
+  THREAD_BUFFER_SIZE = parseInt(process.env.THREAD_BUFFER_SIZE, 10)
 }
 
 module.exports = {}

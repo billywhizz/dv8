@@ -1,3 +1,32 @@
+allow sending messages from main to specific threadid
+allow broadcasting messages to all threads
+allow broadcasting from thread to other threads
+allow control of these options so they can be turned on/off (security!)
+
+SRV records with ports for each service
+
+no filesystem access out of the box
+if you need it, write a c++ module
+no exec
+limited setuid, setgid
+
+
+shutting down
+
+set a timer for x seconds
+unref the timer
+cleanly stop/close any known handles (e.g. client connections, timers, server socket)
+  on next request
+    notify client (HTTP Connection: close)
+    wait for write drain
+close all event loop handles (intelligently if possible)
+run garbage collection
+run micro tasks?
+if timer expires
+  explicit shutdown
+
+
+
 - spin up new isolates on newest hosts
 - idle isolates get terminated
 - idle hosts get terminated

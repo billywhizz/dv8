@@ -118,12 +118,13 @@ inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate)
 
 inline void OnFatalError(const char *location, const char *message)
 {
-  if (location) {
-    fprintf(stderr, "FATAL ERROR: %s %s\n", location, message);
-  }
-  else {
-    fprintf(stderr, "FATAL ERROR: %s\n", message);
-  }
+  fprintf(stderr, "FATAL ERROR: %s %s\n", location, message);
+  fflush(stderr);
+}
+
+inline void OOMErrorHandler(const char *location, bool is_heap_oom)
+{
+  fprintf(stderr, "OOM ERROR: %s %i\n", location, is_heap_oom);
   fflush(stderr);
 }
 

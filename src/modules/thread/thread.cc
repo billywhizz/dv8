@@ -34,6 +34,8 @@ void start_context(uv_work_t *req)
 		// initialize the isolate
 		isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
 		isolate->SetFatalErrorHandler(dv8::OnFatalError);
+		isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
+
 		v8::Isolate::Scope isolate_scope(isolate);
 		v8::HandleScope handle_scope(isolate);
 
@@ -102,7 +104,6 @@ void start_context(uv_work_t *req)
 			return;
 		}
 		module->Evaluate(context);
-
 		// Load main script
 		v8::MaybeLocal<v8::String> source;
 		if (th->isFile == 1) {
