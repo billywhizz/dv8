@@ -1,0 +1,29 @@
+{
+  "name": "dv8",
+  "version": "1.0.0",
+  "description": "## Introduction A low level v8 based JS runtime with small footprint (well, as small as is possible with v8)",
+  "main": "initModule.js",
+  "directories": {
+    "example": "examples"
+  },
+  "standard": {
+    "globals": ["env", "BigInt", "BigInt64Array", "print"],
+    "ignore": [
+        "node_modules/**"
+    ],
+    "parser": "babel-eslint"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/billywhizz/dv8.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/billywhizz/dv8/issues"
+  },
+  "homepage": "https://github.com/billywhizz/dv8#readme"
+}
