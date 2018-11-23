@@ -13,7 +13,6 @@ const mem = new Float64Array(16)
 const cpu = new Float64Array(2)
 const time = new BigInt64Array(1)
 let next = 1
-const thousand = BigInt(1000)
 const queue = []
 const threads = {}
 const heap = [
@@ -28,16 +27,12 @@ const heap = [
 
 global.onUncaughtException = err => {
   print('onUncaughtException:')
-  print(err.message)
-  print(err.stack)
-  //global.shutdown(err)
+  print(JSON.stringify(err))
 }
 
 global.onUnhandledRejection(err => {
   print('onUnhandledRejection:')
-  print(err.message)
-  print(err.stack)
-  //global.shutdown(err)
+  print(JSON.stringify(err))
 })
 
 function setTimeout (fn, delay) {
@@ -125,7 +120,6 @@ process.memoryUsage = () => {
 }
 
 process.spawn = (fun, onComplete) => {
-  const start = process.hrtime()
   const thread = new Thread()
   thread.buffer = Buffer.alloc(THREAD_BUFFER_SIZE)
   const view = new DataView(thread.buffer.bytes)
@@ -134,17 +128,11 @@ process.spawn = (fun, onComplete) => {
   view.setUint8(0, thread.id)
   const envJSON = JSON.stringify(process.env)
   const argsJSON = JSON.stringify(process.args)
-  view.setUint32(1, envJSON.length)
-  thread.buffer.write(envJSON, 5)
-  view.setUint32(envJSON.length + 5, argsJSON.length)
-  thread.buffer.write(argsJSON, envJSON.length + 9)
-  thread.start(fun, (err, status) => {
-    const finish = process.hrtime()
-    const ready = view.getBigUint64(0)
-    thread.time = (finish - start) / thousand
-    thread.boot = (ready - start) / thousand
-    onComplete({ err, thread, status })
-  }, thread.buffer)
+  view.setUint32(5, envJSON.length)
+  thread.buffer.write(envJSON, 9)
+  view.setUint32(envJSON.length + 9, argsJSON.length)
+  thread.buffer.write(argsJSON, envJSON.length + 13)
+  thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
   threads[thread.id] = thread
   return thread
 }
@@ -170,7 +158,6 @@ process.nextTick = fn => {
   })
 }
 
-
 /*
 Initialize Isolate Thread
 
@@ -191,15 +178,15 @@ if (global.workerData) {
   const dv = new DataView(global.workerData.bytes)
   process.TID = dv.getUint8(0)
   process.PID = _process.pid()
+  process.fd = dv.getUint32(1)
   // read the environment and args from the thread buffer
-  const envLength = dv.getUint32(1)
-  const envJSON = global.workerData.read(5, envLength)
+  const envLength = dv.getUint32(5)
+  const envJSON = global.workerData.read(9, envLength)
   process.env = JSON.parse(envJSON)
-  const argsLength = dv.getUint32(5 + envLength)
-  const argsJSON = global.workerData.read(9 + envLength, argsLength)
+  const argsLength = dv.getUint32(9 + envLength)
+  const argsJSON = global.workerData.read(13 + envLength, argsLength)
   process.args = JSON.parse(argsJSON)
   // set the boot time
-  dv.setBigUint64(0, process.hrtime())
   delete global.workerData
 } else {
   process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})

@@ -81,47 +81,24 @@ class Parser {
   }
 }
 
+const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
 if (process.TID) {
   // we are in a thread context
-  const peer = new Socket(UNIX)
-  peer.onConnect(fd => {
-    const [rb, wb] = [Buffer.alloc(4096), Buffer.alloc(4096)]
-    const parser = new Parser(rb, wb)
-    peer.setup(fd, rb, wb)
-    peer.onRead(len => {
-      parser.read(len)
-    })
-    peer.onEnd(() => peer.close())
-    parser.onMessage = message => peer.onMessage(JSON.parse(message.payload))
-    process.send = o => peer.write(parser.write(o))
-  })
-  peer.connect(`./${process.PID}.sock`)
+  const sock = new Socket(UNIX)
+  const parser = new Parser(wb, rb)
+  sock.onConnect(fd => sock.setup(fd, wb, rb))
+  parser.onMessage = message => sock.onMessage(message)
+  process.send = o => sock.write(parser.write(o))
+  sock.onRead(len => parser.read(len))
+  sock.onEnd(() => sock.close())
   process.onMessage = fn => {
-    peer.onMessage = fn
+    sock.onMessage = fn
   }
-  peer.unref()
+  sock.open(process.fd)
+  process.sock = sock
 } else {
   // we are in the main process context
-  const listener = new Socket(UNIX)
-  listener.onConnect(fd => {
-    const peer = new Socket(UNIX)
-    const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
-    const parser = new Parser(rb, wb)
-    peer.setup(fd, rb, wb)
-    peer.onRead(len => {
-      parser.read(len)
-    })
-    peer.onEnd(() => peer.close())
-    parser.onMessage = message => {
-      const o = JSON.parse(message.payload)
-      const thread = process.threads[message.threadId]
-      thread.send = o => peer.write(parser.write(o))
-      thread._onMessage(o)
-    }
-    peer.unref()
-  })
   process.spawn = (fun, onComplete) => {
-    const start = process.hrtime()
     const thread = new Thread()
     thread.buffer = Buffer.alloc(THREAD_BUFFER_SIZE)
     const view = new DataView(thread.buffer.bytes)
@@ -130,30 +107,27 @@ if (process.TID) {
     view.setUint8(0, thread.id)
     const envJSON = JSON.stringify(process.env)
     const argsJSON = JSON.stringify(process.args)
-    view.setUint32(1, envJSON.length)
-    thread.buffer.write(envJSON, 5)
-    view.setUint32(envJSON.length + 5, argsJSON.length)
-    thread.buffer.write(argsJSON, envJSON.length + 9)
+    view.setUint32(5, envJSON.length)
+    thread.buffer.write(envJSON, 9)
+    view.setUint32(envJSON.length + 9, argsJSON.length)
+    thread.buffer.write(argsJSON, envJSON.length + 13)
     process.threads[thread.id] = thread
-    thread.send = () => {}
     thread.onMessage = fn => {
       thread._onMessage = fn
     }
-    thread._onMessage = message => {
-      console.log(`thread (${process.TID}) recv from ${message.threadId}`)
-      const o = JSON.parse(message.payload)
-      console.log(JSON.stringify(o))
-    }
-    thread.start(fun, (err, status) => {
-      const finish = process.hrtime()
-      const ready = view.getBigUint64(0)
-      thread.time = (finish - start) / 1000n
-      thread.boot = (ready - start) / 1000n
-      onComplete({ err, thread, status })
-    }, thread.buffer)
+    thread._onMessage = message => {}
+    const sock = new Socket(UNIX)
+    const parser = new Parser(rb, wb)
+    sock.onConnect(fd => sock.setup(fd, rb, wb))
+    sock.onEnd(() => sock.close())
+    sock.onRead(len => parser.read(len))
+    parser.onMessage = message => thread._onMessage(message)
+    thread.send = o => sock.write(parser.write(o))
+    const fd = sock.open()
+    view.setUint32(1, fd)
+    thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+    thread.sock = sock
     return thread
   }
-  listener.listen(`./${process.PID}.sock`)
-  listener.unref()
 }
 module.exports = {}
