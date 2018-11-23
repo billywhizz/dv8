@@ -20,5 +20,6 @@ client.onConnect(fd => {
 })
 client.onRead(len => {
   print(`client.onRead:\n${rb.read(0, len)}`)
+  client.close()
 })
 client.open(fd)

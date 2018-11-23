@@ -5,6 +5,83 @@ const { Process } = module('process', {})
 const { Timer } = module('timer', {})
 const { Thread } = module('thread', {})
 const { EventLoop } = module('loop', {})
+const { Socket, UNIX } = module('socket', {})
+
+class Parser {
+  constructor (rb, wb) {
+    this.position = 0
+    this.message = {
+      opCode: 0,
+      threadId: 0,
+      payload: ''
+    }
+    this.rb = rb
+    this.wb = wb
+    this.view = {
+      recv: new DataView(rb.bytes),
+      send: new DataView(wb.bytes)
+    }
+    this.onMessage = () => { }
+  }
+
+  read (len, off = 0) {
+    const { rb, view, message } = this
+    let { position } = this
+    const { recv } = view
+    while (off < len) {
+      if (position === 0) {
+        message.threadId = recv.getUint8(off++)
+        position++
+      } else if (position === 1) {
+        message.opCode = recv.getUint8(off++)
+        position++
+      } else if (position === 2) {
+        message.length = recv.getUint8(off++) << 8
+        position++
+      } else if (position === 3) {
+        message.length += recv.getUint8(off++)
+        position++
+        message.payload = ''
+      } else {
+        let toread = message.length - (position - 4)
+        if (toread + off > len) {
+          toread = len - off
+          message.payload += rb.read(off, toread)
+          position += toread
+          off = len
+        } else {
+          message.payload += rb.read(off, toread)
+          off += toread
+          this.onMessage(Object.assign({}, message))
+          position = 0
+        }
+      }
+    }
+    this.position = position
+  }
+
+  write (o, opCode = 1, off = 0) {
+    const { wb, view } = this
+    const { send } = view
+    if (opCode === 1) { // JSON
+      const message = JSON.stringify(o)
+      const len = message.length
+      send.setUint8(0, process.TID || process.PID)
+      send.setUint8(1, opCode)
+      send.setUint16(2, len)
+      wb.write(message, 4)
+      return len + 4
+    } else if (opCode === 2) { // String
+      const len = o.length
+      send.setUint8(0, process.TID || process.PID)
+      send.setUint8(1, opCode)
+      send.setUint16(2, len)
+      wb.write(o, 4)
+      return len + 4
+    }
+    return 0
+  }
+}
 
 /*
 Locals
@@ -121,6 +198,14 @@ process.memoryUsage = () => {
 
 process.spawn = (fun, onComplete) => {
   const thread = new Thread()
+  const sock = new Socket(UNIX)
+  const parser = new Parser(rb, wb)
+  sock.onConnect(fd => {
+    sock.setup(fd, rb, wb)
+  })
+  sock.onEnd(() => sock.close())
+  sock.onRead(len => parser.read(len))
+  parser.onMessage = message => thread._onMessage(message)
   thread.buffer = Buffer.alloc(THREAD_BUFFER_SIZE)
   const view = new DataView(thread.buffer.bytes)
   thread.view = view
@@ -132,8 +217,21 @@ process.spawn = (fun, onComplete) => {
   thread.buffer.write(envJSON, 9)
   view.setUint32(envJSON.length + 9, argsJSON.length)
   thread.buffer.write(argsJSON, envJSON.length + 13)
-  thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
   threads[thread.id] = thread
+  thread.onMessage = fn => {
+    thread._onMessage = fn
+  }
+  thread._onMessage = message => {}
+  thread.send = o => sock.write(parser.write(o))
+  const fd = sock.open()
+  if (fd < 0) {
+    throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
+  }
+  view.setUint32(1, fd)
+  thread.sock = sock
+  nextTick(() => {
+    thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+  })
   return thread
 }
 
@@ -147,7 +245,7 @@ global.process = process
 
 process.runMicroTasks = () => _process.runMicroTasks()
 process.ticks = 0
-process.nextTick = fn => {
+const nextTick = fn => {
   queue.push(fn)
   if (queue.length > 1) return
   loop.onIdle(() => {
@@ -157,6 +255,7 @@ process.nextTick = fn => {
     if (!queue.length) loop.onIdle()
   })
 }
+process.nextTick = nextTick
 
 /*
 Initialize Isolate Thread
@@ -166,6 +265,7 @@ the global object on the new isolate. it will not exist unless in a
 thread isolate
 global.workerData is an instance of builtin Buffer
 */
+const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
 if (global.workerData) {
   // a thread should be sandboxed even further as it can run untrusted code
   // we need to remove access to anything that could crash the process or do damage
@@ -188,6 +288,20 @@ if (global.workerData) {
   process.args = JSON.parse(argsJSON)
   // set the boot time
   delete global.workerData
+  const sock = new Socket(UNIX)
+  const parser = new Parser(rb, wb)
+  sock.onConnect(fd => {
+    sock.setup(fd, rb, wb)
+  })
+  parser.onMessage = message => sock.onMessage(message)
+  process.send = o => sock.write(parser.write(o))
+  sock.onRead(len => parser.read(len))
+  sock.onEnd(() => sock.close())
+  process.onMessage = fn => {
+    sock.onMessage = fn
+  }
+  sock.open(process.fd)
+  process.sock = sock
 } else {
   process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
   process.PID = _process.pid()

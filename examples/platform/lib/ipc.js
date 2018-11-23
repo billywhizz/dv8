@@ -1,9 +1,4 @@
 const { Socket, UNIX } = module('socket', {})
-const { Thread } = module('thread', {})
-
-const THREAD_BUFFER_SIZE = process.env.THREAD_BUFFER_SIZE || (1 * 1024)
-
-let next = 1
 
 class Parser {
   constructor (rb, wb) {
@@ -98,34 +93,22 @@ if (process.TID) {
   process.sock = sock
 } else {
   // we are in the main process context
+  const _spawn = process.spawn
   process.spawn = (fun, onComplete) => {
-    const thread = new Thread()
-    thread.buffer = Buffer.alloc(THREAD_BUFFER_SIZE)
-    const view = new DataView(thread.buffer.bytes)
-    thread.view = view
-    thread.id = next++
-    view.setUint8(0, thread.id)
-    const envJSON = JSON.stringify(process.env)
-    const argsJSON = JSON.stringify(process.args)
-    view.setUint32(5, envJSON.length)
-    thread.buffer.write(envJSON, 9)
-    view.setUint32(envJSON.length + 9, argsJSON.length)
-    thread.buffer.write(argsJSON, envJSON.length + 13)
-    process.threads[thread.id] = thread
-    thread.onMessage = fn => {
-      thread._onMessage = fn
-    }
-    thread._onMessage = message => {}
     const sock = new Socket(UNIX)
     const parser = new Parser(rb, wb)
     sock.onConnect(fd => sock.setup(fd, rb, wb))
     sock.onEnd(() => sock.close())
     sock.onRead(len => parser.read(len))
     parser.onMessage = message => thread._onMessage(message)
-    thread.send = o => sock.write(parser.write(o))
     const fd = sock.open()
-    view.setUint32(1, fd)
-    thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+    const thread = _spawn(fun, onComplete)
+    thread.onMessage = fn => {
+      thread._onMessage = fn
+    }
+    thread._onMessage = message => {}
+    thread.send = o => sock.write(parser.write(o))
+    thread.view.setUint32(1, fd)
     thread.sock = sock
     return thread
   }

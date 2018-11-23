@@ -1,7 +1,4 @@
-require('./lib/ipc.js')
-
 function Worker() {
-  require('./lib/ipc.js')
   let rate = 0
   const tt = setInterval(() => {
     print(`thread: ${rate}`)

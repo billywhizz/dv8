@@ -974,7 +974,10 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
     _context *ctx = context_init((uv_stream_t*)sock, s);
     ctx->data = s;
     status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
-    assert(status == 0);
+    if (status != 0) {
+      args.GetReturnValue().Set(Integer::New(isolate, status));
+      return;
+    }
     if (s->callbacks.onConnect == 1) {
       Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
       Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
@@ -999,13 +1002,13 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
     _context *ctx = context_init((uv_stream_t*)sock, s);
     ctx->data = s;
     status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
-    assert(status == 0);
+    args.GetReturnValue().Set(Integer::New(isolate, status));
+    if (status != 0) return;
     if (s->callbacks.onConnect == 1) {
       Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
       Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
       foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
-    args.GetReturnValue().Set(Integer::New(isolate, status));
   }
 }
 

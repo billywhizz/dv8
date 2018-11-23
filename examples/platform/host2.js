@@ -1,7 +1,4 @@
-require('./lib/ipc.js')
-
 function threadFunc() {
-  require('./lib/ipc.js')
   process.onMessage(message => {
     if (send < 10) {
       process.send({})
@@ -26,10 +23,4 @@ function spawn() {
   thread.onMessage(onMessage(thread))
 }
 
-spawn()
-spawn()
-spawn()
-spawn()
-spawn()
-spawn()
 spawn()
