@@ -2,9 +2,16 @@ require('./lib/ipc.js')
 
 function Worker() {
   require('./lib/ipc.js')
+  let rate = 0
+  const tt = setInterval(() => {
+    print(`thread: ${rate}`)
+    rate = 0
+  }, 1000)
   const { env, args, PID, TID } = process
+  const payload = { env, args, PID, TID }
   process.onMessage(message => {
-    console.log(`process: ${JSON.stringify(message)}`)
+    process.send(payload)
+    rate++
   })
   setTimeout(() => {
     process.send({ env, args, PID, TID })
@@ -12,8 +19,14 @@ function Worker() {
 }
 
 const { env, args, PID, TID } = process
+const payload = { env, args, PID, TID }
 const thread = process.spawn(Worker, result => console.log(`done: ${result.status}`))
+let rate = 0
+const tt = setInterval(() => {
+  print(`process: ${rate}`)
+  rate = 0
+}, 1000)
 thread.onMessage(message => {
-  console.log(`thread: ${JSON.stringify(message)}`)
-  thread.send({ env, args, PID, TID })
+  thread.send(payload)
+  rate++
 })

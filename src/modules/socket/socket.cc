@@ -309,6 +309,8 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "error", Error);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "queueSize", QueueSize);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", Stats);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", UnRef);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", Open);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onConnect", onConnect);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onClose", onClose);
@@ -516,6 +518,14 @@ void Socket::SetKeepAlive(const FunctionCallbackInfo<Value> &args)
   unsigned int delay = args[1]->Uint32Value(context).ToChecked();
   int r = uv_tcp_keepalive((uv_tcp_t *)ctx->handle, enable, delay);
   args.GetReturnValue().Set(Integer::New(isolate, r));
+}
+
+void Socket::UnRef(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
+  uv_unref((uv_handle_t*)ctx->handle);
 }
 
 void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
@@ -931,6 +941,72 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
     return;
   }
   args.GetReturnValue().Set(Integer::New(isolate, 0));
+}
+
+void Socket::Open(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  int argc = args.Length();
+  if (argc == 0) {
+    int fd[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+    uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+    sock->data = s;
+    baton_t *baton = (baton_t *)malloc(sizeof(baton_t));
+    baton->callback = (void *)onNewConnection;
+    baton->object = sock->data;
+    sock->data = baton;
+    int status = uv_pipe_init(env->loop, sock, 0);
+    if (status)
+    {
+      args.GetReturnValue().Set(Integer::New(isolate, status));
+      return;
+    }
+    status = uv_pipe_open(sock, fd[0]);
+    if (status)
+    {
+      args.GetReturnValue().Set(Integer::New(isolate, status));
+      return;
+    }
+    _context *ctx = context_init((uv_stream_t*)sock, s);
+    ctx->data = s;
+    status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
+    assert(status == 0);
+    if (s->callbacks.onConnect == 1) {
+      Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
+      Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
+      foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    }
+    args.GetReturnValue().Set(Integer::New(isolate, fd[1]));
+  } else {
+    uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+    sock->data = s;
+    baton_t *baton = (baton_t *)malloc(sizeof(baton_t));
+    baton->callback = (void *)onNewConnection;
+    baton->object = sock->data;
+    sock->data = baton;
+    int status = uv_pipe_init(env->loop, sock, 0);
+    if (status)
+    {
+      args.GetReturnValue().Set(Integer::New(isolate, status));
+      return;
+    }
+    int fd = args[0]->Int32Value(context).ToChecked();
+    status = uv_pipe_open(sock, fd);
+    _context *ctx = context_init((uv_stream_t*)sock, s);
+    ctx->data = s;
+    status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
+    assert(status == 0);
+    if (s->callbacks.onConnect == 1) {
+      Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
+      Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
+      foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    }
+    args.GetReturnValue().Set(Integer::New(isolate, status));
+  }
 }
 
 void Socket::Bind(const FunctionCallbackInfo<Value> &args)

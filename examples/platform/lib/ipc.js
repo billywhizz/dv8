@@ -99,6 +99,7 @@ if (process.TID) {
   process.onMessage = fn => {
     peer.onMessage = fn
   }
+  peer.unref()
 } else {
   // we are in the main process context
   const listener = new Socket(UNIX)
@@ -117,6 +118,7 @@ if (process.TID) {
       thread.send = o => peer.write(parser.write(o))
       thread._onMessage(o)
     }
+    peer.unref()
   })
   process.spawn = (fun, onComplete) => {
     const start = process.hrtime()
@@ -152,5 +154,6 @@ if (process.TID) {
     return thread
   }
   listener.listen(`./${process.PID}.sock`)
+  listener.unref()
 }
 module.exports = {}
