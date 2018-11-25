@@ -43,13 +43,21 @@ class Parser {
         let toread = message.length - (position - 4)
         if (toread + off > len) {
           toread = len - off
-          message.payload += rb.read(off, toread)
+          if (message.opCode !== 3) {
+            message.payload += rb.read(off, toread)
+          }
           position += toread
           off = len
         } else {
-          message.payload += rb.read(off, toread)
+          if (message.opCode !== 3) {
+            message.payload += rb.read(off, toread)
+            this.onMessage(Object.assign({}, message))
+          } else {
+            message.payload = null
+            message.offset = off
+            this.onMessage(Object.assign({}, message))
+          }
           off += toread
-          this.onMessage(Object.assign({}, message))
           position = 0
         }
       }
@@ -63,23 +71,22 @@ class Parser {
     if (opCode === 1) { // JSON
       const message = JSON.stringify(o)
       const len = message.length
-      send.setUint8(0, process.TID || process.PID)
-      send.setUint8(1, opCode)
-      send.setUint16(2, len)
-      wb.write(message, 4)
+      send.setUint8(off, process.TID || process.PID)
+      send.setUint8(off + 1, opCode)
+      send.setUint16(off + 2, len)
+      wb.write(message, off + 4)
       return len + 4
     } else if (opCode === 2) { // String
       const len = o.length
-      send.setUint8(0, process.TID || process.PID)
-      send.setUint8(1, opCode)
-      send.setUint16(2, len)
-      wb.write(o, 4)
+      send.setUint8(off, process.TID || process.PID)
+      send.setUint8(off + 1, opCode)
+      send.setUint16(off + 2, len)
+      wb.write(o, off + 4)
       return len + 4
     } else if (opCode === 3) { // buffer
-      send.setUint8(0, process.TID || process.PID)
-      send.setUint8(1, opCode)
-      send.setUint16(2, size)
-      o.copy(wb, size)
+      send.setUint8(off, process.TID || process.PID)
+      send.setUint8(off + 1, opCode)
+      send.setUint16(off + 2, size)
       return size + 4
     }
     return 0
@@ -209,7 +216,7 @@ process.spawn = (fun, onComplete) => {
   thread._onMessage = message => {}
   thread.send = o => sock.write(parser.write(o))
   thread.sendString = s => sock.write(parser.write(s, 2))
-  thread.sendBuffer = (b, len) => sock.write(parser.write(b, 3, 0, len))
+  thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
   const fd = sock.open()
   if (fd < 0) {
     throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
@@ -244,7 +251,7 @@ const nextTick = fn => {
 process.nextTick = nextTick
 
 const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
-
+process.ipc = { in: rb, out: wb }
 if (global.workerData) {
   global.workerData.bytes = global.workerData.alloc()
   const dv = new DataView(global.workerData.bytes)
@@ -266,7 +273,7 @@ if (global.workerData) {
   parser.onMessage = message => sock.onMessage(message)
   process.send = o => sock.write(parser.write(o))
   process.sendString = s => sock.write(parser.write(s, 2))
-  process.sendBuffer = (b, len) => sock.write(parser.write(b, 3, 0, len))
+  process.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
   sock.onRead(len => parser.read(len))
   sock.onEnd(() => sock.close())
   process.onMessage = fn => {

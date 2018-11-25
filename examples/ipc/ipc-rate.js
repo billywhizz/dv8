@@ -1,5 +1,6 @@
 function Worker() {
   const rate = { send: 0, recv: 0 }
+  const len = process.ipc.out.write('ping', 4)
   const timer = setInterval(() => {
     print(`thread: send ${rate.send} recv ${rate.recv}`)
     rate.send = rate.recv = 0
@@ -7,13 +8,14 @@ function Worker() {
   const payload = JSON.stringify({ TID: process.TID })
   process.onMessage(message => {
     rate.recv++
-    process.sendString(payload)
+    process.sendBuffer(len)
     rate.send++
   })
-  process.sendString(payload)
+  process.sendBuffer(len)
 }
 
 const payload = JSON.stringify({ PID: process.PID })
+const len = process.ipc.out.write('pong', 4)
 const rate = { send: 0, recv: 0 }
 const timer = setInterval(() => {
   print(`process: send ${rate.send} recv ${rate.recv}`)
@@ -24,7 +26,7 @@ function spawn() {
   const thread = process.spawn(Worker, result => console.log(`done: ${result.status}`))
   thread.onMessage(message => {
     rate.recv++
-    thread.sendString(payload)
+    thread.sendBuffer(len)
     rate.send++
   })
 }
