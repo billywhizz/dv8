@@ -1,20 +1,16 @@
-const payload = JSON.stringify({ PID: process.PID })
+const payload = { PID: process.PID, TID: process.TID }
 
 const thread = process.spawn(() => {
-  const payload = JSON.stringify({ TID: process.TID })
-  const len = process.ipc.out.write(payload, 4)
+  const payload = { PID: process.PID, TID: process.TID }
   process.onMessage(message => {
     print(JSON.stringify(message))
-    print(process.ipc.in.read(message.offset, message.length))
     process.sock.unref()
   })
-  process.sendBuffer(len)
-}, result => thread.sock.close())
+  process.send(payload)
+}, result => thread.sock.close(), { ipc: true })
 
-const len = process.ipc.out.write(payload, 4)
 thread.onMessage(message => {
   print(JSON.stringify(message))
-  print(process.ipc.in.read(message.offset, message.length))
-  thread.sendBuffer(len)
+  thread.send(payload)
   thread.sock.unref()
 })

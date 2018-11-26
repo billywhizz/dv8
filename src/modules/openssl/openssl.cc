@@ -36,7 +36,6 @@ namespace openssl {
 	}
 	
 	int VerifyCallback(int preverify_ok, X509_STORE_CTX* ctx) {
-		fprintf(stderr, "Verify\n");
 		return SSL_TLSEXT_ERR_OK;
 	}
 
@@ -224,7 +223,7 @@ namespace openssl {
 			int n = SSL_read(secure->ssl, buf, len);
 			if (n <= 0) {
 				n = SSL_get_error(secure->ssl, n);
-				fprintf(stderr, "SSL_read: %i\n", n);
+				//fprintf(stderr, "SSL_read: %i\n", n);
 				return;
 			}
 			if (n > 0) {
@@ -243,7 +242,7 @@ namespace openssl {
 	}
 
 	void on_plugin_close(void* obj) {
-		fprintf(stderr, "openssl.on_close\n");
+		//fprintf(stderr, "openssl.on_close\n");
 		socket_plugin* plugin = (socket_plugin*)obj;
 		SecureSocket* secure = (SecureSocket*)plugin->data;
 		Socket* sock = secure->socket;
@@ -253,7 +252,7 @@ namespace openssl {
 		size_t outlen = context->out.len;
 		size_t inlen = context->in.len;
 		if (SSL_is_init_finished(secure->ssl)) {
-			fprintf(stderr, "openssl.flush\n");
+			//fprintf(stderr, "openssl.flush\n");
 			// TODO: check return codes etc.
 			cycleIn(secure, (uv_stream_t *)context->handle, in, inlen);
 			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);

@@ -23,7 +23,7 @@ const timer = setInterval(() => {
 }, 1000)
 
 function spawn() {
-  const thread = process.spawn(Worker, result => console.log(`done: ${result.status}`))
+  const thread = process.spawn(Worker, result => console.log(`done: ${result.status}`), { ipc: true })
   thread.onMessage(message => {
     rate.recv++
     thread.sendBuffer(len)

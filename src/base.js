@@ -111,12 +111,18 @@ const heap = [
 
 global.onUncaughtException = err => {
   print('onUncaughtException:')
-  print(JSON.stringify(err))
+  const keys = Object.getOwnPropertyNames(err)
+  for (const key of keys) {
+    print(`${key}: ${err[key]}`)
+  }
 }
 
 global.onUnhandledRejection(err => {
   print('onUnhandledRejection:')
-  print(JSON.stringify(err))
+  const keys = Object.getOwnPropertyNames(err)
+  for (const key of keys) {
+    print(`${key}: ${err[key]}`)
+  }
 })
 
 function setTimeout (fn, delay) {
@@ -188,18 +194,35 @@ process.memoryUsage = () => {
   }
 }
 
-process.spawn = (fun, onComplete) => {
+process.spawn = (fun, onComplete, opts = { ipc: false }) => {
   const thread = new Thread()
-  const sock = new Socket(UNIX)
-  const parser = new Parser(rb, wb)
-  sock.onConnect(fd => {
-    sock.setup(fd, rb, wb)
-  })
-  sock.onEnd(() => sock.close())
-  sock.onRead(len => parser.read(len))
-  parser.onMessage = message => thread._onMessage(message)
   thread.buffer = Buffer.alloc(THREAD_BUFFER_SIZE)
   const view = new DataView(thread.buffer.bytes)
+  if (opts.ipc) {
+    const sock = new Socket(UNIX)
+    const parser = new Parser(rb, wb)
+    sock.onConnect(fd => {
+      sock.setup(fd, rb, wb)
+    })
+    sock.onEnd(() => sock.close())
+    sock.onRead(len => parser.read(len))
+    parser.onMessage = message => thread._onMessage(message)
+    thread.onMessage = fn => {
+      thread._onMessage = fn
+    }
+    thread._onMessage = message => {}
+    thread.send = o => sock.write(parser.write(o))
+    thread.sendString = s => sock.write(parser.write(s, 2))
+    thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
+    const fd = sock.open()
+    if (fd < 0) {
+      throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
+    }
+    view.setUint32(1, fd)
+    thread.sock = sock
+  } else {
+    view.setUint32(1, 0)
+  }
   thread.view = view
   thread.id = next++
   view.setUint8(0, thread.id)
@@ -210,19 +233,6 @@ process.spawn = (fun, onComplete) => {
   view.setUint32(envJSON.length + 9, argsJSON.length)
   thread.buffer.write(argsJSON, envJSON.length + 13)
   threads[thread.id] = thread
-  thread.onMessage = fn => {
-    thread._onMessage = fn
-  }
-  thread._onMessage = message => {}
-  thread.send = o => sock.write(parser.write(o))
-  thread.sendString = s => sock.write(parser.write(s, 2))
-  thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
-  const fd = sock.open()
-  if (fd < 0) {
-    throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
-  }
-  view.setUint32(1, fd)
-  thread.sock = sock
   nextTick(() => {
     thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
   })
@@ -265,25 +275,28 @@ if (global.workerData) {
   const argsJSON = global.workerData.read(13 + envLength, argsLength)
   process.args = JSON.parse(argsJSON)
   delete global.workerData
-  const sock = new Socket(UNIX)
-  const parser = new Parser(rb, wb)
-  sock.onConnect(fd => {
-    sock.setup(fd, rb, wb)
-  })
-  parser.onMessage = message => sock.onMessage(message)
-  process.send = o => sock.write(parser.write(o))
-  process.sendString = s => sock.write(parser.write(s, 2))
-  process.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
-  sock.onRead(len => parser.read(len))
-  sock.onEnd(() => sock.close())
-  process.onMessage = fn => {
-    sock.onMessage = fn
+  if (process.fd !== 0) {
+    const sock = new Socket(UNIX)
+    const parser = new Parser(rb, wb)
+    sock.onConnect(fd => {
+      sock.setup(fd, rb, wb)
+    })
+    parser.onMessage = message => sock.onMessage(message)
+    process.send = o => sock.write(parser.write(o))
+    process.sendString = s => sock.write(parser.write(s, 2))
+    process.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
+    sock.onRead(len => parser.read(len))
+    sock.onEnd(() => sock.close())
+    process.onMessage = fn => {
+      sock.onMessage = fn
+    }
+    sock.open(process.fd)
+    process.sock = sock
   }
-  sock.open(process.fd)
-  process.sock = sock
 } else {
   process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
   process.PID = _process.pid()
+  process.TID = 0
   process.args = global.args
   process.threads = threads
 }

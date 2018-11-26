@@ -175,7 +175,7 @@ void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args) {
 }
 
 void on_plugin_close(void* obj) {
-	fprintf(stderr, "parser.on_close\n");
+	//fprintf(stderr, "parser.on_close\n");
 	socket_plugin* plugin = (socket_plugin*)obj;
 	HTTPParser* parser = (HTTPParser*)plugin->data;
 	if (parser->plugin->next) {
