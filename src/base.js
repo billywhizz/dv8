@@ -274,7 +274,7 @@ if (global.workerData) {
   const argsLength = dv.getUint32(9 + envLength)
   const argsJSON = global.workerData.read(13 + envLength, argsLength)
   process.args = JSON.parse(argsJSON)
-  delete global.workerData
+  //delete global.workerData
   if (process.fd !== 0) {
     const sock = new Socket(UNIX)
     const parser = new Parser(rb, wb)

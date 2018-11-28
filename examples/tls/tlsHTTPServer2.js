@@ -1,8 +1,5 @@
 const { Socket, TCP } = module('socket', {})
 const { HTTPParser, REQUEST } = module('httpParser', {})
-//const { setSecure, addContext } = require('./lib/tls.js')
-
-let rps = 0
 
 const createContext = () => {
   if (contexts.length) return contexts.shift()
@@ -29,7 +26,6 @@ const onHeaders = context => {
 }
 
 const onRequest = context => {
-  rps++
   const { client, out, request } = context
   const len = out.write(r200, 0)
   const r = client.write(len)
@@ -68,22 +64,18 @@ const onClient = fd => {
   client.onEnd(() => client.close())
   client.setNoDelay(true)
   client.setKeepAlive(true, 3000)
-  //setSecure(client)
   parser.reset(REQUEST, client)
 }
 
-//addContext('dv8.billywhizz.io')
-//addContext('foo.billywhizz.io')
-
-let r200 = `HTTP/1.1 200 OK\r\nServer: dv8\r\nDate: ${(new Date()).toUTCString()}\r\nContent-Length: 0\r\n\r\n`
+let serviceName = process.env.SERVICE_NAME || 'dv8'
+let r200 = `HTTP/1.1 200 OK\r\nServer: ${serviceName}\r\nDate: ${(new Date()).toUTCString()}\r\nContent-Length: 0\r\n\r\n`
 const contexts = []
 const server = new Socket(TCP)
 server.onConnect(onClient)
 server.timer = setInterval(() => {
-  r200 = `HTTP/1.1 200 OK\r\nServer: dv8\r\nDate: ${(new Date()).toUTCString()}\r\nContent-Length: 0\r\n\r\n`
-  if (process.send) process.send({ rps })
+  r200 = `HTTP/1.1 200 OK\r\nServer: ${serviceName}\r\nDate: ${(new Date()).toUTCString()}\r\nContent-Length: 0\r\n\r\n`
   rps = 0
 }, 1000)
-const r = server.listen('0.0.0.0', 3000)
-print(`port: ${server.portNumber()}`)
-if (r !== 0) print(`listen: ${r}, ${server.error(r)}`)
+const r = server.listen('0.0.0.0', 0)
+if (r !== 0) throw new Error(`listen: ${r}, ${server.error(r)}`)
+if (process.send) process.send({ port: server.portNumber() })

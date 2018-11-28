@@ -311,6 +311,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", Stats);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", UnRef);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", Open);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "portNumber", PortNumber);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onConnect", onConnect);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onClose", onClose);
@@ -791,6 +792,19 @@ void Socket::onConnect(const v8::FunctionCallbackInfo<v8::Value> &args)
     s->_onConnect.Reset(isolate, onConnect);
     s->callbacks.onConnect = 1;
   }
+}
+
+void Socket::PortNumber(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  uv_tcp_t* sock = (uv_tcp_t*)s->_stream;
+  struct sockaddr_storage address;
+  int addrlen = sizeof(address);
+  int status = uv_tcp_getsockname(sock, reinterpret_cast<sockaddr *>(&address), &addrlen);
+  const sockaddr *addr2 = reinterpret_cast<const sockaddr *>(&address);
+  const sockaddr_in *a4 = reinterpret_cast<const sockaddr_in *>(addr2);
+  args.GetReturnValue().Set(Integer::New(isolate, ntohs(a4->sin_port)));
 }
 
 void Socket::Listen(const FunctionCallbackInfo<Value> &args)
