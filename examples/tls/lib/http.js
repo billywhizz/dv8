@@ -1,43 +1,19 @@
 const { Socket, TCP, UNIX } = module('socket', {})
 const { HTTPParser, REQUEST } = module('httpParser', {})
+const { Timer } = module('timer', {})
 
 const contexts = []
 
 let serviceName = process.env.SERVICE_NAME || 'dv8'
+let MAX_PIPELINE = parseInt(process.env.MAX_PIPELINE || '5', 10)
+
+const foo = () => {}
 
 const createContext = (responses) => {
   if (contexts.length) return contexts.shift()
   const work = Buffer.alloc(16384)
   const parser = new HTTPParser()
-  const context = { in: Buffer.alloc(16384), out: Buffer.alloc(16384), work, parser, bytes: new Uint8Array(work.bytes), view: new DataView(work.bytes), request: { major: 1, minor: 1, method: 1, upgrade: 0, keepalive: 1, url: '', headers: '', body: [] }, client: null }
-  const { out, request } = context
-  const response = {
-    statusCode: 200,
-    end: () => {
-      const { client } = context
-      const len = out.write(responses[response.statusCode] || responses['404'], 0)
-      const r = client.write(len)
-      if (r === len) {
-        if (request.keepalive === 1) return
-        if (client.queueSize() === 0) {
-          return client.close()
-        }
-        client.onDrain(() => {
-          client.close()
-        })
-        return
-      }
-      if (r < 0) client.close()
-      if (r < len) {
-        if (request.keepalive === 1) return client.pause()
-        if (client.queueSize() === 0) {
-          return client.close()
-        }
-        client.onDrain(() => client.close())
-      }
-    }
-  }
-  context.response = response
+  const context = { timer: new Timer(), queue: [], in: Buffer.alloc(16384), out: Buffer.alloc(16384), work, parser, bytes: new Uint8Array(work.bytes), view: new DataView(work.bytes), client: null }
   parser.setup(context.in, work)
   return context
 }
@@ -57,15 +33,50 @@ const createServer = (callback, opts = { type: TCP }) => {
   server.onConnect(fd => {
     const client = new Socket(opts.type)
     const context = createContext(responses)
-    const { bytes, view, work, parser, request, response } = context
-    const { body } = request
+    const { bytes, view, work, parser, out } = context
     context.client = client
-    parser.onBody(len => body.push(work.read(0, len)))
+    let inflight = 0
+    let paused = false
+    parser.onBody(len => context.request.onBody(work, len))
     parser.onHeaders(() => {
-      if (body.length) body.length = 0
+      inflight++
+      if (inflight > MAX_PIPELINE && !paused) {
+        print(`pausing: ${inflight}`)
+        parser.pause()
+        client.pause()
+        paused = true
+      }
       const urlLength = view.getUint16(5)
       const headerLength = view.getUint16(7)
       const str = work.read(16, 16 + urlLength + headerLength)
+      const request = { timer: context.timer, major: 1, minor: 1, method: 1, upgrade: 0, keepalive: 1, url: '', headers: '', onBody: foo, onEnd: foo }
+      const response = {
+        statusCode: 200,
+        end: () => {
+          const { client } = context
+          inflight--
+          if (inflight < MAX_PIPELINE && paused) {
+            print(`resuming: ${inflight}`)
+            parser.resume()
+            client.resume()
+            paused = false
+          }
+          const len = out.write(responses[response.statusCode] || responses['404'], 0)
+          const r = client.write(len)
+          if (r === len) {
+            if (request.keepalive === 1) return
+            if (client.queueSize() === 0) return client.close()
+            client.onDrain(() => client.close())
+            return
+          }
+          if (r < 0) client.close()
+          if (r < len) {
+            if (request.keepalive === 1) return client.pause()
+            if (client.queueSize() === 0) return client.close()
+            client.onDrain(() => client.close())
+          }
+        }
+      }
       request.major = bytes[0]
       request.minor = bytes[1]
       request.method = bytes[2]
@@ -73,14 +84,20 @@ const createServer = (callback, opts = { type: TCP }) => {
       request.keepalive = bytes[4]
       request.url = str.substring(0, urlLength)
       request.headers = str.substring(urlLength, urlLength + headerLength)
+      context.response = response
+      context.request = request
+      callback(request, response)
     })
-    parser.onRequest(() => callback(request, response))
+    parser.onRequest(() => context.request.onEnd())
     client.setup(fd, context.in, context.out)
     client.address = client.remoteAddress()
-    client.onClose(() => contexts.push(context))
+    client.onClose(() => {
+      context.queue.length = 0
+      contexts.push(context)
+    })
     client.onEnd(() => client.close())
-    client.setNoDelay(true)
-    client.setKeepAlive(true, 3000)
+    //client.setNoDelay(true)
+    //client.setKeepAlive(true, 3000)
     parser.reset(REQUEST, client)
   })
   server.onClose(() => {

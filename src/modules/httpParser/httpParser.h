@@ -101,6 +101,8 @@ class HTTPParser : public dv8::ObjectWrap {
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Reset(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Pause(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Resume(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Execute(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void onHeaders(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void onBody(const v8::FunctionCallbackInfo<v8::Value>& args);

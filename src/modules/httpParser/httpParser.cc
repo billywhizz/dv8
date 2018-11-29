@@ -124,6 +124,8 @@ void HTTPParser::Init(Local<Object> exports) {
 	tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", HTTPParser::Setup);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", HTTPParser::Reset);
+	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pause", HTTPParser::Pause);
+	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "resume", HTTPParser::Resume);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "execute", HTTPParser::Execute);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onHeaders", HTTPParser::onHeaders);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onBody", HTTPParser::onBody);
@@ -222,6 +224,22 @@ void HTTPParser::Reset(const FunctionCallbackInfo<Value> &args) {
 		obj->plugin = plugin;
 	}
 	args.GetReturnValue().Set(Integer::New(isolate, 0));
+}
+
+void HTTPParser::Pause(const FunctionCallbackInfo<Value> &args)
+{
+	Isolate *isolate = args.GetIsolate();
+	v8::HandleScope handleScope(isolate);
+	HTTPParser *obj = ObjectWrap::Unwrap<HTTPParser>(args.Holder());
+	http_parser_pause(obj->context->parser, 1);
+}
+
+void HTTPParser::Resume(const FunctionCallbackInfo<Value> &args)
+{
+	Isolate *isolate = args.GetIsolate();
+	v8::HandleScope handleScope(isolate);
+	HTTPParser *obj = ObjectWrap::Unwrap<HTTPParser>(args.Holder());
+	http_parser_pause(obj->context->parser, 0);
 }
 
 void HTTPParser::Execute(const FunctionCallbackInfo<Value> &args)

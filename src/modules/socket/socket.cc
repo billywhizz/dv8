@@ -187,14 +187,15 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   if (nread > 0) {
     ctx->stats.in.read += (uint64_t)nread;
     ctx->stats.in.data++;
+    //TODO: allow returning a different length from onRead - if reader wantes to transform the buffer and the transformation has a different length
+    if (s->first) {
+      uint32_t r = s->first->onRead(nread, s->first);
+    }
     if (s->callbacks.onRead == 1)
     {
       Local<Value> argv[1] = {Number::New(isolate, nread)};
       Local<Function> onRead = Local<Function>::New(isolate, s->_onRead);
       onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
-    }
-    if (s->first) {
-      uint32_t r = s->first->onRead(nread, s->first);
     }
 /*    
     if (s->callbacks.onPluginRead == 1) {

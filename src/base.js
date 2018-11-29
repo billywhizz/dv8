@@ -248,20 +248,36 @@ global.process = process
 
 process.runMicroTasks = () => _process.runMicroTasks()
 process.ticks = 0
+
+let idleActive = false
+
+process.stats = () => {
+  const st = {
+    ticks: process.ticks,
+    queue: queue.length
+  }
+  return st
+}
+
 const nextTick = fn => {
   queue.push(fn)
-  if (queue.length > 1) return
+  if (idleActive) return
   loop.onIdle(() => {
     process.ticks++
     let len = queue.length
     while (len--) queue.shift()()
-    if (!queue.length) loop.onIdle()
+    if (!queue.length) {
+      idleActive = false
+      loop.onIdle()
+    }
   })
+  idleActive = true
 }
 process.nextTick = nextTick
 
 const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
 process.ipc = { in: rb, out: wb }
+
 if (global.workerData) {
   global.workerData.bytes = global.workerData.alloc()
   const dv = new DataView(global.workerData.bytes)

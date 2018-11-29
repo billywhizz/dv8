@@ -79,6 +79,7 @@ void Timer::Stop(const FunctionCallbackInfo<Value> &args)
     int r = uv_timer_stop(t->handle);
     uv_handle_t *handle = (uv_handle_t *)t->handle;
     uv_close(handle, OnClose);
+    t->onTimeout.Reset();
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
