@@ -20,6 +20,9 @@ RUN ./platform.sh && \
     ./module.sh timer && \
     ./module.sh tty && \
     ./module.sh loop && \
+    ./module.sh fs && \
+    ./module.sh udp && \
+    ./module.sh dns && \
     ./http-parser.sh && \
     ./openssl.sh
 CMD ["/bin/sh"]
