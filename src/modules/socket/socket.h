@@ -11,10 +11,6 @@
 
 #include <dv8.h>
 
-// size of work buffer for reading. this should be user configurable and be same size as in buffer
-// TODO: need to figure out what is correct for this
-#define MAX_CONTEXTS 4096
-
 namespace dv8
 {
 
@@ -31,7 +27,6 @@ typedef struct
 {
   uv_write_t req; // libu write handle
   uv_buf_t buf;   // buffer reference
-  uint32_t fd;    // id of the context
 } write_req_t;
 
 // object for passing socket server structure to libuv
@@ -78,7 +73,6 @@ void context_free(uv_handle_t *handle);
 static void on_connection(uv_stream_t *server, int status);
 static void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
 static void after_write(uv_write_t *req, int status);
-static void after_write2(uv_write_t *req, int status);
 static void on_close(uv_handle_t *peer);
 static void after_shutdown(uv_shutdown_t *req, int status);
 static void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf);
@@ -112,7 +106,6 @@ typedef struct
 // socket context
 struct _context
 {
-  uint32_t fd;                // id of the context
   uint32_t readBufferLength;  // size of read buffer
   uint32_t writeBufferLength; // size of write buffer
   uint32_t index;             // position in buffer
@@ -126,8 +119,6 @@ struct _context
   bool paused;
   socket_stats stats;
 };
-
-static std::queue<_context *> contexts; // queue for managing pool of contexts
 
 class Socket : public dv8::ObjectWrap
 {
@@ -151,14 +142,14 @@ public:
   dv8::socket::socket_plugin* first = 0;
   dv8::socket::socket_plugin* last = 0;
   bool isServer = true;
+  Socket()
+  {
+  }
 
 protected:
   void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 private:
-  Socket()
-  {
-  }
 
   ~Socket()
   {

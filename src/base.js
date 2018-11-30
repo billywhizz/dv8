@@ -155,7 +155,6 @@ const _process = new Process()
 const process = {}
 const loop = new EventLoop()
 process.loop = loop
-let THREAD_BUFFER_SIZE = 1024
 
 process.cpuUsage = () => {
   _process.cpuUsage(cpu)
@@ -194,51 +193,6 @@ process.memoryUsage = () => {
   }
 }
 
-process.spawn = (fun, onComplete, opts = { ipc: false }) => {
-  const thread = new Thread()
-  thread.buffer = Buffer.alloc(THREAD_BUFFER_SIZE)
-  const view = new DataView(thread.buffer.bytes)
-  if (opts.ipc) {
-    const sock = new Socket(UNIX)
-    const parser = new Parser(rb, wb)
-    sock.onConnect(fd => {
-      sock.setup(fd, rb, wb)
-    })
-    sock.onEnd(() => sock.close())
-    sock.onRead(len => parser.read(len))
-    parser.onMessage = message => thread._onMessage(message)
-    thread.onMessage = fn => {
-      thread._onMessage = fn
-    }
-    thread._onMessage = message => {}
-    thread.send = o => sock.write(parser.write(o))
-    thread.sendString = s => sock.write(parser.write(s, 2))
-    thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
-    const fd = sock.open()
-    if (fd < 0) {
-      throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
-    }
-    view.setUint32(1, fd)
-    thread.sock = sock
-  } else {
-    view.setUint32(1, 0)
-  }
-  thread.view = view
-  thread.id = next++
-  view.setUint8(0, thread.id)
-  const envJSON = JSON.stringify(process.env)
-  const argsJSON = JSON.stringify(process.args)
-  view.setUint32(5, envJSON.length)
-  thread.buffer.write(envJSON, 9)
-  view.setUint32(envJSON.length + 9, argsJSON.length)
-  thread.buffer.write(argsJSON, envJSON.length + 13)
-  threads[thread.id] = thread
-  nextTick(() => {
-    thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
-  })
-  return thread
-}
-
 global.setTimeout = setTimeout
 global.setInterval = setInterval
 global.clearTimeout = clearTimeout
@@ -275,10 +229,8 @@ const nextTick = fn => {
 }
 process.nextTick = nextTick
 
-const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
-process.ipc = { in: rb, out: wb }
-
 if (global.workerData) {
+  const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
   global.workerData.bytes = global.workerData.alloc()
   const dv = new DataView(global.workerData.bytes)
   process.TID = dv.getUint8(0)
@@ -290,7 +242,7 @@ if (global.workerData) {
   const argsLength = dv.getUint32(9 + envLength)
   const argsJSON = global.workerData.read(13 + envLength, argsLength)
   process.args = JSON.parse(argsJSON)
-  //delete global.workerData
+  delete global.workerData
   if (process.fd !== 0) {
     const sock = new Socket(UNIX)
     const parser = new Parser(rb, wb)
@@ -310,14 +262,57 @@ if (global.workerData) {
     process.sock = sock
   }
 } else {
+  process.spawn = (fun, onComplete, opts = { ipc: false }) => {
+    const thread = new Thread()
+    const envJSON = JSON.stringify(process.env)
+    const argsJSON = JSON.stringify(process.args)
+    const bufferSize = envJSON.length + argsJSON.length + 13
+    thread.buffer = Buffer.alloc(bufferSize)
+    const view = new DataView(thread.buffer.bytes)
+    if (opts.ipc) {
+      const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
+      const sock = new Socket(UNIX)
+      const parser = new Parser(rb, wb)
+      sock.onConnect(fd => {
+        sock.setup(fd, rb, wb)
+      })
+      sock.onEnd(() => sock.close())
+      sock.onRead(len => parser.read(len))
+      parser.onMessage = message => thread._onMessage(message)
+      thread.onMessage = fn => {
+        thread._onMessage = fn
+      }
+      thread._onMessage = message => {}
+      thread.send = o => sock.write(parser.write(o))
+      thread.sendString = s => sock.write(parser.write(s, 2))
+      thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
+      const fd = sock.open()
+      if (fd < 0) {
+        throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
+      }
+      view.setUint32(1, fd)
+      thread.sock = sock
+    } else {
+      view.setUint32(1, 0)
+    }
+    thread.view = view
+    thread.id = next++
+    view.setUint8(0, thread.id)
+    view.setUint32(5, envJSON.length)
+    thread.buffer.write(envJSON, 9)
+    view.setUint32(envJSON.length + 9, argsJSON.length)
+    thread.buffer.write(argsJSON, envJSON.length + 13)
+    threads[thread.id] = thread
+    nextTick(() => {
+      thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+    })
+    return thread
+  }
   process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
   process.PID = _process.pid()
   process.TID = 0
   process.args = global.args
   process.threads = threads
-}
-if (process.env.THREAD_BUFFER_SIZE) {
-  THREAD_BUFFER_SIZE = parseInt(process.env.THREAD_BUFFER_SIZE, 10)
 }
 
 module.exports = {}

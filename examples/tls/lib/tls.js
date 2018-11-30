@@ -22,10 +22,10 @@ const setSecure = (sock, onSecure, currentContext = defaultContext) => {
   if (onSecure) secureClient.onSecure(onSecure)
 }
 
-const addContext = (hostname, isServer = true) => {
+const addContext = (hostname, { isServer = true, certStore = './certs' }) => {
   const secureContext = new SecureContext()
   if (isServer) {
-    secureContext.setup(0, `./certs/${hostname}.cert.pem`, `./certs/${hostname}.key.pem`)
+    secureContext.setup(0, `${certStore}/${hostname}.cert.pem`, `${certStore}/${hostname}.key.pem`)
   } else {
     secureContext.setup(1)
   }

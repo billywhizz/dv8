@@ -43,8 +43,14 @@ to run an "app"
 - uses platform stdlib
 
 ## NEXT
-- fix segfault in ByteServer when socket closes unexpectedly
+- make context_init and context_free in socket module thread safe, without locks if possible
+- liblxc module
+- postgres module?
+- lldb ?
+- sync fs module
+- file stream from separate thread
 - use pthreads instead of uv_queue_work for threaded isolates - can spin up as many as we need to
+- fix segfault in ByteServer when socket closes unexpectedly
 - refactor socket plugins - handle openssl module write correctly - get fetch2 and ByteServer working in TLS mode
 ```bash
 ## server

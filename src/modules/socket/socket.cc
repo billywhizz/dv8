@@ -21,23 +21,9 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
-static int contextid = 0; // incrementing counter for context ids
-static _context *contextMap[MAX_CONTEXTS];
-
 _context *context_init(uv_stream_t *handle, Socket *s)
 {
-  _context *ctx;
-  if (contexts.empty())
-  {
-    ctx = (_context *)calloc(1, sizeof(_context));
-    ctx->fd = contextid++;
-    contextMap[ctx->fd] = ctx;
-  }
-  else
-  {
-    ctx = contexts.front();
-    contexts.pop();
-  }
+  _context* ctx = s->context;
   ctx->handle = handle;
   ctx->closing = false;
   ctx->blocked = false;
@@ -58,13 +44,14 @@ _context *context_init(uv_stream_t *handle, Socket *s)
   ctx->stats.out.free = 0;
   ctx->stats.out.eagain = 0;
   handle->data = ctx;
+  ctx->data = s;
   return ctx;
 }
 
 void context_free(uv_handle_t *handle)
 {
   _context *context = (_context *)handle->data;
-  contexts.push(context);
+  free(context);
   free(handle);
 }
 
@@ -73,7 +60,8 @@ void after_write(uv_write_t *req, int status)
   Isolate *isolate = Isolate::GetCurrent();
   v8::HandleScope handleScope(isolate);
   write_req_t *wr = (write_req_t *)req;
-  _context *ctx = contextMap[wr->fd];
+  uv_stream_t *stream = (uv_stream_t *)req->handle;
+  _context *ctx = (_context*)stream->data;
   Socket *socket = (Socket *)ctx->data;
   if (socket->callbacks.onWrite == 1)
   {
@@ -95,7 +83,6 @@ void after_write(uv_write_t *req, int status)
     }
     return;
   }
-  uv_stream_t *stream = (uv_stream_t *)req->handle;
   size_t queueSize = stream->write_queue_size;
   if (queueSize > ctx->stats.out.maxQueue)
   {
@@ -153,7 +140,6 @@ void on_close2(uv_handle_t *peer)
   Socket *s = (Socket *)peer->data;
   if (s->callbacks.onClose == 1)
   {
-    fprintf(stderr, "on_close2\n");
     Local<Value> argv[0] = {};
     Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
     onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
@@ -197,11 +183,6 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       Local<Function> onRead = Local<Function>::New(isolate, s->_onRead);
       onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
-/*    
-    if (s->callbacks.onPluginRead == 1) {
-      uint32_t r = s->onPluginRead(nread, s->pluginData);
-    }
-*/
   }
   else if (nread == UV_EOF) {
     if (s->callbacks.onEnd == 1)
@@ -251,6 +232,7 @@ void on_client_connection(uv_connect_t *client, int status)
   Socket *s = (Socket *)baton->object;
   _context *ctx = (_context *)client->handle->data;
   ctx->data = s;
+  s->context = ctx;
   if (!uv_is_readable(client->handle) || !uv_is_writable(client->handle) || uv_is_closing((uv_handle_t *)client->handle))
   {
     return;
@@ -267,6 +249,7 @@ void on_connection(uv_stream_t *server, int status)
   cb callback = (cb)baton->callback;
   Socket *s = (Socket *)baton->object;
   Isolate *isolate = Isolate::GetCurrent();
+  v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
   if (s->socktype == TCP)
@@ -281,9 +264,15 @@ void on_connection(uv_stream_t *server, int status)
     status = uv_pipe_init(env->loop, (uv_pipe_t *)stream, 0);
   }
   status = uv_accept(server, stream);
-  _context *ctx = context_init(stream, s);
-  ctx->data = baton->object;
-  callback(ctx);
+  if (s->callbacks.onConnect == 1) {
+      Local<Value> argv[0] = {};
+      Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
+      Local<Value> result = foo->Call(context->Global(), 0, argv);
+      Local<Object> sock;
+      bool ok = result->ToObject(context).ToLocal(&sock);
+      Socket *s = ObjectWrap::Unwrap<Socket>(sock);
+      _context *ctx = context_init(stream, s);
+  }
   status = uv_read_start(stream, alloc_chunk, after_read);
   assert(status == 0);
 }
@@ -333,7 +322,6 @@ void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   v8::HandleScope handleScope(isolate);
   ObjectWrap *wrap = data.GetParameter();
   Socket* sock = static_cast<Socket *>(wrap);
-  //fprintf(stderr, "Socket::Destroy\n");
 }
 
 void Socket::QueueSize(const FunctionCallbackInfo<Value> &args)
@@ -398,6 +386,7 @@ void Socket::New(const FunctionCallbackInfo<Value> &args)
   if (args.IsConstructCall()) {
     Local<Context> context = isolate->GetCurrentContext();
     Socket *obj = new Socket();
+    obj->context = (_context *)calloc(1, sizeof(_context));
     int len = args.Length();
     if (len > 0) {
       obj->socktype = (socket_type)args[0]->Uint32Value(context).ToChecked();
@@ -482,9 +471,9 @@ int onNewConnection(_context *ctx)
   v8::HandleScope handleScope(isolate);
   if (obj->callbacks.onConnect == 1)
   {
-    Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
+    Local<Value> argv[0] = {};
     Local<Function> foo = Local<Function>::New(isolate, obj->_onConnect);
-    foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
   }
   return 0;
 }
@@ -494,16 +483,12 @@ void Socket::Setup(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   v8::HandleScope handleScope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
-  ctx->data = s;
-  s->context = ctx;
-  Buffer *b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
+  _context* ctx = s->context;
+  Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
   size_t len = b->_length;
   ctx->in = uv_buf_init((char *)b->_data, len);
   ctx->readBufferLength = len;
-  b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
+  b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
   len = b->_length;
   ctx->out = uv_buf_init((char *)b->_data, len);
   ctx->readBufferLength = len;
@@ -594,7 +579,6 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     ctx->stats.out.alloc++;
     ctx->stats.out.eagain++;
     wr->buf = uv_buf_init(wrb, len);
-    wr->fd = ctx->fd;
     int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
     r = 0;
     if (status != 0) {
@@ -623,7 +607,6 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     memcpy(wrb, base, len - r);
     ctx->stats.out.alloc++;
     wr->buf = uv_buf_init(wrb, len - r);
-    wr->fd = ctx->fd;
     int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
     ctx->blocked = true;
     if (socket->callbacks.onWrite == 1)
@@ -987,16 +970,10 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
       return;
     }
     _context *ctx = context_init((uv_stream_t*)sock, s);
-    ctx->data = s;
     status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
     if (status != 0) {
       args.GetReturnValue().Set(Integer::New(isolate, status));
       return;
-    }
-    if (s->callbacks.onConnect == 1) {
-      Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
-      Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
-      foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
     }
     args.GetReturnValue().Set(Integer::New(isolate, fd[1]));
   } else {
@@ -1015,15 +992,9 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
     int fd = args[0]->Int32Value(context).ToChecked();
     status = uv_pipe_open(sock, fd);
     _context *ctx = context_init((uv_stream_t*)sock, s);
-    ctx->data = s;
     status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
     args.GetReturnValue().Set(Integer::New(isolate, status));
     if (status != 0) return;
-    if (s->callbacks.onConnect == 1) {
-      Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
-      Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
-      foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
-    }
   }
 }
 

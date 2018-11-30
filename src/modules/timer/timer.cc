@@ -30,6 +30,7 @@ void Timer::Init(Local<Object> exports)
 
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", Timer::Start);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stop", Timer::Stop);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", Timer::UnRef);
 
     DV8_SET_EXPORT(isolate, tpl, "Timer", exports);
 }
@@ -69,6 +70,13 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
 void Timer::OnClose(uv_handle_t *handle)
 {
     free(handle);
+}
+
+void Timer::UnRef(const FunctionCallbackInfo<Value> &args)
+{
+    Isolate *isolate = args.GetIsolate();
+    Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
+    uv_unref((uv_handle_t*)t->handle);
 }
 
 void Timer::Stop(const FunctionCallbackInfo<Value> &args)

@@ -10,7 +10,7 @@ const opts = {
   parseHeaders: false
 }
 
-process.tt = setInterval(() => {
+const timer = setInterval(() => {
   const stats = process.stats()
   console.log(`queue: ${stats.queue}, ticks: ${stats.ticks}`)
 }, 1000)
