@@ -2,24 +2,28 @@ const { Socket, UNIX } = module('socket', {})
 const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
 
 const server = new Socket(UNIX)
-server.onConnect(fd => {
-  print(`server.onConnect: ${fd}`)
-  server.setup(fd, rb, wb)
+server.onConnect(() => {
+  print(`server.onConnect`)
+  server.setup(rb, wb)
+  server.resume()
 })
 server.onRead(len => {
   print(`server.onRead:\n${rb.read(0, len)}`)
-  server.write(rb.write('pong'))
+  const r = server.write(wb.write('pong'))
+  print(`server.write: ${r}`)
 })
 const fd = server.open()
 
 const client = new Socket(UNIX)
-client.onConnect(fd => {
-  print(`client.onConnect: ${fd}`)
-  client.setup(fd, wb, rb)
-  client.write(rb.write('ping'))
+client.onConnect(() => {
+  print(`client.onConnect`)
+  client.setup(wb, rb)
+  client.resume()
+  const r = client.write(rb.write('ping'))
+  print(`client.write: ${r}`)
 })
 client.onRead(len => {
-  print(`client.onRead:\n${rb.read(0, len)}`)
+  print(`client.onRead:\n${wb.read(0, len)}`)
   client.close()
 })
 client.open(fd)

@@ -25,7 +25,7 @@ namespace fs {
 		tpl->SetClassName(String::NewFromUtf8(isolate, "FileSystem"));
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hello", FileSystem::Hello);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "readFie", FileSystem::ReadFile);
 	
 		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
 	}
@@ -40,7 +40,7 @@ namespace fs {
 		}
 	}
 
-	void FileSystem::Hello(const FunctionCallbackInfo<Value> &args)
+	void FileSystem::ReadFile(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();

@@ -26,8 +26,9 @@ out.eagain       : ${stats[17]}
 
 const server = new Socket(UNIX)
 
-server.onConnect(fd => {
-  server.setup(fd, rb, wb)
+server.onConnect(() => {
+  server.setup(rb, wb)
+  server.resume()
 })
 
 server.onRead(len => {
@@ -43,9 +44,10 @@ const fd = server.open()
 
 const client = new Socket(UNIX)
 
-client.onConnect(fd => {
-  client.setup(fd, wb, rb)
+client.onConnect(() => {
+  client.setup(wb, rb)
   client.write(SIZE)
+  client.resume()
 })
 
 client.onRead(len => {

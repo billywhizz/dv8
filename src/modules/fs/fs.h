@@ -20,7 +20,7 @@ class FileSystem : public dv8::ObjectWrap {
 		}
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void Hello(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void ReadFile(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

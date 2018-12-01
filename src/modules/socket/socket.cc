@@ -970,11 +970,8 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
       return;
     }
     _context *ctx = context_init((uv_stream_t*)sock, s);
-    status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
-    if (status != 0) {
-      args.GetReturnValue().Set(Integer::New(isolate, status));
-      return;
-    }
+    ctx->paused = true;
+    onNewConnection(ctx);
     args.GetReturnValue().Set(Integer::New(isolate, fd[1]));
   } else {
     uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
@@ -992,9 +989,9 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
     int fd = args[0]->Int32Value(context).ToChecked();
     status = uv_pipe_open(sock, fd);
     _context *ctx = context_init((uv_stream_t*)sock, s);
-    status = uv_read_start((uv_stream_t*)sock, alloc_chunk, after_read);
+    ctx->paused = true;
+    onNewConnection(ctx);
     args.GetReturnValue().Set(Integer::New(isolate, status));
-    if (status != 0) return;
   }
 }
 

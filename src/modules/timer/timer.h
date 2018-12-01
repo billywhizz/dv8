@@ -28,6 +28,8 @@ private:
   static void New(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Start(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Stop(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Close(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Again(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void UnRef(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void OnTimeout(uv_timer_t *handle);
   static void OnClose(uv_handle_t *handle);

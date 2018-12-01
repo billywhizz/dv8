@@ -34,24 +34,50 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
       const request = { major: 1, minor: 1, method: 1, upgrade: 0, keepalive: 1, url: '', headers: '', onBody: () => {}, onEnd: () => {} }
       const response = {
         headers: [],
+        headersSent: false,
         setHeader: (k, v) => {
           response.headers.push(`${k}: ${v}\r\n`)
         },
         statusCode: 200,
+        buffer: out,
         contentLength: 0,
-        end: body => {
-          if (body) response.contentLength = body.length
+        writeString: chunk => {
           const { client } = context
-          const { statusCode, contentLength } = response
-          const page = defaults[statusCode] || defaults[404]
-          let clientHeaders = ''
-          if (response.headers.length) {
-            clientHeaders = response.headers.join('')
+          let payload = chunk
+          if (!response.headersSent) {
+            const { statusCode, contentLength } = response
+            const page = defaults[statusCode] || defaults[404]
+            let clientHeaders = ''
+            if (response.headers.length) {
+              clientHeaders = response.headers.join('')
+            }
+            payload = `HTTP/1.1 ${statusCode} ${page.message}\r\nServer: ${opts.serverName}\r\nDate: ${now}\r\nContent-Length: ${contentLength}\r\n${clientHeaders}\r\n${chunk || ''}`
           }
-          const payload = `HTTP/1.1 ${statusCode} ${page.message}\r\nServer: ${opts.serverName}\r\nDate: ${now}\r\nContent-Length: ${contentLength}\r\n${clientHeaders}\r\n${body || ''}`
           // TODO: buffer overrun
           const len = out.write(payload, 0)
           const r = client.write(len)
+          response.headersSent = true
+          if (r === len) return
+          if (r < 0) client.close()
+          if (r < len) return client.pause()
+        },
+        end: chunk => {
+          const { client } = context
+          let payload = chunk
+          if (!response.headersSent) {
+            const { statusCode, contentLength } = response
+            const page = defaults[statusCode] || defaults[404]
+            let clientHeaders = ''
+            if (response.headers.length) {
+              clientHeaders = response.headers.join('')
+            }
+            payload = `HTTP/1.1 ${statusCode} ${page.message}\r\nServer: ${opts.serverName}\r\nDate: ${now}\r\nContent-Length: ${contentLength}\r\n${clientHeaders}\r\n${chunk || ''}`
+          }
+          if (!(payload && payload.length)) return
+          // TODO: buffer overrun
+          const len = out.write(payload, 0)
+          const r = client.write(len)
+          response.headersSent = true
           if (r === len) {
             if (request.keepalive === 1) return
             if (client.queueSize() === 0) return client.close()
@@ -85,7 +111,6 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
       print(message)
     })
     client.setup(context.in, context.out)
-    //client.address = client.remoteAddress()
     parser.reset(REQUEST, client)
     if (_onConnect) {
       _onConnect(client)

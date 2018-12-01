@@ -127,7 +127,10 @@ global.onUnhandledRejection(err => {
 
 function setTimeout (fn, delay) {
   const t = new Timer()
-  t.start(fn, delay)
+  t.start(() => {
+    fn()
+    t.close()
+  }, delay)
   return t
 }
 
@@ -246,8 +249,9 @@ if (global.workerData) {
   if (process.fd !== 0) {
     const sock = new Socket(UNIX)
     const parser = new Parser(rb, wb)
-    sock.onConnect(fd => {
-      sock.setup(fd, rb, wb)
+    sock.onConnect(() => {
+      sock.setup(rb, wb)
+      sock.resume()
     })
     parser.onMessage = message => sock.onMessage(message)
     process.send = o => sock.write(parser.write(o))
@@ -273,8 +277,9 @@ if (global.workerData) {
       const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
       const sock = new Socket(UNIX)
       const parser = new Parser(rb, wb)
-      sock.onConnect(fd => {
-        sock.setup(fd, rb, wb)
+      sock.onConnect(() => {
+        sock.setup(rb, wb)
+        sock.resume()
       })
       sock.onEnd(() => sock.close())
       sock.onRead(len => parser.read(len))
