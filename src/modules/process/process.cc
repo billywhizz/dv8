@@ -33,6 +33,7 @@ void Process::Init(Local<Object> exports) {
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cpuUsage", Process::CPUUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hrtime", Process::HRTime);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
+  // spawn, kill, getTitle, setTitle, rss, uptime, rusage, ppid, interfaces, loadavg, exepath, cwd, chdir, homedir, tmpdir, passwd, memory, handles, hostname, getPriority, setPriority 
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
 }
 

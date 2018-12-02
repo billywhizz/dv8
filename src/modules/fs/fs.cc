@@ -25,7 +25,18 @@ namespace fs {
 		tpl->SetClassName(String::NewFromUtf8(isolate, "FileSystem"));
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "readFie", FileSystem::ReadFile);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", FileSystem::Open);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", FileSystem::Close);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "read", FileSystem::Read);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unlink", FileSystem::Unlink);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "mkdir", FileSystem::Mkdir);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", FileSystem::Write);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "fstat", FileSystem::FStat);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "rename", FileSystem::Rename);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "fsync", FileSystem::FSync);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ftruncate", FileSystem::FTruncate);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "copy", FileSystem::Copy);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "sendfile", FileSystem::SendFile);
 	
 		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
 	}
@@ -40,7 +51,7 @@ namespace fs {
 		}
 	}
 
-	void FileSystem::ReadFile(const FunctionCallbackInfo<Value> &args)
+	void FileSystem::Open(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
@@ -49,6 +60,117 @@ namespace fs {
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
-	
+
+	void FileSystem::Close(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::Read(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::Unlink(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::Mkdir(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::Write(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::FStat(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::Rename(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::FSync(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::FTruncate(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::Copy(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void FileSystem::SendFile(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+
 }
 }	

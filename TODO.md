@@ -43,6 +43,8 @@ to run an "app"
 - uses platform stdlib
 
 ## NEXT
+- openssl engine selection: https://wiki.openssl.org/index.php/Command_Line_Utilities
+- fips mode for openssl: https://wiki.openssl.org/index.php/FIPS_mode_set()
 - make context_init and context_free in socket module thread safe, without locks if possible
 - liblxc module
 - postgres module?

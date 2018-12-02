@@ -4,6 +4,212 @@ namespace dv8 {
 
 namespace openssl {
 
+	void Hmac::Init(Local<Object> exports) {
+		Isolate* isolate = exports->GetIsolate();
+		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
+	
+		tpl->SetClassName(String::NewFromUtf8(isolate, "Hmac"));
+		tpl->InstanceTemplate()->SetInternalFieldCount(1);
+	
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", Hmac::Setup);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "create", Hmac::Create);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "update", Hmac::Update);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "digest", Hmac::Digest);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "free", Hmac::Free);
+	
+		DV8_SET_EXPORT(isolate, tpl, "Hmac", exports);
+	}
+
+	void Hmac::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		Hmac* obj = static_cast<Hmac *>(wrap);
+		HMAC_CTX_cleanup(obj->context);
+	}
+
+	void Hmac::New(const FunctionCallbackInfo<Value>& args) {
+		Isolate* isolate = args.GetIsolate();
+		HandleScope handle_scope(isolate);
+		if (args.IsConstructCall()) {
+			Hmac* obj = new Hmac();
+			obj->Wrap(args.This());
+			args.GetReturnValue().Set(args.This());
+		}
+	}
+
+	void Hmac::Setup(const FunctionCallbackInfo<Value>& args) {
+		Isolate* isolate = args.GetIsolate();
+		HandleScope handle_scope(isolate);
+		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
+		String::Utf8Value hash_type(isolate, args[0]);
+		const EVP_MD* md = EVP_get_digestbyname(*hash_type);
+		if (obj->context == nullptr) {
+			obj->context = (HMAC_CTX *)calloc(1, sizeof(HMAC_CTX));
+		} else {
+			HMAC_CTX_cleanup(obj->context);
+		}
+		HMAC_CTX_init(obj->context);
+		String::Utf8Value key(isolate, args[1]);
+		HMAC_Init_ex(obj->context, *key, strlen(*key), md, nullptr);
+		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
+		size_t len = b->_length;
+		obj->in = uv_buf_init((char *)b->_data, len);
+		b = ObjectWrap::Unwrap<Buffer>(args[3].As<v8::Object>());
+		len = b->_length;
+		obj->out = uv_buf_init((char *)b->_data, len);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Hmac::Create(const FunctionCallbackInfo<Value>& args) {
+		Isolate* isolate = args.GetIsolate();
+		HandleScope handle_scope(isolate);
+		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
+		HMAC_Init_ex(obj->context, nullptr, 0, nullptr, nullptr);
+		int argc = args.Length();
+		if (argc > 0) {
+			Local<Context> context = isolate->GetCurrentContext();
+			uint32_t len = args[0]->Uint32Value(context).ToChecked();
+			char* data = obj->in.base;
+			int r = HMAC_Update(obj->context, reinterpret_cast<const unsigned char*>(data), len);
+			args.GetReturnValue().Set(Integer::New(isolate, r));
+			return;
+		}
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Hmac::Update(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		uint32_t len = args[0]->Uint32Value(context).ToChecked();
+		char* data = obj->in.base;
+		int r = HMAC_Update(obj->context, reinterpret_cast<const unsigned char*>(data), len);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
+	}
+
+	void Hmac::Free(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		HMAC_CTX_cleanup(obj->context);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Hmac::Digest(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		unsigned int md_len = 0;
+		unsigned char* data = (unsigned char*)obj->out.base;
+    HMAC_Final(obj->context, data, &md_len);
+		args.GetReturnValue().Set(Integer::New(isolate, md_len));
+	}
+
+	void Hash::Init(Local<Object> exports) {
+		Isolate* isolate = exports->GetIsolate();
+		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
+	
+		tpl->SetClassName(String::NewFromUtf8(isolate, "Hash"));
+		tpl->InstanceTemplate()->SetInternalFieldCount(1);
+	
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", Hash::Setup);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "create", Hash::Create);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "update", Hash::Update);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "digest", Hash::Digest);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "free", Hash::Free);
+	
+		DV8_SET_EXPORT(isolate, tpl, "Hash", exports);
+	}
+
+	void Hash::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		Hash* obj = static_cast<Hash *>(wrap);
+		EVP_MD_CTX_cleanup(obj->context);
+	}
+
+	void Hash::New(const FunctionCallbackInfo<Value>& args) {
+		Isolate* isolate = args.GetIsolate();
+		HandleScope handle_scope(isolate);
+		if (args.IsConstructCall()) {
+			Hash* obj = new Hash();
+			obj->Wrap(args.This());
+			args.GetReturnValue().Set(args.This());
+		}
+	}
+
+	void Hash::Setup(const FunctionCallbackInfo<Value>& args) {
+		Isolate* isolate = args.GetIsolate();
+		HandleScope handle_scope(isolate);
+		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
+		String::Utf8Value hash_type(isolate, args[0]);
+		obj->md = EVP_get_digestbyname(*hash_type);
+		if (obj->context == nullptr) {
+			obj->context = (EVP_MD_CTX *)calloc(1, sizeof(EVP_MD_CTX));
+		} else {
+			EVP_MD_CTX_cleanup(obj->context);
+		}
+		EVP_MD_CTX_init(obj->context);
+		EVP_DigestInit_ex(obj->context, obj->md, nullptr);
+		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
+		size_t len = b->_length;
+		obj->in = uv_buf_init((char *)b->_data, len);
+		b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
+		len = b->_length;
+		obj->out = uv_buf_init((char *)b->_data, len);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Hash::Create(const FunctionCallbackInfo<Value>& args) {
+		Isolate* isolate = args.GetIsolate();
+		HandleScope handle_scope(isolate);
+		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
+		EVP_DigestInit_ex(obj->context, obj->md, nullptr);
+		int argc = args.Length();
+		if (argc > 0) {
+			Local<Context> context = isolate->GetCurrentContext();
+			uint32_t len = args[0]->Uint32Value(context).ToChecked();
+			char* data = obj->in.base;
+			int r = EVP_DigestUpdate(obj->context, reinterpret_cast<const unsigned char*>(data), len);
+			args.GetReturnValue().Set(Integer::New(isolate, r));
+			return;
+		}
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Hash::Free(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		EVP_MD_CTX_cleanup(obj->context);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Hash::Update(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		uint32_t len = args[0]->Uint32Value(context).ToChecked();
+		char* data = obj->in.base;
+		int r = EVP_DigestUpdate(obj->context, reinterpret_cast<const unsigned char*>(data), len);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
+	}
+
+	void Hash::Digest(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
+		v8::HandleScope handleScope(isolate);
+		unsigned int md_len = 0;
+		unsigned char* data = (unsigned char*)obj->out.base;
+    EVP_DigestFinal_ex(obj->context, data, &md_len);
+		args.GetReturnValue().Set(Integer::New(isolate, md_len));
+	}
+
+
 	void SecureContext::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);

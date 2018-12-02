@@ -37,7 +37,7 @@ void on_handle_close(uv_handle_t *h) {
 
 void shutdown(uv_loop_t *loop) {
   uv_walk(loop, [](uv_handle_t *handle, void *arg) {
-    fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
+    //fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
     uv_close(handle, on_handle_close);
   }, NULL);
 }

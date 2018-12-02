@@ -1,28 +1,44 @@
 const { Timer } = module('timer', {})
+const { createServer, TCP } = require('./lib/http.js')
 
 const timers = []
+const getTimer = () => (timers.shift() || new Timer())
+const sleep = (ms, timer) => new Promise(resolve => timer.start(() => resolve(), ms))
 
-function getTimer() {
-  if (timers.length) return timers.shift()
-  return new Timer()
+const startServer = options => {
+  const server = createServer((req, res) => {
+    req.onEnd(async () => {
+      const timer = getTimer()
+      const payload = JSON.stringify(process.env)
+      res.contentLength = payload.length
+      res.setHeader('Content-Type', 'text/plain; charset=UTF-8')
+      await sleep(10, timer)
+      res.writeString(payload.slice(0, 100))
+      await sleep(10, timer)
+      res.writeString(payload.slice(100, 200))
+      await sleep(30, timer)
+      res.writeString(payload.slice(200))
+      timers.push(timer)
+    })
+  }, options)
+
+  const ok = server.listen()
+  if (ok !== 0) throw new Error('Listen Failed')
+
+  server.onConnect((sock, context) => {
+    conn++
+  })
+
+  server.onDisconnect((sock, context) => {
+    conn--
+  })
+
+  // const { now, sock, defaults, opts, contexts } = server  
 }
 
-const sleep = ms => new Promise(resolve => {
-  const timer = getTimer()
-  timer.start(() => {
-    timers.push(timer)
-    resolve()
-  }, ms)
+startServer({
+  type: TCP,
+  serverName: 'foo',
+  address: '0.0.0.0',
+  port: 3000
 })
-
-require('./lib/http.js').createServer(async (req, res) => {
-  const payload = JSON.stringify(process.env)
-  res.contentLength = payload.length
-  res.setHeader('Content-Type', 'text/plain; charset=UTF-8')
-  await sleep(200)
-  res.writeString(payload.slice(0, 100))
-  await sleep(400)
-  res.writeString(payload.slice(100, 200))
-  await sleep(400)
-  res.writeString(payload.slice(200))
-}).listen()

@@ -12,7 +12,9 @@ namespace openssl {
 		static std::atomic<uint64_t> inits{0};
 		inits++;
 		int loads = inits.load();
-		fprintf(stderr, "inited: %i\n", loads);
+		//fprintf(stderr, "inited: %i\n", loads);
+		Hash::Init(exports);
+		Hmac::Init(exports);
 		SecureContext::Init(exports);
 		SecureSocket::Init(exports);
 		if (loads == 1) {

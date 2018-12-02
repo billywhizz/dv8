@@ -1,4 +1,4 @@
-const { UV_TTY_MODE_RAW, UV_TTY_MODE_NORMAL, TTY } = module('tty', {})
+const { UV_TTY_MODE_NORMAL, TTY } = module('tty', {})
 const { start, stop } = require('./meter.js')
 
 const stdin = new TTY(0)

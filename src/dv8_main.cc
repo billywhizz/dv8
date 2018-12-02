@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
       uv_tty_reset_mode();
       int r = uv_loop_close(uv_default_loop());
       if (r != 0) {
-        fprintf(stderr, "uv_loop_close: %i\n", r);
+        //fprintf(stderr, "uv_loop_close: %i\n", r);
       }
 
     }

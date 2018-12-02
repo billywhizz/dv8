@@ -4,7 +4,7 @@ const SIZE = parseInt(process.args[2] || '16384')
 const [rb, wb] = [Buffer.alloc(SIZE), Buffer.alloc(SIZE)]
 const stats = new BigUint64Array(20)
 
-function dumpStats(name) {
+function dumpStats (name) {
   print(`${name}
 close            : ${stats[0]}
 error            : ${stats[1]}
@@ -61,9 +61,7 @@ client.onClose(() => {
 
 client.open(fd)
 
-let then = Date.now()
-
-function toMib(bytes) {
+function toMib (bytes) {
   return (((bytes * 8n) / (1024n * 1024n)) * 100n) / 100n
 }
 
@@ -71,9 +69,7 @@ const last = {
   clientRead: 0n, clientWrite: 0n, serverRead: 0n, serverWrite: 0n
 }
 
-const timer = setInterval(() => {
-  const now = Date.now()
-  const elapsed = now - then
+setInterval(() => {
   client.stats(stats)
   const clientRead = stats[2]
   const clientWrite = stats[10]
@@ -91,5 +87,4 @@ server.write: ${toMib(serverWrite - last.serverWrite)}
   last.clientWrite = clientWrite
   last.serverRead = serverRead
   last.serverWrite = serverWrite
-  then = Date.now()
 }, 1000)

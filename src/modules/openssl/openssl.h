@@ -8,6 +8,7 @@
 #include <openssl/ssl.h>
 #include <openssl/conf.h>
 #include <openssl/engine.h>
+#include <openssl/hmac.h>
 
 namespace dv8 {
 
@@ -27,6 +28,7 @@ using v8::String;
 using v8::Value;
 using v8::Array;
 using dv8::builtins::Environment;
+using dv8::builtins::Buffer;
 using dv8::socket::Socket;
 using dv8::socket::socket_plugin;
 
@@ -51,6 +53,61 @@ static void on_plugin_close(void* obj);
 extern int VerifyCallback(int preverify_ok, X509_STORE_CTX* ctx);
 static int TLSExtStatusCallback(SSL* s, void* arg);
 static int SelectSNIContextCallback(SSL* s, int* ad, void* arg);
+
+class Hmac : public dv8::ObjectWrap {
+	public:
+		static void Init(v8::Local<v8::Object> exports);
+
+	protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
+	private:
+
+		Hmac() {
+		}
+
+		~Hmac() {
+		}
+
+		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Create(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Update(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Digest(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Free(const v8::FunctionCallbackInfo<v8::Value>& args);
+		HMAC_CTX* context;
+		uv_buf_t in;
+		uv_buf_t out;
+
+};
+
+class Hash : public dv8::ObjectWrap {
+	public:
+		static void Init(v8::Local<v8::Object> exports);
+
+	protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
+	private:
+
+		Hash() {
+		}
+
+		~Hash() {
+		}
+
+		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Create(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Update(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Digest(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Free(const v8::FunctionCallbackInfo<v8::Value>& args);
+		EVP_MD_CTX* context;
+		const EVP_MD* md;
+		uv_buf_t in;
+		uv_buf_t out;
+
+};
 
 class SecureContext : public dv8::ObjectWrap {
 	public:
