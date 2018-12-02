@@ -151,7 +151,7 @@ void start_context(uv_work_t *req)
 		}
 		int r = uv_loop_close(loop);
 		if (r != 0) {
-			fprintf(stderr, "uv_thread_loop_close: %i\n", r);
+			// fprintf(stderr, "uv_thread_loop_close: %i\n", r);
 		}
 	}
 	//isolate->Terminate(); ?? when do we use terminate?

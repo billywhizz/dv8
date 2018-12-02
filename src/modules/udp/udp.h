@@ -16,6 +16,7 @@ class UDP : public dv8::ObjectWrap {
 		v8::Persistent<v8::Function> onMessage;
 		v8::Persistent<v8::Function> onError;
 		v8::Persistent<v8::Function> onClose;
+		v8::Persistent<v8::Function> onSend;
 
 	private:
 
@@ -38,6 +39,7 @@ class UDP : public dv8::ObjectWrap {
 		static void OnMessage(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnError(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnClose(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void OnSend(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

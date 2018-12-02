@@ -19,6 +19,16 @@ namespace udp {
 	using dv8::builtins::Buffer;
 	using dv8::builtins::Environment;
 
+	void after_send(uv_udp_send_t* req, int status) {
+		Isolate *isolate = Isolate::GetCurrent();
+		v8::HandleScope handleScope(isolate);
+		UDP *obj = (UDP *)req->handle->data;
+		Local<Value> argv[1] = { Number::New(isolate, status) };
+		Local<Function> onSend = Local<Function>::New(isolate, obj->onSend);
+		onSend->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+		free(req);
+	}
+
 	void after_read(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr* addr, unsigned flags) {
 		Isolate *isolate = Isolate::GetCurrent();
 		v8::HandleScope handleScope(isolate);
@@ -70,6 +80,7 @@ namespace udp {
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onMessage", UDP::OnMessage);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", UDP::OnError);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onClose", UDP::OnClose);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onSend", UDP::OnSend);
 
 		DV8_SET_EXPORT(isolate, tpl, "UDP", exports);
 	}
@@ -92,9 +103,9 @@ namespace udp {
 	void UDP::Open(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
-		v8::HandleScope handleScope(isolate);
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
@@ -102,9 +113,9 @@ namespace udp {
 	void UDP::Send(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
-		v8::HandleScope handleScope(isolate);
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
 		uint32_t len = args[0]->Uint32Value(context).ToChecked();
     String::Utf8Value str(args.GetIsolate(), args[1]);
@@ -115,17 +126,17 @@ namespace udp {
 		uv_udp_send_t* message = (uv_udp_send_t*)calloc(1, sizeof(uv_udp_send_t));
 		uv_buf_t buf;
 		buf.base = obj->out.base;
-		buf.len = obj->out.len;
-		int r = uv_udp_send(message, obj->handle, &buf, 1, (const struct sockaddr *)&addr, 0);
+		buf.len = len;
+		int r = uv_udp_send(message, obj->handle, &buf, 1, (const struct sockaddr *)&addr, after_send);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void UDP::Setup(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
-		v8::HandleScope handleScope(isolate);
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
 
 		Buffer* b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
@@ -139,25 +150,25 @@ namespace udp {
 	void UDP::Bind(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
-		v8::HandleScope handleScope(isolate);
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
     String::Utf8Value str(args.GetIsolate(), args[0]);
     const unsigned int port = args[1]->IntegerValue(context).ToChecked();
     const char *ip_address = *str;
     struct sockaddr_in addr;
     uv_ip4_addr(ip_address, port, &addr);
-    int r = uv_udp_bind(obj->handle, (const struct sockaddr *)&addr, 0);
+    int r = uv_udp_bind(obj->handle, (const struct sockaddr *)&addr, UV_UDP_REUSEADDR);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void UDP::Start(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
-		v8::HandleScope handleScope(isolate);
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
     int r = uv_udp_recv_start(obj->handle, alloc_chunk, after_read);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -166,9 +177,9 @@ namespace udp {
 	void UDP::Stop(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
-		v8::HandleScope handleScope(isolate);
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
     int r = uv_udp_recv_stop(obj->handle);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -177,9 +188,9 @@ namespace udp {
 	void UDP::Close(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
-		v8::HandleScope handleScope(isolate);
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
     uv_handle_t *handle = (uv_handle_t *)obj->handle;
     uv_close(handle, on_close);
@@ -213,6 +224,16 @@ namespace udp {
 		if (args[0]->IsFunction()) {
 			Local<Function> onMessage = Local<Function>::Cast(args[0]);
 			obj->onMessage.Reset(isolate, onMessage);
+		}
+	}
+
+	void UDP::OnSend(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
+		if (args[0]->IsFunction()) {
+			Local<Function> onSend = Local<Function>::Cast(args[0]);
+			obj->onSend.Reset(isolate, onSend);
 		}
 	}
 
