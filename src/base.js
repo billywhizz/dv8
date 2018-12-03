@@ -142,6 +142,7 @@ function setInterval (fn, repeat) {
 
 function clearTimeout (t) {
   t.stop()
+  t.close()
 }
 
 const GlobalBuffer = global.Buffer
@@ -200,7 +201,7 @@ global.setTimeout = setTimeout
 global.setInterval = setInterval
 global.clearTimeout = clearTimeout
 global.clearInterval = clearTimeout
-global.console = { log: global.print }
+global.console = { log: global.print, error: global.print, dir: o => print(JSON.stringify(o, null, '  ')) }
 global.process = process
 
 process.runMicroTasks = () => _process.runMicroTasks()
@@ -230,6 +231,7 @@ const nextTick = fn => {
   })
   idleActive = true
 }
+// TODO: rename this as it's not the same as node.js nextTick
 process.nextTick = nextTick
 
 if (global.workerData) {
@@ -308,6 +310,7 @@ if (global.workerData) {
     view.setUint32(envJSON.length + 9, argsJSON.length)
     thread.buffer.write(argsJSON, envJSON.length + 13)
     threads[thread.id] = thread
+    // TODO: do we need nextTick here? for the ipc socket ?
     nextTick(() => {
       thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
     })

@@ -43,6 +43,9 @@ to run an "app"
 - uses platform stdlib
 
 ## NEXT
+- allow different "runtimes" to be selected - override base
+    - can have tailored runtimes for different needs 
+- buffers and sharing across threads
 - unbound module: https://linux.die.net/man/3/libunbound, https://www.npmjs.com/package/unbound
 - http://www.yonch.com/uncategorized/dns-resolver-libraries
 - https://en.wikipedia.org/wiki/DNS_over_TLS
@@ -60,7 +63,6 @@ samples - 2 days
 docs - 3 days
 tests - 10 days
 refactor and cleanup - 10 days
-
 - openssl engine selection: https://wiki.openssl.org/index.php/Command_Line_Utilities
 - fips mode for openssl: https://wiki.openssl.org/index.php/FIPS_mode_set()
 - frame-based ipc for multiplexing

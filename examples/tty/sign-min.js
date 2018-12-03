@@ -7,6 +7,16 @@ const hmac = new Hmac()
 hmac.setup('sha512', 'mybigsecret', buf, buf)
 hmac.create()
 stdin.setup(buf, UV_TTY_MODE_NORMAL)
-stdin.onEnd(() => print(buf2hex(buf.bytes, hmac.digest())))
+stdin.onEnd(() => {
+  const hex = buf2hex(buf.bytes, hmac.digest())
+  print(hex)
+  if (process.args.length > 2) {
+    if (process.args[2] !== hex) {
+      print('signature does not match')
+      return
+    }
+    print('signature matches')
+  }
+})
 stdin.onRead(len => hmac.update(len))
 stdin.resume()

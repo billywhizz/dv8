@@ -7,6 +7,7 @@ namespace fs {
 
 	void InitAll(Local<Object> exports) {
 		FileSystem::Init(exports);
+		File::Init(exports);
 	}
 }
 }

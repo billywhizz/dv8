@@ -55,6 +55,7 @@ void Buffer::New(const FunctionCallbackInfo<Value> &args)
   }
 }
 
+// TODO: figure out how to do shared buffers across threads
 void Buffer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   Isolate *isolate = data.GetIsolate();
   v8::HandleScope handleScope(isolate);
