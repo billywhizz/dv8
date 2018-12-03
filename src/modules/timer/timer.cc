@@ -88,7 +88,7 @@ void Timer::Stop(const FunctionCallbackInfo<Value> &args)
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
-    //t->onTimeout.Reset();
+    t->onTimeout.Reset();
     int r = uv_timer_stop(t->handle);
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }

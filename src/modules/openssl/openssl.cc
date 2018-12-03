@@ -26,6 +26,9 @@ namespace openssl {
 		ObjectWrap *wrap = data.GetParameter();
 		Hmac* obj = static_cast<Hmac *>(wrap);
 		HMAC_CTX_cleanup(obj->context);
+		free(obj->in);
+		free(obj->out);
+		free(obj->context);
 	}
 
 	void Hmac::New(const FunctionCallbackInfo<Value>& args) {
@@ -34,6 +37,9 @@ namespace openssl {
 		if (args.IsConstructCall()) {
 			Hmac* obj = new Hmac();
 			obj->Wrap(args.This());
+			obj->context = (HMAC_CTX *)calloc(1, sizeof(HMAC_CTX));
+			obj->in = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
+			obj->out = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
 			args.GetReturnValue().Set(args.This());
 		}
 	}
@@ -44,20 +50,16 @@ namespace openssl {
 		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
 		String::Utf8Value hash_type(isolate, args[0]);
 		const EVP_MD* md = EVP_get_digestbyname(*hash_type);
-		if (obj->context == nullptr) {
-			obj->context = (HMAC_CTX *)calloc(1, sizeof(HMAC_CTX));
-		} else {
-			HMAC_CTX_cleanup(obj->context);
-		}
 		HMAC_CTX_init(obj->context);
 		String::Utf8Value key(isolate, args[1]);
 		HMAC_Init_ex(obj->context, *key, strlen(*key), md, nullptr);
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
-		size_t len = b->_length;
-		obj->in = uv_buf_init((char *)b->_data, len);
+		obj->in->base = (char*)b->_data;
+		obj->in->len = b->_length;
 		b = ObjectWrap::Unwrap<Buffer>(args[3].As<v8::Object>());
-		len = b->_length;
-		obj->out = uv_buf_init((char *)b->_data, len);
+		obj->out->base = (char*)b->_data;
+		obj->out->len = b->_length;
+		//EVP_cleanup();
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -70,7 +72,7 @@ namespace openssl {
 		if (argc > 0) {
 			Local<Context> context = isolate->GetCurrentContext();
 			uint32_t len = args[0]->Uint32Value(context).ToChecked();
-			char* data = obj->in.base;
+			char* data = obj->in->base;
 			int r = HMAC_Update(obj->context, reinterpret_cast<const unsigned char*>(data), len);
 			args.GetReturnValue().Set(Integer::New(isolate, r));
 			return;
@@ -84,7 +86,7 @@ namespace openssl {
 		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		uint32_t len = args[0]->Uint32Value(context).ToChecked();
-		char* data = obj->in.base;
+		char* data = obj->in->base;
 		int r = HMAC_Update(obj->context, reinterpret_cast<const unsigned char*>(data), len);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
@@ -102,7 +104,7 @@ namespace openssl {
 		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
 		v8::HandleScope handleScope(isolate);
 		unsigned int md_len = 0;
-		unsigned char* data = (unsigned char*)obj->out.base;
+		unsigned char* data = (unsigned char*)obj->out->base;
     HMAC_Final(obj->context, data, &md_len);
 		args.GetReturnValue().Set(Integer::New(isolate, md_len));
 	}
@@ -129,6 +131,10 @@ namespace openssl {
 		ObjectWrap *wrap = data.GetParameter();
 		Hash* obj = static_cast<Hash *>(wrap);
 		EVP_MD_CTX_cleanup(obj->context);
+		free(obj->in);
+		free(obj->out);
+		free(obj->context);
+		//EVP_cleanup();
 	}
 
 	void Hash::New(const FunctionCallbackInfo<Value>& args) {
@@ -137,6 +143,9 @@ namespace openssl {
 		if (args.IsConstructCall()) {
 			Hash* obj = new Hash();
 			obj->Wrap(args.This());
+			obj->context = (EVP_MD_CTX *)calloc(1, sizeof(EVP_MD_CTX));
+			obj->in = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
+			obj->out = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
 			args.GetReturnValue().Set(args.This());
 		}
 	}
@@ -147,19 +156,14 @@ namespace openssl {
 		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
 		String::Utf8Value hash_type(isolate, args[0]);
 		obj->md = EVP_get_digestbyname(*hash_type);
-		if (obj->context == nullptr) {
-			obj->context = (EVP_MD_CTX *)calloc(1, sizeof(EVP_MD_CTX));
-		} else {
-			EVP_MD_CTX_cleanup(obj->context);
-		}
 		EVP_MD_CTX_init(obj->context);
 		EVP_DigestInit_ex(obj->context, obj->md, nullptr);
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
-		size_t len = b->_length;
-		obj->in = uv_buf_init((char *)b->_data, len);
+		obj->in->base = (char*)b->_data;
+		obj->in->len = b->_length;
 		b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
-		len = b->_length;
-		obj->out = uv_buf_init((char *)b->_data, len);
+		obj->out->base = (char*)b->_data;
+		obj->out->len = b->_length;
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -172,7 +176,7 @@ namespace openssl {
 		if (argc > 0) {
 			Local<Context> context = isolate->GetCurrentContext();
 			uint32_t len = args[0]->Uint32Value(context).ToChecked();
-			char* data = obj->in.base;
+			char* data = obj->in->base;
 			int r = EVP_DigestUpdate(obj->context, reinterpret_cast<const unsigned char*>(data), len);
 			args.GetReturnValue().Set(Integer::New(isolate, r));
 			return;
@@ -194,7 +198,7 @@ namespace openssl {
 		v8::HandleScope handleScope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
 		uint32_t len = args[0]->Uint32Value(context).ToChecked();
-		char* data = obj->in.base;
+		char* data = obj->in->base;
 		int r = EVP_DigestUpdate(obj->context, reinterpret_cast<const unsigned char*>(data), len);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
@@ -204,7 +208,7 @@ namespace openssl {
 		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
 		v8::HandleScope handleScope(isolate);
 		unsigned int md_len = 0;
-		unsigned char* data = (unsigned char*)obj->out.base;
+		unsigned char* data = (unsigned char*)obj->out->base;
     EVP_DigestFinal_ex(obj->context, data, &md_len);
 		args.GetReturnValue().Set(Integer::New(isolate, md_len));
 	}

@@ -76,8 +76,8 @@ class Hmac : public dv8::ObjectWrap {
 		static void Digest(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Free(const v8::FunctionCallbackInfo<v8::Value>& args);
 		HMAC_CTX* context;
-		uv_buf_t in;
-		uv_buf_t out;
+		uv_buf_t* in;
+		uv_buf_t* out;
 
 };
 
@@ -104,8 +104,8 @@ class Hash : public dv8::ObjectWrap {
 		static void Free(const v8::FunctionCallbackInfo<v8::Value>& args);
 		EVP_MD_CTX* context;
 		const EVP_MD* md;
-		uv_buf_t in;
-		uv_buf_t out;
+		uv_buf_t* in;
+		uv_buf_t* out;
 
 };
 

@@ -43,15 +43,37 @@ to run an "app"
 - uses platform stdlib
 
 ## NEXT
+- unbound module: https://linux.die.net/man/3/libunbound, https://www.npmjs.com/package/unbound
+- http://www.yonch.com/uncategorized/dns-resolver-libraries
+- https://en.wikipedia.org/wiki/DNS_over_TLS
+- https://en.wikipedia.org/wiki/Datagram_Transport_Layer_Security
+- https://github.com/Rantanen/node-dtls
+- https://github.com/krekeltronics/node-mbed-dtls/tree/master/src
+- https://github.com/nodertc/dtls
+- buffer from/to uint8array
+udp complete - 1 day
+event loop complete - 1 day
+fs complete - 2 days
+process/spawn - 2 days
+thread - 2 days
+samples - 2 days
+docs - 3 days
+tests - 10 days
+refactor and cleanup - 10 days
+
 - openssl engine selection: https://wiki.openssl.org/index.php/Command_Line_Utilities
 - fips mode for openssl: https://wiki.openssl.org/index.php/FIPS_mode_set()
-- make context_init and context_free in socket module thread safe, without locks if possible
+- frame-based ipc for multiplexing
 - liblxc module
+- finalize module loading/caching
 - postgres module?
+- lmdb
+- raft: https://github.com/hashicorp/raft
 - lldb ?
 - sync fs module
 - file stream from separate thread
 - use pthreads instead of uv_queue_work for threaded isolates - can spin up as many as we need to
+    - would have to do something similar to uv_queue_work to do callback in main thread
 - fix segfault in ByteServer when socket closes unexpectedly
 - refactor socket plugins - handle openssl module write correctly - get fetch2 and ByteServer working in TLS mode
 ```bash
