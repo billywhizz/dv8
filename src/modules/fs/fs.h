@@ -24,6 +24,7 @@ class File : public dv8::ObjectWrap {
 		uv_buf_t out;
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 		static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -45,6 +46,7 @@ class FileSystem : public dv8::ObjectWrap {
 		}
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 		static void Unlink(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Mkdir(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void FStat(const v8::FunctionCallbackInfo<v8::Value>& args);
