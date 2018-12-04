@@ -135,11 +135,15 @@ namespace loop {
 		Isolate *isolate = Isolate::GetCurrent();
 		EventLoop *obj = (EventLoop *)handle->data;
 		v8::HandleScope handleScope(isolate);
-        if (obj->callbacks.onIdle == 1) {
-            Local<Value> argv[0] = {};
-            Local<Function> Callback = Local<Function>::New(isolate, obj->onIdle);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
-        }
+		if (obj->callbacks.onIdle == 1) {
+				Local<Value> argv[0] = {};
+				Local<Function> Callback = Local<Function>::New(isolate, obj->onIdle);
+				v8::TryCatch try_catch(isolate);
+				Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+				if (try_catch.HasCaught()) {
+					dv8::ReportException(isolate, &try_catch);
+				}
+		}
 	}
 
 	void on_prepare(uv_prepare_t* handle) {

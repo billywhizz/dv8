@@ -109,19 +109,46 @@ const heap = [
   new Float64Array(4)
 ]
 
+Error.stackTraceLimit = Infinity
+
+Error.prepareStackTrace = (err, stack) => {
+  err.stack = []
+  for (const callsite of stack) {
+    const typeName = callsite.getTypeName()
+    const functionName = callsite.getFunctionName()
+    const methodName = callsite.getMethodName()
+    const fileName = callsite.getFileName()
+    const lineNumber = callsite.getLineNumber()
+    const columnNumber = callsite.getColumnNumber()
+    const isToplevel = callsite.isToplevel()
+    const isEval = callsite.isEval()
+    const isNative = callsite.isEval()
+    const isConstructor = callsite.isConstructor()
+    err.stack.push({ typeName, functionName, methodName, fileName, lineNumber, columnNumber, isToplevel, isEval, isNative, isConstructor })
+  }
+}
+
 global.onUncaughtException = err => {
   print('onUncaughtException:')
   const keys = Object.getOwnPropertyNames(err)
   for (const key of keys) {
-    print(`${key}: ${err[key]}`)
+    if (key === 'stack') {
+      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${JSON.stringify(err[key], null, '  ')}`)
+    } else {
+      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${err[key]}`)
+    }
   }
 }
 
-global.onUnhandledRejection(err => {
+global.onUnhandledRejection((promise, value, eventType) => {
   print('onUnhandledRejection:')
-  const keys = Object.getOwnPropertyNames(err)
+  const keys = Object.getOwnPropertyNames(value)
   for (const key of keys) {
-    print(`${key}: ${err[key]}`)
+    if (key === 'stack') {
+      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${JSON.stringify(value[key], null, '  ')}`)
+    } else {
+      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${value[key]}`)
+    }
   }
 })
 
@@ -223,7 +250,14 @@ const nextTick = fn => {
   loop.onIdle(() => {
     process.ticks++
     let len = queue.length
-    while (len--) queue.shift()()
+    while (len--) {
+      const fun = queue.shift()
+      try {
+        fun()
+      } catch (err) {
+        throw (err)
+      }
+    }
     if (!queue.length) {
       idleActive = false
       loop.onIdle()

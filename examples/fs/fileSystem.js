@@ -9,6 +9,7 @@ function readFile (path, opts = {}, file = null) {
     file.open(path, O_RDONLY)
     file.size = 0
     file.paused = true
+    file.buf = buf
     file.pause = () => (file.paused = true)
     file.resume = () => {
       file.paused = false

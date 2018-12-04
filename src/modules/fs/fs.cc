@@ -74,6 +74,8 @@ namespace fs {
 			flags = args[1]->Int32Value(context).ToChecked();
 		}
 		int fd = uv_fs_open(env->loop, &obj->req, *filename, flags, 0, NULL);
+		//uv_ref((uv_handle_t*)obj->req);
+
 		args.GetReturnValue().Set(Integer::New(isolate, fd));
 	}
 

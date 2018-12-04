@@ -43,6 +43,15 @@ to run an "app"
 - uses platform stdlib
 
 ## NEXT
+- inspector protocol
+- commands to run dns lookup without installing anything except docker
+```bash
+docker run -it --net=host --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/out/lib:/usr/local/lib -v $(pwd)/examples:/app dv8 dv8 ./udp/dns3.js
+docker run -it --net=host --rm -v $(pwd):/app dv8 dv8 ./dns.js api.billywhizz.io
+```
+- DNS: http://www.zytrax.com/books/dns/ch15/#qtype
+  - https://routley.io/tech/2017/12/28/hand-writing-dns-messages.html
+  - https://www2.cs.duke.edu/courses/fall16/compsci356/DNS/DNS-primer.pdf
 - allow different "runtimes" to be selected - override base
     - can have tailored runtimes for different needs 
 - buffers and sharing across threads

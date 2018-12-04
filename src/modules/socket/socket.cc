@@ -267,7 +267,11 @@ void on_connection(uv_stream_t *server, int status)
   if (s->callbacks.onConnect == 1) {
       Local<Value> argv[0] = {};
       Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
+      v8::TryCatch try_catch(isolate);
       Local<Value> result = foo->Call(context->Global(), 0, argv);
+      if (try_catch.HasCaught()) {
+        dv8::ReportException(isolate, &try_catch);
+      }
       Local<Object> sock;
       bool ok = result->ToObject(context).ToLocal(&sock);
       Socket *s = ObjectWrap::Unwrap<Socket>(sock);
@@ -473,7 +477,11 @@ int onNewConnection(_context *ctx)
   {
     Local<Value> argv[0] = {};
     Local<Function> foo = Local<Function>::New(isolate, obj->_onConnect);
+    v8::TryCatch try_catch(isolate);
     foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    if (try_catch.HasCaught()) {
+      dv8::ReportException(isolate, &try_catch);
+    }
   }
   return 0;
 }

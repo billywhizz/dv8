@@ -1,5 +1,6 @@
 const { UDP } = module('udp', {})
 const sock = new UDP()
+
 const [ rb, wb ] = [ Buffer.alloc(4096), Buffer.alloc(4096) ]
 sock.setup(rb, wb)
 sock.bind('0.0.0.0', 30000)
