@@ -1,10 +1,10 @@
 function threadFunc () {
   const { Hash } = module('openssl', {})
   const { createServer } = require('./lib/http.js')
-  const { WSParser, createMessage } = require('./lib/websocket.js')
+  const { WSParser, createMessage, unmask } = require('./lib/websocket.js')
   const { buf2b64 } = require('./lib/util.js')
 
-  const [ wb, rb ] = [ Buffer.alloc(1 * 1024), Buffer.alloc(1 * 1024) ]
+  const [ wb, rb ] = [ Buffer.alloc(100), Buffer.alloc(100) ]
   const hash = new Hash()
   hash.setup('sha1', wb, rb)
 
@@ -20,17 +20,10 @@ function threadFunc () {
       if (req.upgrade) {
         const chunks = []
         const websocket = new WSParser()
-        process.onMessage(message => {
-          client.write(createMessage(context.out, message.payload))
-        })
+        process.onMessage(message => client.write(createMessage(context.out, message.payload)))
         websocket.onHeader = header => (chunks.length = 0)
         websocket.onChunk = (off, len, header) => {
-          let size = len
-          let pos = off
-          while (size--) {
-            bytes[pos] = bytes[pos] ^ header.maskkey[(pos - off) % 4]
-            pos++
-          }
+          if (header.mask) unmask(bytes, header.maskkey, off, len)
           chunks.push(context.in.read(off, len))
         }
         websocket.onMessage = header => {
@@ -54,9 +47,7 @@ function threadFunc () {
         res.setHeader('Connection', 'Upgrade')
         res.setHeader('Sec-WebSocket-Accept', buf2b64(rb, hash.digest()))
         res.end()
-        client.onRead(len => {
-          client.onRead(len => websocket.execute(bytes, 0, len))
-        })
+        client.onRead(len => client.onRead(len => websocket.execute(bytes, 0, len)))
         return
       }
       let payload
@@ -83,10 +74,7 @@ function threadFunc () {
           res.statusCode = 200
           res.version = '1.0'
           res.setHeader('Content-Type', 'application/json; charset=UTF-8')
-          payload = {
-            Browser: 'node.js/v10.10.0',
-            'Protocol-Version': '1.1'
-          }
+          payload = { Browser: 'node.js/v10.10.0', 'Protocol-Version': '1.1' }
           res.end(JSON.stringify(payload))
           break
         default:
@@ -112,10 +100,11 @@ module.exports = {
     global.onRunMessageLoop = () => {
       if (looping) return
       looping = true
-      process.loop.run(1)
+      process.loop.run(UV_RUN_ONCE)
       while (looping) {
         process.usleep(1000) // sleep for a millisecond
         process.loop.run(UV_RUN_ONCE) // run the loop once
+        process.runMicroTasks()
       }
     }
     global.onQuitMessageLoop = () => (looping = false)

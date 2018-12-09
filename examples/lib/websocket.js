@@ -57,7 +57,6 @@ function WSParser () {
             current.RSV3 = cbyte >> 4 & 0x01
             current.OpCode = cbyte & 0x0f
             current.maskkey = [0, 0, 0, 0]
-            current.payload = null
             break
           case 1:
             current.mask = cbyte >> 7 & 0x01
@@ -68,6 +67,10 @@ function WSParser () {
               _payload64 = true
             } else if (!current.length) {
               onMessage()
+            } else if (!current.mask) {
+              _inheader = false
+              bpos = 0
+              onHeader()
             }
             break
           case 2:
@@ -251,4 +254,13 @@ function createMessage (buf, str) {
   return str.length + startOffset
 }
 
-module.exports = { WSParser, createMessage }
+function unmask (bytes, maskkey, off, len) {
+  let size = len
+  let pos = off
+  while (size--) {
+    bytes[pos] = bytes[pos] ^ maskkey[(pos - off) % 4]
+    pos++
+  }
+}
+
+module.exports = { WSParser, createMessage, unmask }

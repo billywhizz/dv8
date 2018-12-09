@@ -177,6 +177,7 @@ global.Buffer = {
   alloc: size => {
     const buf = new GlobalBuffer()
     const ab = buf.alloc(size)
+    buf.size = size
     buf.bytes = ab
     return buf
   }
@@ -272,7 +273,6 @@ const nextTick = fn => {
 process.nextTick = nextTick
 
 if (global.workerData) {
-  const [rb, wb] = [Buffer.alloc(1024 * 1024), Buffer.alloc(1024 * 1024)]
   global.workerData.bytes = global.workerData.alloc()
   const dv = new DataView(global.workerData.bytes)
   process.TID = dv.getUint8(0)
@@ -286,6 +286,8 @@ if (global.workerData) {
   process.args = JSON.parse(argsJSON)
   delete global.workerData
   if (process.fd !== 0) {
+    const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
+    const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
     const sock = new Socket(UNIX)
     const parser = new Parser(rb, wb)
     sock.onConnect(() => {
@@ -294,7 +296,28 @@ if (global.workerData) {
     })
     parser.onMessage = message => sock.onMessage(message)
     process.send = o => sock.write(parser.write(o))
-    process.sendString = s => sock.write(parser.write(s, 2))
+    process.sendString = s => {
+/*
+      print(`process.sendString: ${s.length}`)
+      let len = s.length
+      let towrite = 0
+      if (len + 4 > wb.size) {
+        towrite = wb.size - 4
+        let off = 0
+        sock.write(parser.write(s.slice(off, towrite), 2))
+        len -= towrite
+        off += towrite
+        while (len) {
+          towrite = Math.min(len, wb.size)
+          sock.write(parser.write(s.slice(off, towrite), 2))
+          len -= towrite
+          off += towrite
+        }
+        return
+      }
+*/
+      sock.write(parser.write(s, 2))
+    }
     process.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
     sock.onRead(len => parser.read(len))
     sock.onEnd(() => sock.close())
@@ -313,7 +336,8 @@ if (global.workerData) {
     thread.buffer = Buffer.alloc(bufferSize)
     const view = new DataView(thread.buffer.bytes)
     if (opts.ipc) {
-      const [rb, wb] = [Buffer.alloc(1024 * 1024), Buffer.alloc(1024 * 1024)]
+      const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
+      const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
       const sock = new Socket(UNIX)
       const parser = new Parser(rb, wb)
       sock.onConnect(() => {
@@ -328,7 +352,9 @@ if (global.workerData) {
       }
       thread._onMessage = message => {}
       thread.send = o => sock.write(parser.write(o))
-      thread.sendString = s => sock.write(parser.write(s, 2))
+      thread.sendString = s => {
+        sock.write(parser.write(s, 2))
+      }
       thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
       const fd = sock.open()
       if (fd < 0) {
