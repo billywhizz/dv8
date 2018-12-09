@@ -21,6 +21,8 @@ private:
   static void HeapSpaceUsage(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void CPUUsage(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void HRTime(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Sleep(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void USleep(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void RunMicroTasks(const v8::FunctionCallbackInfo<v8::Value> &args);
 };
 

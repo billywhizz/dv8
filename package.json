@@ -14,7 +14,8 @@
     "parser": "babel-eslint"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docker-debug": "docker run -it --cap-add=NET_ADMIN --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/out/lib:/usr/local/lib -v $(pwd)/examples:/app -p 3000:3000 -p 9222:9222 dv8-debug dv8 app.js"
   },
   "repository": {
     "type": "git",

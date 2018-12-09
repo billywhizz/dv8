@@ -32,6 +32,8 @@ void Process::Init(Local<Object> exports) {
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "heapUsage", Process::HeapSpaceUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cpuUsage", Process::CPUUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hrtime", Process::HRTime);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "sleep", Process::Sleep);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "usleep", Process::USleep);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
   // spawn, kill, getTitle, setTitle, rss, uptime, rusage, ppid, interfaces, loadavg, exepath, cwd, chdir, homedir, tmpdir, passwd, memory, handles, hostname, getPriority, setPriority 
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
@@ -82,6 +84,22 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
 void Process::RunMicroTasks(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   isolate->RunMicrotasks();
+}
+
+void Process::Sleep(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  int seconds = args[0]->IntegerValue(context).ToChecked();
+  sleep(seconds);
+}
+
+void Process::USleep(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  int microseconds = args[0]->IntegerValue(context).ToChecked();
+  usleep(microseconds);
 }
 
 void Process::MemoryUsage(const FunctionCallbackInfo<Value> &args) {

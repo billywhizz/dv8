@@ -187,6 +187,9 @@ const process = {}
 const loop = new EventLoop()
 process.loop = loop
 
+process.sleep = seconds => _process.sleep(seconds)
+process.usleep = microseconds => _process.usleep(microseconds)
+
 process.cpuUsage = () => {
   _process.cpuUsage(cpu)
   return {
@@ -269,7 +272,7 @@ const nextTick = fn => {
 process.nextTick = nextTick
 
 if (global.workerData) {
-  const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
+  const [rb, wb] = [Buffer.alloc(1024 * 1024), Buffer.alloc(1024 * 1024)]
   global.workerData.bytes = global.workerData.alloc()
   const dv = new DataView(global.workerData.bytes)
   process.TID = dv.getUint8(0)
@@ -310,7 +313,7 @@ if (global.workerData) {
     thread.buffer = Buffer.alloc(bufferSize)
     const view = new DataView(thread.buffer.bytes)
     if (opts.ipc) {
-      const [rb, wb] = [Buffer.alloc(16384), Buffer.alloc(16384)]
+      const [rb, wb] = [Buffer.alloc(1024 * 1024), Buffer.alloc(1024 * 1024)]
       const sock = new Socket(UNIX)
       const parser = new Parser(rb, wb)
       sock.onConnect(() => {

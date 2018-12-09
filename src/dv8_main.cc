@@ -82,6 +82,7 @@ int main(int argc, char *argv[])
         dv8::ReportException(isolate, &try_catch);
         return 1;
       }
+      dv8::InspectorClient inspector_client(context, true);
       module->Evaluate(context);
 
       // Load main script

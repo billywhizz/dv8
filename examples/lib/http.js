@@ -1,19 +1,23 @@
 const { Socket, TCP, UNIX } = module('socket', {})
 const { HTTPParser, REQUEST } = module('httpParser', {})
 
-const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
+const methods = { 0: 'DELETE', 1: 'GET', 2: 'HEAD', 3: 'POST', 4: 'PUT', 6: 'OPTIONS', 28: 'PATCH' }
+
+const createServer = (callback, opts) => {
+  opts = Object.assign({ address: '127.0.0.1', port: 3000, type: TCP, serverName: 'dv8' }, opts)
   const contexts = []
-  const defaults = { 200: { message: 'OK' }, 400: { message: 'Bad Request' }, 404: { message: 'Not Found' } }
+  const defaults = { 200: { message: 'OK' }, 400: { message: 'Bad Request' }, 404: { message: 'Not Found' }, 101: { message: 'Switching Protocols' } }
   const server = new Socket(opts.type)
   let _onConnect
   let _onDisconnect
   let _onClose
+  const emptyFn = () => {}
   let now = (new Date()).toUTCString()
   const createContext = () => {
     if (contexts.length) return contexts.shift()
-    const work = Buffer.alloc(16384)
+    const work = Buffer.alloc(1024 * 1024)
     const parser = new HTTPParser()
-    const context = { in: Buffer.alloc(16384), out: Buffer.alloc(16384), work, parser, bytes: new Uint8Array(work.bytes), view: new DataView(work.bytes), client: null }
+    const context = { in: Buffer.alloc(1024 * 1024), out: Buffer.alloc(1024 * 1024), work, parser, bytes: new Uint8Array(work.bytes), view: new DataView(work.bytes), client: null }
     parser.setup(context.in, work)
     return context
   }
@@ -31,9 +35,10 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
       const urlLength = view.getUint16(5)
       const headerLength = view.getUint16(7)
       const str = work.read(16, 16 + urlLength + headerLength)
-      const request = { major: 1, minor: 1, method: 1, upgrade: 0, keepalive: 1, url: '', headers: '', onBody: fn => (request._onBody = fn), onEnd: fn => (request._onEnd = fn) }
+      const request = { major: 1, minor: 1, method: 1, upgrade: 0, keepalive: 1, url: '', headers: '', _onBody: emptyFn, _onEnd: emptyFn, onBody: fn => (request._onBody = fn), onEnd: fn => (request._onEnd = fn) }
       const response = {
         headers: [],
+        version: '1.1',
         headersSent: false,
         setHeader: (k, v) => {
           response.headers.push(`${k}: ${v}\r\n`)
@@ -46,13 +51,13 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
           if (client.closed) return
           let payload = chunk
           if (!response.headersSent) {
-            const { statusCode, contentLength } = response
+            const { version, statusCode, contentLength } = response
             const page = defaults[statusCode] || defaults[404]
             let clientHeaders = ''
             if (response.headers.length) {
               clientHeaders = response.headers.join('')
             }
-            payload = `HTTP/1.1 ${statusCode} ${page.message}\r\nServer: ${opts.serverName}\r\nDate: ${now}\r\nContent-Length: ${contentLength}\r\n${clientHeaders}\r\n${chunk || ''}`
+            payload = `HTTP/${version} ${statusCode} ${page.message}\r\nServer: ${opts.serverName}\r\nDate: ${now}\r\nContent-Length: ${contentLength}\r\n${clientHeaders}\r\n${chunk || ''}`
           }
           // TODO: buffer overrun
           const len = out.write(payload, 0)
@@ -64,9 +69,10 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
         },
         end: chunk => {
           const { client } = context
+          if (client.closed) return
           let payload = chunk
           if (!response.headersSent) {
-            const { statusCode } = response
+            const { statusCode, version } = response
             let { contentLength } = response
             if (contentLength === 0 && payload && payload.length) {
               contentLength = payload.length
@@ -76,7 +82,7 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
             if (response.headers.length) {
               clientHeaders = response.headers.join('')
             }
-            payload = `HTTP/1.1 ${statusCode} ${page.message}\r\nServer: ${opts.serverName}\r\nDate: ${now}\r\nContent-Length: ${contentLength}\r\n${clientHeaders}\r\n${chunk || ''}`
+            payload = `HTTP/${version} ${statusCode} ${page.message}\r\nServer: ${opts.serverName}\r\nDate: ${now}\r\nContent-Length: ${contentLength}\r\n${clientHeaders}\r\n${chunk || ''}`
           }
           if (!(payload && payload.length)) return
           // TODO: buffer overrun
@@ -84,29 +90,41 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
           const r = client.write(len)
           response.headersSent = true
           if (r === len) {
-            if (request.keepalive === 1) return
-            if (client.queueSize() === 0) return client.close()
-            client.onDrain(() => client.close())
+            if (request.keepalive) return
+            if (client.queueSize() === 0) {
+              client.close()
+              return
+            }
+            client.onDrain(() => {
+              client.close()
+            })
             return
           }
-          if (r < 0) client.close()
+          if (r < 0) {
+            client.close()
+          }
           if (r < len) {
-            if (request.keepalive === 1) return client.pause()
-            if (client.queueSize() === 0) return client.close()
-            client.onDrain(() => client.close())
+            if (request.keepalive) return client.pause()
+            if (client.queueSize() === 0) {
+              client.close()
+              return
+            }
+            client.onDrain(() => {
+              client.close()
+            })
           }
         }
       }
       request.major = bytes[0]
       request.minor = bytes[1]
-      request.method = bytes[2]
-      request.upgrade = bytes[3]
-      request.keepalive = bytes[4]
+      request.method = methods[bytes[2]]
+      request.upgrade = bytes[3] === 1
+      request.keepalive = bytes[4] === 1
       request.url = str.substring(0, urlLength)
       request.headers = str.substring(urlLength, urlLength + headerLength)
       context.response = response
       context.request = request
-      callback(request, response)
+      callback(request, response, context)
     })
     parser.onRequest(() => context.request._onEnd())
     client.onClose(() => {
@@ -116,16 +134,19 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
         _onDisconnect(client, context)
       }
     })
-    client.onEnd(() => client.close())
+    client.onEnd(() => {
+      client.close()
+    })
     client.onError((code, message) => {
+      print('client.onError')
       print(code)
       print(message)
     })
     client.setup(context.in, context.out)
-    parser.reset(REQUEST, client)
     if (_onConnect) {
       _onConnect(client, context)
     }
+    parser.reset(REQUEST, client)
     return client
   })
   server.onClose(() => {
@@ -134,7 +155,7 @@ const createServer = (callback, opts = { type: TCP, serverName: 'dv8' }) => {
       _onClose()
     }
   })
-  const { address = '127.0.0.1', port = 3000 } = opts
+  const { address, port } = opts
   return { now, contexts, sock: server, defaults, opts, listen: () => server.listen(address, port), onClose: fn => (_onClose = fn), onConnect: fn => (_onConnect = fn), onDisconnect: fn => (_onDisconnect = fn) }
 }
 

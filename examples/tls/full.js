@@ -10,7 +10,7 @@ const server = createServer((req, res) => {
   }
 
   req.onEnd = () => {
-    //console.log(JSON.stringify(req, null, '  '))
+    console.log(JSON.stringify(req, null, '  '))
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify({}))
@@ -22,7 +22,7 @@ server.onClose(() => {
 })
 
 server.onConnect(sock => {
-  //setSecure(sock)
+  setSecure(sock)
 })
 
 addContext('dv8.billywhizz.io', './certs')

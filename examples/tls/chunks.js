@@ -24,15 +24,6 @@ const startServer = options => {
 
   const ok = server.listen()
   if (ok !== 0) throw new Error('Listen Failed')
-
-  server.onConnect((sock, context) => {
-    conn++
-  })
-
-  server.onDisconnect((sock, context) => {
-    conn--
-  })
-
   // const { now, sock, defaults, opts, contexts } = server  
 }
 

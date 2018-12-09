@@ -6,7 +6,7 @@ function readFile (path, opts = {}, file = null) {
     const buf = Buffer.alloc(chunkSize)
     file = new File()
     file.setup(buf, buf)
-    file.open(path, O_RDONLY)
+    file.fd = file.open(path, O_RDONLY)
     file.size = 0
     file.paused = true
     file.buf = buf

@@ -1,5 +1,13 @@
 const { UDP } = module('udp', {})
 
+/*
+DNS Client Example
+
+To run:
+
+docker run -it --rm --net=host -v $(pwd):/app billywhizz/dv8:0.0.5a dv8 ./dns.js api.billywhizz.io
+*/
+
 class Client {
   constructor (address, port) {
     const requests = {}
@@ -137,8 +145,8 @@ class Client {
 }
 
 async function run () {
-  const dns = new Client('8.8.8.8', 53)
-  const host = process.args[2] || 'www.example.com'
+  const [ , , host = 'www.example.com', serverIP = '8.8.8.8', serverPort = 53 ] = process.args
+  const dns = new Client(serverIP, serverPort)
   const result = await dns.query(host)
   console.log(JSON.stringify(result, null, '  '))
   dns.stop()

@@ -45,6 +45,8 @@ class EventLoop : public dv8::ObjectWrap {
 		static void Run(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void IsAlive(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Ref(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void UnRef(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnIdle(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnCheck(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnPrepare(const v8::FunctionCallbackInfo<v8::Value>& args);

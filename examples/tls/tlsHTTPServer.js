@@ -53,7 +53,7 @@ const onRequest = context => {
   }
 }
 
-const onClient = fd => {
+const onClient = () => {
   const client = new Socket(TCP)
   const context = createContext()
   const { work, parser, request } = context
@@ -62,14 +62,15 @@ const onClient = fd => {
   parser.onBody(len => body.push(work.read(0, len)))
   parser.onHeaders(() => onHeaders(context))
   parser.onRequest(() => onRequest(context))
-  client.setup(fd, context.in, context.out)
-  client.address = client.remoteAddress()
+  client.setup(context.in, context.out)
+  //client.address = client.remoteAddress()
   client.onClose(() => contexts.push(context))
   client.onEnd(() => client.close())
   client.setNoDelay(true)
   client.setKeepAlive(true, 3000)
   //setSecure(client)
   parser.reset(REQUEST, client)
+  return client
 }
 
 //addContext('dv8.billywhizz.io')

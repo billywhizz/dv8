@@ -1,3 +1,5 @@
+require('../debugger/debug.js')
+
 const { UV_TTY_MODE_NORMAL, TTY } = module('tty', {})
 const { start, stop } = require('./meter.js')
 

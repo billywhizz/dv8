@@ -5,7 +5,6 @@ const middleware = (req, res) => {
     print(buf.read(0, len))
   })
   req.onEnd(() => {
-    print(JSON.stringify(req, null, '  '))
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify({}))
