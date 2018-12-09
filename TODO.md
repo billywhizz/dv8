@@ -43,7 +43,8 @@ to run an "app"
 - uses platform stdlib
 
 ## NEXT
-- inspector protocol
+- use a custom socket for debugger thread so we don't pollute thread ipc and don't need big buffers 
+- inspector protocol - DONE
 - commands to run dns lookup without installing anything except docker
 ```bash
 docker run -it --net=host --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/out/lib:/usr/local/lib -v $(pwd)/examples:/app dv8 dv8 ./udp/dns3.js
@@ -66,8 +67,10 @@ docker run -it --net=host --rm -v $(pwd):/app dv8 dv8 ./dns.js api.billywhizz.io
 udp complete - 1 day
 event loop complete - 1 day
 fs complete - 2 days
+    - async fs
 process/spawn - 2 days
 thread - 2 days
+    - killing a thread
 samples - 2 days
 docs - 3 days
 tests - 10 days
