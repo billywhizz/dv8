@@ -125,15 +125,14 @@ int main(int argc, char *argv[])
           dv8::ReportException(isolate, &try_catch);
         }
       }
-
+      v8::platform::PumpMessageLoop(platform.get(), isolate);
       // event loop is done, we are shutting down
       dv8::shutdown(uv_default_loop());
       uv_tty_reset_mode();
       int r = uv_loop_close(uv_default_loop());
       if (r != 0) {
-        //fprintf(stderr, "uv_loop_close: %i\n", r);
+        fprintf(stderr, "uv_loop_close: %i\n", r);
       }
-
     }
     // cleanup
     isolate->Dispose();

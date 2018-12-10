@@ -17,6 +17,7 @@ namespace loop {
 	using v8::Value;
 	using v8::Array;
 	using dv8::builtins::Environment;
+	using dv8::builtins::Buffer;
 
 	void EventLoop::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
@@ -29,11 +30,13 @@ namespace loop {
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "run", EventLoop::Run);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "isAlive", EventLoop::IsAlive);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", EventLoop::Close);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", EventLoop::Reset);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onIdle", EventLoop::OnIdle);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onPrepare", EventLoop::OnPrepare);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onCheck", EventLoop::OnCheck);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", EventLoop::UnRef);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ref", EventLoop::Ref);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listHandles", EventLoop::ListHandles);
 
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_RUN_DEFAULT), "UV_RUN_DEFAULT", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_RUN_ONCE), "UV_RUN_ONCE", exports);
@@ -75,17 +78,10 @@ namespace loop {
 		v8::HandleScope handleScope(isolate);
 		ObjectWrap *wrap = data.GetParameter();
 		EventLoop* obj = static_cast<EventLoop *>(wrap);
-/*
-		if (obj->prepare_handle) {
-			free(obj->prepare_handle);
-		}
-		if (obj->check_handle) {
-			free(obj->check_handle);
-		}
-		if (obj->idle_handle) {
-			free(obj->idle_handle);
-		}
-*/
+		fprintf(stderr, "EventLoop::Destroy");
+		uv_close((uv_handle_t*)obj->prepare_handle, OnClose);
+		uv_close((uv_handle_t*)obj->check_handle, OnClose);
+		uv_close((uv_handle_t*)obj->idle_handle, OnClose);
 	}
 
 	void EventLoop::Stop(const FunctionCallbackInfo<Value> &args)
@@ -122,6 +118,40 @@ namespace loop {
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 	
+	void EventLoop::ListHandles(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
+		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
+		size_t len = b->_length;
+		uint8_t *work = (uint8_t *)b->_data;
+		loophandle_t handles;
+		handles.off = 0;
+		handles.size = 0;
+		handles.buf = work;
+		uv_walk(env->loop, [](uv_handle_t *handle, void *arg) {
+			loophandle_t* handles = (loophandle_t*)arg;
+			uint8_t *work = handles->buf + handles->off;
+			work[0] = uv_is_active(handle);
+			work++;
+			handles->off++;
+			const char* type = uv_handle_type_name(handle->type);
+			int typelen = strlen(type);
+			work[0] = typelen;
+			work++;
+			handles->off++;
+			memcpy(work, type, typelen);
+			work += typelen;
+			handles->off += typelen;
+			handles->size++;
+			work[0] = 0;
+		}, &handles);
+		args.GetReturnValue().Set(Integer::New(isolate, handles.size));
+	}
+	
 	void EventLoop::UnRef(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
@@ -144,6 +174,11 @@ namespace loop {
 		args.GetReturnValue().Set(Integer::New(isolate, alive));
 	}
 	
+	void EventLoop::OnClose(uv_handle_t *handle)
+	{
+			free(handle);
+	}
+
 	void EventLoop::Close(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
@@ -153,6 +188,19 @@ namespace loop {
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		int ok = uv_loop_close(env->loop);
 		args.GetReturnValue().Set(Integer::New(isolate, ok));
+	}
+	
+	void EventLoop::Reset(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		v8::HandleScope handleScope(isolate);
+		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
+		uv_close((uv_handle_t*)obj->prepare_handle, OnClose);
+		uv_close((uv_handle_t*)obj->check_handle, OnClose);
+		uv_close((uv_handle_t*)obj->idle_handle, OnClose);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 	
 	void on_idle(uv_idle_t* handle) {

@@ -180,6 +180,11 @@ global.Buffer = {
     buf.size = size
     buf.bytes = ab
     return buf
+  },
+  fromString: str => {
+    const buf = global.Buffer.alloc(str.length)
+    buf.write(str)
+    return buf
   }
 }
 
@@ -248,6 +253,25 @@ process.stats = () => {
   return st
 }
 
+const activeHandles = () => {
+  const buf = Buffer.alloc(16384)
+  loop.listHandles(buf)
+  const bytes = new Uint8Array(buf.bytes)
+  let off = 0
+  const handles = []
+  while (1) {
+    const active = bytes[off]
+    const len = bytes[off + 1]
+    if (len === 0) break
+    const type = buf.read(off + 2, len)
+    handles.push({ active, type })
+    off += (2 + len)
+  }
+  return handles
+}
+
+process.activeHandles = activeHandles
+
 const nextTick = fn => {
   queue.push(fn)
   if (idleActive) return
@@ -267,10 +291,18 @@ const nextTick = fn => {
       loop.onIdle()
     }
   })
+  loop.ref() // ensure we run
   idleActive = true
 }
 // TODO: rename this as it's not the same as node.js nextTick
 process.nextTick = nextTick
+
+global.onExit(() => {
+  // at this point the main loop is done so if you want to run anything you have to manually pump the loop
+  process.loop.reset()
+  process.loop.run(2)
+  if (process.onExit) process.onExit()
+})
 
 if (global.workerData) {
   global.workerData.bytes = global.workerData.alloc()

@@ -14,6 +14,13 @@ typedef struct
   uint8_t onPrepare;
 } callbacks_t;
 
+typedef struct
+{
+  int size;
+  int off;
+  uint8_t* buf;
+} loophandle_t;
+
 static void on_idle(uv_idle_t* handle);
 static void on_check(uv_check_t* handle);
 static void on_prepare(uv_prepare_t* handle);
@@ -45,11 +52,14 @@ class EventLoop : public dv8::ObjectWrap {
 		static void Run(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void IsAlive(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Reset(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Ref(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void UnRef(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void ListHandles(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnIdle(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnCheck(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnPrepare(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void OnClose(uv_handle_t *handle);
 
 };
 
