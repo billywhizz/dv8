@@ -91,6 +91,7 @@ function threadFunc () {
 const UV_RUN_ONCE = 1
 let thread
 let looping = false
+const { Inspector } = module('inspector', {})
 
 module.exports = {
   start: () => {
