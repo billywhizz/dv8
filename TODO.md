@@ -43,9 +43,9 @@ to run an "app"
 - uses platform stdlib
 
 ## NEXT
+- https://github.com/seL4/libcpio/blob/master/src/cpio.c
 - fix ipc writing (buffer overrun)
-- require directory handling
-- return list of handles from loop module
+- require path handling
 - use a custom socket for debugger thread so we don't pollute thread ipc and don't need big buffers 
 - inspector protocol - DONE
 - commands to run dns lookup without installing anything except docker

@@ -6,10 +6,12 @@ let defaultContext
 const setSecure = (sock, onSecure, currentContext = defaultContext) => {
   const secureClient = new SecureSocket()
   secureClient.onHost(hostname => {
-    if (!hostname) return
+    if (!hostname) return false
     const context = contexts[hostname]
     if (!context) return false
-    if (context.hostname === currentContext.hostname) return
+    print(context.hostname)
+    print(currentContext.hostname)
+    if (context.hostname === currentContext.hostname) return context
     return context
   })
   secureClient.onError((code, message) => {

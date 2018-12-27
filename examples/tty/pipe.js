@@ -1,5 +1,5 @@
 const { UV_TTY_MODE_RAW, TTY } = module('tty', {})
-const { start, stop } = require('./lib/meter.js')
+const { start, stop } = require('./meter.js')
 const BUFFER_SIZE = 64 * 1024
 const MAX_BUFFER = 4 * BUFFER_SIZE
 const stdin = new TTY(0)

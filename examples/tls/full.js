@@ -1,5 +1,5 @@
-const { createServer } = require('./lib/http.js')
-const { setSecure, addContext } = require('./lib/tls.js')
+const { createServer } = require('../lib/http.js')
+const { setSecure, addContext } = require('../lib/tls.js')
 
 const server = createServer((req, res) => {
   req.body = []
@@ -22,7 +22,9 @@ server.onClose(() => {
 })
 
 server.onConnect(sock => {
-  setSecure(sock)
+  setSecure(sock, () => {
+    print('onSecure')
+  })
 })
 
 addContext('dv8.billywhizz.io', './certs')

@@ -23,6 +23,7 @@ RUN ./platform.sh && \
     ./module.sh fs && \
     ./module.sh udp && \
     ./module.sh dns && \
+    ./module.sh libz && \
     ./http-parser.sh && \
     ./openssl.sh
 CMD ["/bin/sh"]
