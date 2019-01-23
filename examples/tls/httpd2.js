@@ -1,1 +1,1 @@
-require('./lib/http.js').createServer((req, res) => res.end()).listen()
+require('../lib/http.js').createServer((req, res) => res.end()).listen()

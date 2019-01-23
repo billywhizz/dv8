@@ -58,6 +58,8 @@ int main(int argc, char *argv[])
       globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
       globalInstance->Set(v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
       dv8::builtins::Buffer::Init(globalInstance);
+      //dv8::InspectorClient inspector_client(context, true);
+      v8::TryCatch try_catch(isolate);
 
       // compile and run the base module
       v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
@@ -71,7 +73,6 @@ int main(int argc, char *argv[])
         v8::False(isolate), 
         v8::True(isolate));
       v8::Local<v8::Module> module;
-      v8::TryCatch try_catch(isolate);
       v8::ScriptCompiler::Source basescript(base.ToLocalChecked(), baseorigin);
       if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
         dv8::ReportException(isolate, &try_catch);
@@ -82,7 +83,6 @@ int main(int argc, char *argv[])
         dv8::ReportException(isolate, &try_catch);
         return 1;
       }
-      dv8::InspectorClient inspector_client(context, true);
       module->Evaluate(context);
 
       // Load main script

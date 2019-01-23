@@ -137,7 +137,8 @@ void on_close2(uv_handle_t *peer)
 {
   Isolate *isolate = Isolate::GetCurrent();
   v8::HandleScope handleScope(isolate);
-  Socket *s = (Socket *)peer->data;
+  baton_t *baton = (baton_t *)peer->data;
+  Socket *s = (Socket *)baton->object;
   if (s->callbacks.onClose == 1)
   {
     Local<Value> argv[0] = {};

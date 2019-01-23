@@ -1,5 +1,5 @@
 init = function(args)
-    depth = 10
+    depth = 64
     local r = {}
     for i=1,depth do
        r[i] = wrk.format(nil, "/")
