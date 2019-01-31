@@ -165,6 +165,7 @@ private:
   static void Listen(const v8::FunctionCallbackInfo<v8::Value> &args);    // listen to port/path/handle
   static void Close(const v8::FunctionCallbackInfo<v8::Value> &args);     // close a socket
   static void Write(const v8::FunctionCallbackInfo<v8::Value> &args);     // write from out buffer to the socket
+  static void Splice(const v8::FunctionCallbackInfo<v8::Value> &args);     // write from out buffer to the socket
   static void Pause(const v8::FunctionCallbackInfo<v8::Value> &args);     // pause the socket
   static void Resume(const v8::FunctionCallbackInfo<v8::Value> &args);    // resume the socket
   static void Error(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the uv error string for an error code

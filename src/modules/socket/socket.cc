@@ -295,6 +295,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "bind", Bind);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", Close);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Write);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "splice", Splice);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", Setup);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setNoDelay", SetNoDelay);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pause", Pause);
@@ -641,6 +642,95 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
   args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
+void Socket::Splice(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *socket = ObjectWrap::Unwrap<Socket>(args.Holder());
+  Local<Context> context = isolate->GetCurrentContext();
+  int argc = args.Length();
+  uint32_t off = 0;
+  uint32_t len = args[0]->Uint32Value(context).ToChecked();
+  if (argc > 1) {
+    off = args[1]->Int32Value(context).ToChecked();
+  }
+  _context *ctx = socket->context;
+  char *src = ctx->out.base + off;
+
+  int fd;
+  uv_fileno((uv_handle_t *)ctx->handle, &fd);
+  fprintf(stderr, "fd: %i\n", fd);
+  struct iovec iov { src, len };
+  int r = vmsplice(fd, &iov, 1, SPLICE_F_NONBLOCK);
+  fprintf(stderr, "vmsplice: %i\n", r);
+  fprintf(stderr, "errno: %i\n", errno);
+/*
+  uv_buf_t buf;
+  buf.base = src;
+  buf.len = len;
+  r = uv_try_write((uv_stream_t *)ctx->handle, &buf, 1);
+  if (r == UV_EAGAIN || r == UV_ENOSYS)
+  {
+    write_req_t *wr;
+    wr = (write_req_t *)malloc(sizeof *wr);
+    char *wrb = (char *)calloc(len, 1);
+    memcpy(wrb, src, len);
+    ctx->stats.out.alloc++;
+    ctx->stats.out.eagain++;
+    wr->buf = uv_buf_init(wrb, len);
+    int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+    r = 0;
+    if (status != 0) {
+      r = status;
+    }
+    ctx->blocked = true;
+  }
+  else if (r < 0)
+  {
+    ctx->stats.error++;
+    if (socket->callbacks.onError == 1)
+    {
+      Local<Value> argv[1] = {Number::New(isolate, r)};
+      Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
+      Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    }
+  }
+  else if ((uint32_t)r < len)
+  {
+    ctx->stats.out.incomplete++;
+    ctx->stats.out.written += r;
+    write_req_t *wr;
+    wr = (write_req_t *)malloc(sizeof *wr);
+    char *wrb = (char *)calloc(len - r, 1);
+    char *base = src + r;
+    memcpy(wrb, base, len - r);
+    ctx->stats.out.alloc++;
+    wr->buf = uv_buf_init(wrb, len - r);
+    int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+    ctx->blocked = true;
+    if (socket->callbacks.onWrite == 1)
+    {
+      Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
+      Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+      onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+    }
+    if (status != 0)
+    {
+      r = status;
+    }
+  } else {
+    ctx->stats.out.full++;
+    ctx->stats.out.written += (uint64_t)r;
+    if (socket->callbacks.onWrite == 1)
+    {
+      Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
+      Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+      onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+    }
+  }
+*/
+  args.GetReturnValue().Set(Integer::New(isolate, r));
+}
+
 void Socket::Connect(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
@@ -928,6 +1018,12 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
       args.GetReturnValue().Set(Integer::New(isolate, status));
       return;
     }
+/*
+    int fd;
+    uv_fileno((uv_handle_t *)sock, &fd);
+    int on = 1;
+    setsockopt(fd, SOL_SOCKET, SOCK_ZEROCOPY, &on, sizeof(on));
+*/
     status = uv_pipe_bind(sock, path);
     if (status)
     {
