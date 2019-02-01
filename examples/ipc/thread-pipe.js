@@ -14,9 +14,7 @@ function createServer () {
 
   server.onRead(len => {
     stats.in += len
-    print('server.onRead')
-    server.splice(len)
-    //server.write(len)
+    server.write(len)
     stats.out += len
   })
 
@@ -40,13 +38,11 @@ function createClient () {
     client.setup(buf, buf)
     client.resume()
     client.write(BUFFER_SIZE)
-    //client.splice(BUFFER_SIZE)
   })
 
   client.onRead(len => {
     stats.in += len
-    client.splice(len)
-    //client.write(len)
+    client.write(len)
     stats.out += len
   })
 

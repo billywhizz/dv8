@@ -48,9 +48,9 @@ wget https://github.com/billywhizz/dv8/archive/v$DV8_VERSION.tar.gz
 tar -zxvf v$DV8_VERSION.tar.gz
 cd dv8-$DV8_VERSION
 ## build v8
-docker build -t v8-build .
+docker build -t v8-build -f Dockerfile.v8 .
 ## build libuv
-docker build -t uv-build .
+docker build -t uv-build -f Dockerfile.uv .
 ## build sdk and runtime
 docker build -t dv8-sdk -f Dockerfile.sdk .
 ## build runtime only docker image

@@ -1,22 +1,22 @@
 ## Build v8 monolithic lib
 FROM alpine:3.8 as v8-build
 
-LABEL repository.hub="alexmasterov/alpine-libv8:7.1" \
+LABEL repository.hub="alexmasterov/alpine-libv8:7.3" \
       repository.url="https://github.com/AlexMasterov/dockerfiles" \
       maintainer="Alex Masterov <alex.masterow@gmail.com>"
 
-ARG V8_VERSION=7.1.163
+ARG V8_VERSION=7.3.24
 ARG V8_DIR=/usr/local/v8
 
-ARG BUILD_COMMIT=641370b8b44f9bf4714782331cfba1994ccd41a5
-ARG BUILDTOOLS_COMMIT=2dff9c9c74e9d732e6fe57c84ef7fd044cc45d96
-ARG ICU_COMMIT=7ca3ffa77d635e44b9735e1b54fb9c4da3b6c821
-ARG GTEST_COMMIT=2e68926a9d4929e9289373cd49e40ddcb9a628f7
+ARG BUILD_COMMIT=f686dfc6d92d0e2fa9d238a78f266739f0a921c4
+ARG BUILDTOOLS_COMMIT=04161ec8d7c781e4498c699254c69ba0dd959fde
+ARG ICU_COMMIT=407b39301e71006b68bd38e770f35d32398a7b14
+ARG GTEST_COMMIT=879ac092fde0a19e1b3a61b2546b2a422b1528bc
 ARG TRACE_EVENT_COMMIT=211b3ed9d0481b4caddbee1322321b86a483ca1f
-ARG CLANG_COMMIT=9ad74fabeb3a6635a7205ccb9abfa1b361fb324e
+ARG CLANG_COMMIT=558f684ffbadcf6c4e1e89c6792c801f1f84ce3d
 ARG JINJA2_COMMIT=b41863e42637544c2941b574c7877d3e1f663e25
 ARG MARKUPSAFE_COMMIT=8f45f5cfa0009d2a70589bcda0349b8cb2b72783
-ARG CATAPULT_COMMIT=6f7c60dde99fb258809c0a2b3253fa1d978fdde5
+ARG CATAPULT_COMMIT=4feee5840de24533ab336d366cf632c2f5210510
 
 ARG GN_SOURCE=https://www.dropbox.com/s/3ublwqh4h9dit9t/alpine-gn-80e00be.tar.gz
 ARG V8_SOURCE=https://chromium.googlesource.com/v8/v8/+archive/${V8_VERSION}.tar.gz
@@ -37,8 +37,8 @@ RUN set -x \
     ninja \
     python \
     tar \
-    xz
-RUN : "---------- V8 ----------" \
+    xz \
+  && : "---------- V8 ----------" \
   && mkdir -p /tmp/v8 \
   && curl -fSL --connect-timeout 30 ${V8_SOURCE} | tar xmz -C /tmp/v8 \
   && : "---------- Dependencies ----------" \
@@ -122,18 +122,3 @@ RUN cd /tmp/v8 \
 
 RUN cd /tmp/v8 \
   && ninja v8_monolith -C out.gn/x64.release/ -j 2
-
-## Build libuv
-FROM alpine:3.8 as uv-build
-WORKDIR /source
-RUN apk update \
-    && apk add --no-cache --virtual .build-deps make g++ python gcc git
-RUN wget "https://github.com/libuv/libuv/archive/v1.23.0.tar.gz" \
-    && tar -zxvf v1.23.0.tar.gz \
-    && mv libuv-1.23.0 uv
-RUN cd uv \
-    && git clone https://chromium.googlesource.com/external/gyp build/gyp
-RUN cd uv \
-    && ./gyp_uv.py -f make \
-    && BUILDTYPE=Release make -C out
-CMD ["/bin/sh"]
