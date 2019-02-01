@@ -15,6 +15,7 @@
 #include "src/ic/ic.h"
 #include "src/ic/stub-cache.h"
 #include "src/isolate.h"
+#include "src/macro-assembler.h"
 #include "src/objects/api-callbacks.h"
 #include "src/regexp/jsregexp.h"
 #include "src/regexp/regexp-macro-assembler.h"
@@ -41,7 +42,6 @@ void JSEntryStub::Generate(MacroAssembler* masm) {
 
   {
     NoRootArrayScope no_root_array(masm);
-    ProfileEntryHookStub::MaybeCallEntryHook(masm);
 
     // PPC LINUX ABI:
     // preserve LR in pre-reserved slot in caller's frame
@@ -180,6 +180,13 @@ void DirectCEntryStub::Generate(MacroAssembler* masm) {
   // GC safe. The RegExp backend also relies on this.
   __ mflr(r0);
   __ StoreP(r0, MemOperand(sp, kStackFrameExtraParamSlot * kPointerSize));
+
+  if (ABI_USES_FUNCTION_DESCRIPTORS && FLAG_embedded_builtins) {
+    // AIX/PPC64BE Linux use a function descriptor;
+    __ LoadP(ToRegister(ABI_TOC_REGISTER), MemOperand(ip, kPointerSize));
+    __ LoadP(ip, MemOperand(ip, 0));  // Instruction address
+  }
+
   __ Call(ip);  // Call the C++ function.
   __ LoadP(r0, MemOperand(sp, kStackFrameExtraParamSlot * kPointerSize));
   __ mtlr(r0);
@@ -201,7 +208,7 @@ void DirectCEntryStub::GenerateCall(MacroAssembler* masm, Register target) {
       return;
     }
   }
-  if (ABI_USES_FUNCTION_DESCRIPTORS) {
+  if (ABI_USES_FUNCTION_DESCRIPTORS && !FLAG_embedded_builtins) {
     // AIX/PPC64BE Linux use a function descriptor.
     __ LoadP(ToRegister(ABI_TOC_REGISTER), MemOperand(target, kPointerSize));
     __ LoadP(ip, MemOperand(target, 0));  // Instruction address
@@ -214,114 +221,6 @@ void DirectCEntryStub::GenerateCall(MacroAssembler* masm, Register target) {
   intptr_t code = reinterpret_cast<intptr_t>(GetCode().location());
   __ mov(r0, Operand(code, RelocInfo::CODE_TARGET));
   __ Call(r0);  // Call the stub.
-}
-
-
-void ProfileEntryHookStub::MaybeCallEntryHookDelayed(TurboAssembler* tasm,
-                                                     Zone* zone) {
-  if (tasm->isolate()->function_entry_hook() != nullptr) {
-    PredictableCodeSizeScope predictable(tasm,
-#if V8_TARGET_ARCH_PPC64
-                                         14 * kInstrSize);
-#else
-                                         11 * kInstrSize);
-#endif
-    tasm->mflr(r0);
-    tasm->Push(r0, ip);
-    tasm->CallStubDelayed(new (zone) ProfileEntryHookStub(nullptr));
-    tasm->Pop(r0, ip);
-    tasm->mtlr(r0);
-  }
-}
-
-void ProfileEntryHookStub::MaybeCallEntryHook(MacroAssembler* masm) {
-  if (masm->isolate()->function_entry_hook() != nullptr) {
-    PredictableCodeSizeScope predictable(masm,
-#if V8_TARGET_ARCH_PPC64
-                                         14 * kInstrSize);
-#else
-                                         11 * kInstrSize);
-#endif
-    ProfileEntryHookStub stub(masm->isolate());
-    __ mflr(r0);
-    __ Push(r0, ip);
-    __ CallStub(&stub);
-    __ Pop(r0, ip);
-    __ mtlr(r0);
-  }
-}
-
-
-void ProfileEntryHookStub::Generate(MacroAssembler* masm) {
-  // The entry hook is a "push lr, ip" instruction, followed by a call.
-  const int32_t kReturnAddressDistanceFromFunctionStart =
-      Assembler::kCallTargetAddressOffset + 3 * kInstrSize;
-
-  // This should contain all kJSCallerSaved registers.
-  const RegList kSavedRegs = kJSCallerSaved |  // Caller saved registers.
-                             r15.bit();        // Saved stack pointer.
-
-  // We also save lr, so the count here is one higher than the mask indicates.
-  const int32_t kNumSavedRegs = kNumJSCallerSaved + 2;
-
-  // Save all caller-save registers as this may be called from anywhere.
-  __ mflr(ip);
-  __ MultiPush(kSavedRegs | ip.bit());
-
-  // Compute the function's address for the first argument.
-  __ subi(r3, ip, Operand(kReturnAddressDistanceFromFunctionStart));
-
-  // The caller's return address is two slots above the saved temporaries.
-  // Grab that for the second argument to the hook.
-  __ addi(r4, sp, Operand((kNumSavedRegs + 1) * kPointerSize));
-
-  // Align the stack if necessary.
-  int frame_alignment = masm->ActivationFrameAlignment();
-  if (frame_alignment > kPointerSize) {
-    __ mr(r15, sp);
-    DCHECK(base::bits::IsPowerOfTwo(frame_alignment));
-    __ ClearRightImm(sp, sp, Operand(WhichPowerOf2(frame_alignment)));
-  }
-
-#if !defined(USE_SIMULATOR)
-  uintptr_t entry_hook =
-      reinterpret_cast<uintptr_t>(isolate()->function_entry_hook());
-#else
-  // Under the simulator we need to indirect the entry hook through a
-  // trampoline function at a known address.
-  ApiFunction dispatcher(FUNCTION_ADDR(EntryHookTrampoline));
-  ExternalReference entry_hook =
-      ExternalReference::Create(&dispatcher, ExternalReference::BUILTIN_CALL);
-
-  // It additionally takes an isolate as a third parameter
-  __ mov(r5, Operand(ExternalReference::isolate_address(isolate())));
-#endif
-
-  __ mov(ip, Operand(entry_hook));
-
-  if (ABI_USES_FUNCTION_DESCRIPTORS) {
-    __ LoadP(ToRegister(ABI_TOC_REGISTER), MemOperand(ip, kPointerSize));
-    __ LoadP(ip, MemOperand(ip, 0));
-  }
-  // ip set above, so nothing more to do for ABI_CALL_VIA_IP.
-
-  // PPC LINUX ABI:
-  __ li(r0, Operand::Zero());
-  __ StorePU(r0, MemOperand(sp, -kNumRequiredStackFrameSlots * kPointerSize));
-
-  __ Call(ip);
-
-  __ addi(sp, sp, Operand(kNumRequiredStackFrameSlots * kPointerSize));
-
-  // Restore the stack pointer if needed.
-  if (frame_alignment > kPointerSize) {
-    __ mr(sp, r15);
-  }
-
-  // Also pop lr to get Ret(0).
-  __ MultiPop(kSavedRegs | ip.bit());
-  __ mtlr(ip);
-  __ Ret();
 }
 
 static int AddressOffset(ExternalReference ref0, ExternalReference ref1) {
@@ -432,7 +331,7 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
   __ bind(&leave_exit_frame);
   // LeaveExitFrame expects unwind space to be in a register.
   if (stack_space_operand != nullptr) {
-    __ lwz(r14, *stack_space_operand);
+    __ LoadP(r14, *stack_space_operand);
   } else {
     __ mov(r14, Operand(stack_space));
   }
@@ -464,20 +363,32 @@ static void CallApiFunctionAndReturn(MacroAssembler* masm,
 
 void CallApiCallbackStub::Generate(MacroAssembler* masm) {
   // ----------- S t a t e -------------
-  //  -- r7                  : call_data
-  //  -- r5                  : holder
-  //  -- r4                  : api_function_address
-  //  -- cp                  : context
+  //  -- cp                  : kTargetContext
+  //  -- r4                  : kApiFunctionAddress
+  //  -- r5                  : kArgc
   //  --
   //  -- sp[0]               : last argument
   //  -- ...
   //  -- sp[(argc - 1)* 4]   : first argument
-  //  -- sp[argc * 4]        : receiver
+  //  -- sp[(argc + 0) * 4]  : receiver
+  //  -- sp[(argc + 1) * 4]  : kHolder
+  //  -- sp[(argc + 2) * 4]  : kCallData
   // -----------------------------------
 
-  Register call_data = r7;
-  Register holder = r5;
   Register api_function_address = r4;
+  Register argc = r5;
+  Register scratch = r7;
+  Register index = r8;  // For indexing MemOperands.
+
+  DCHECK(!AreAliased(api_function_address, argc, scratch, index));
+
+  // Stack offsets (without argc).
+  static constexpr int kReceiverOffset = 0;
+  static constexpr int kHolderOffset = kReceiverOffset + 1;
+  static constexpr int kCallDataOffset = kHolderOffset + 1;
+
+  // Extra stack arguments are: the receiver, kHolder, kCallData.
+  static constexpr int kExtraStackArgumentCount = 3;
 
   typedef FunctionCallbackArguments FCA;
 
@@ -489,25 +400,43 @@ void CallApiCallbackStub::Generate(MacroAssembler* masm) {
   STATIC_ASSERT(FCA::kIsolateIndex == 1);
   STATIC_ASSERT(FCA::kHolderIndex == 0);
 
-  // new target
-  __ PushRoot(RootIndex::kUndefinedValue);
+  // Set up FunctionCallbackInfo's implicit_args on the stack as follows:
+  //
+  // Target state:
+  //   sp[0 * kPointerSize]: kHolder
+  //   sp[1 * kPointerSize]: kIsolate
+  //   sp[2 * kPointerSize]: undefined (kReturnValueDefaultValue)
+  //   sp[3 * kPointerSize]: undefined (kReturnValue)
+  //   sp[4 * kPointerSize]: kData
+  //   sp[5 * kPointerSize]: undefined (kNewTarget)
 
-  // call data
-  __ push(call_data);
+  // Reserve space on the stack.
+  __ subi(sp, sp, Operand(FCA::kArgsLength * kPointerSize));
 
-  Register scratch = call_data;
-  __ LoadRoot(scratch, RootIndex::kUndefinedValue);
-  // return value
-  __ push(scratch);
-  // return value default
-  __ push(scratch);
-  // isolate
+  // kHolder.
+  __ addi(index, argc, Operand(FCA::kArgsLength + kHolderOffset));
+  __ ShiftLeftImm(ip, index, Operand(kPointerSizeLog2));
+  __ LoadPX(scratch, MemOperand(sp, ip));
+  __ StoreP(scratch, MemOperand(sp, 0 * kPointerSize));
+
+  // kIsolate.
   __ Move(scratch, ExternalReference::isolate_address(masm->isolate()));
-  __ push(scratch);
-  // holder
-  __ push(holder);
+  __ StoreP(scratch, MemOperand(sp, 1 * kPointerSize));
 
-  // Prepare arguments.
+  // kReturnValueDefaultValue, kReturnValue, and kNewTarget.
+  __ LoadRoot(scratch, RootIndex::kUndefinedValue);
+  __ StoreP(scratch, MemOperand(sp, 2 * kPointerSize));
+  __ StoreP(scratch, MemOperand(sp, 3 * kPointerSize));
+  __ StoreP(scratch, MemOperand(sp, 5 * kPointerSize));
+
+  // kData.
+  __ addi(index, argc, Operand(FCA::kArgsLength + kCallDataOffset));
+  __ ShiftLeftImm(ip, index, Operand(kPointerSizeLog2));
+  __ LoadPX(scratch, MemOperand(sp, ip));
+  __ StoreP(scratch, MemOperand(sp, 4 * kPointerSize));
+
+  // Keep a pointer to kHolder (= implicit_args) in a scratch register.
+  // We use it below to set up the FunctionCallbackInfo object.
   __ mr(scratch, sp);
 
   // Allocate the v8::Arguments structure in the arguments' space since
@@ -517,36 +446,58 @@ void CallApiCallbackStub::Generate(MacroAssembler* masm) {
   // Create 4 extra slots on stack:
   //    [0] space for DirectCEntryStub's LR save
   //    [1-3] FunctionCallbackInfo
-  const int kApiStackSpace = 4;
-  const int kFunctionCallbackInfoOffset =
-      (kStackFrameExtraParamSlot + 1) * kPointerSize;
+  //    [4] number of bytes to drop from the stack after returning
+  static constexpr int kApiStackSpace = 5;
+  static constexpr bool kDontSaveDoubles = false;
 
   FrameScope frame_scope(masm, StackFrame::MANUAL);
-  __ EnterExitFrame(false, kApiStackSpace);
+  __ EnterExitFrame(kDontSaveDoubles, kApiStackSpace);
 
-  DCHECK(api_function_address != r3 && scratch != r3);
-  // r3 = FunctionCallbackInfo&
-  // Arguments is after the return address.
-  __ addi(r3, sp, Operand(kFunctionCallbackInfoOffset));
-  // FunctionCallbackInfo::implicit_args_
-  __ StoreP(scratch, MemOperand(r3, 0 * kPointerSize));
-  // FunctionCallbackInfo::values_
-  __ addi(ip, scratch, Operand((FCA::kArgsLength - 1 + argc()) * kPointerSize));
-  __ StoreP(ip, MemOperand(r3, 1 * kPointerSize));
-  // FunctionCallbackInfo::length_ = argc
-  __ li(ip, Operand(argc()));
-  __ stw(ip, MemOperand(r3, 2 * kPointerSize));
+  // FunctionCallbackInfo::implicit_args_ (points at kHolder as set up above).
+  // Arguments are after the return address (pushed by EnterExitFrame()).
+  __ StoreP(scratch,
+            MemOperand(sp, (kStackFrameExtraParamSlot + 1) * kPointerSize));
+
+  // FunctionCallbackInfo::values_ (points at the first varargs argument passed
+  // on the stack).
+  __ addi(scratch, scratch, Operand((FCA::kArgsLength - 1) * kPointerSize));
+  __ ShiftLeftImm(ip, argc, Operand(kPointerSizeLog2));
+  __ add(scratch, scratch, ip);
+  __ StoreP(scratch,
+            MemOperand(sp, (kStackFrameExtraParamSlot + 2) * kPointerSize));
+
+  // FunctionCallbackInfo::length_.
+  __ StoreP(argc,
+            MemOperand(sp, (kStackFrameExtraParamSlot + 3) * kPointerSize));
+
+  // We also store the number of bytes to drop from the stack after returning
+  // from the API function here.
+  __ mov(scratch,
+         Operand((FCA::kArgsLength + kExtraStackArgumentCount) * kPointerSize));
+  __ ShiftLeftImm(ip, argc, Operand(kPointerSizeLog2));
+  __ add(scratch, scratch, ip);
+  __ StoreP(scratch,
+            MemOperand(sp, (kStackFrameExtraParamSlot + 4) * kPointerSize));
+
+  // v8::InvocationCallback's argument.
+  __ addi(r3, sp, Operand((kStackFrameExtraParamSlot + 1) * kPointerSize));
 
   ExternalReference thunk_ref = ExternalReference::invoke_function_callback();
 
+  // There are two stack slots above the arguments we constructed on the stack.
+  // TODO(jgruber): Document what these arguments are.
+  static constexpr int kStackSlotsAboveFCA = 2;
+  MemOperand return_value_operand(
+      fp, (kStackSlotsAboveFCA + FCA::kReturnValueOffset) * kPointerSize);
+
+  static constexpr int kUseStackSpaceOperand = 0;
+  MemOperand stack_space_operand(
+      sp, (kStackFrameExtraParamSlot + 4) * kPointerSize);
+
   AllowExternalCallThatCantCauseGC scope(masm);
-  // Stores return the first js argument
-  int return_value_offset = 2 + FCA::kReturnValueOffset;
-  MemOperand return_value_operand(fp, return_value_offset * kPointerSize);
-  const int stack_space = argc() + FCA::kArgsLength + 1;
-  MemOperand* stack_space_operand = nullptr;
-  CallApiFunctionAndReturn(masm, api_function_address, thunk_ref, stack_space,
-                           stack_space_operand, return_value_operand);
+  CallApiFunctionAndReturn(masm, api_function_address, thunk_ref,
+                           kUseStackSpaceOperand, &stack_space_operand,
+                           return_value_operand);
 }
 
 
@@ -581,7 +532,7 @@ void CallApiGetterStub::Generate(MacroAssembler* masm) {
   __ Push(scratch, scratch);
   __ Move(scratch, ExternalReference::isolate_address(isolate()));
   __ Push(scratch, holder);
-  __ Push(Smi::kZero);  // should_throw_on_error -> false
+  __ Push(Smi::zero());  // should_throw_on_error -> false
   __ LoadP(scratch, FieldMemOperand(callback, AccessorInfo::kNameOffset));
   __ push(scratch);
 
@@ -638,8 +589,10 @@ void CallApiGetterStub::Generate(MacroAssembler* masm) {
   // +3 is to skip prolog, return address and name handle.
   MemOperand return_value_operand(
       fp, (PropertyCallbackArguments::kReturnValueOffset + 3) * kPointerSize);
+  MemOperand* const kUseStackSpaceConstant = nullptr;
   CallApiFunctionAndReturn(masm, api_function_address, thunk_ref,
-                           kStackUnwindSpace, nullptr, return_value_operand);
+                           kStackUnwindSpace, kUseStackSpaceConstant,
+                           return_value_operand);
 }
 
 #undef __

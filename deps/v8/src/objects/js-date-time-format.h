@@ -9,15 +9,21 @@
 #ifndef V8_OBJECTS_JS_DATE_TIME_FORMAT_H_
 #define V8_OBJECTS_JS_DATE_TIME_FORMAT_H_
 
+#include <set>
+#include <string>
+
 #include "src/isolate.h"
+#include "src/objects/intl-objects.h"
 #include "src/objects/managed.h"
+#include "unicode/uversion.h"
 
 // Has to be the last include (doesn't have include guards):
 #include "src/objects/object-macros.h"
 
 namespace U_ICU_NAMESPACE {
+class Locale;
 class SimpleDateFormat;
-}
+}  // namespace U_ICU_NAMESPACE
 
 namespace v8 {
 namespace internal {
@@ -28,11 +34,8 @@ class JSDateTimeFormat : public JSObject {
       Isolate* isolate, Handle<JSDateTimeFormat> date_time_format,
       Handle<Object> locales, Handle<Object> options);
 
-  static icu::SimpleDateFormat* UnpackDateFormat(
-      Handle<JSDateTimeFormat> date_time_format);
-
   V8_WARN_UNUSED_RESULT static MaybeHandle<JSObject> ResolvedOptions(
-      Isolate* isolate, Handle<JSReceiver> format_holder);
+      Isolate* isolate, Handle<JSDateTimeFormat> date_time_format);
 
   // ecma402/#sec-unwrapdatetimeformat
   V8_WARN_UNUSED_RESULT static MaybeHandle<JSDateTimeFormat>
@@ -66,28 +69,25 @@ class JSDateTimeFormat : public JSObject {
 
   V8_WARN_UNUSED_RESULT static MaybeHandle<String> ToLocaleDateTime(
       Isolate* isolate, Handle<Object> date, Handle<Object> locales,
-      Handle<Object> options, RequiredOption required, DefaultsOption defaults,
-      const char* service);
+      Handle<Object> options, RequiredOption required, DefaultsOption defaults);
+
+  static std::set<std::string> GetAvailableLocales();
 
   DECL_CAST(JSDateTimeFormat)
 
-// TODO(ftang): try to remove numbering_system from JSDateTimeFormat and
-// directly read from icu to save some bytes later.
 // Layout description.
-#define JS_DATE_TIME_FORMAT_FIELDS(V)         \
-  V(kLocaleOffset, kPointerSize)              \
-  V(kNumberingSystemOffset, kPointerSize)     \
-  V(kICUSimpleDateFormatOffset, kPointerSize) \
-  V(kBoundFormatOffset, kPointerSize)         \
-  /* Total size. */                           \
+#define JS_DATE_TIME_FORMAT_FIELDS(V)        \
+  V(kICULocaleOffset, kTaggedSize)           \
+  V(kICUSimpleDateFormatOffset, kTaggedSize) \
+  V(kBoundFormatOffset, kTaggedSize)         \
+  /* Total size. */                          \
   V(kSize, 0)
 
   DEFINE_FIELD_OFFSET_CONSTANTS(JSObject::kHeaderSize,
                                 JS_DATE_TIME_FORMAT_FIELDS)
 #undef JS_DATE_TIME_FORMAT_FIELDS
 
-  DECL_ACCESSORS(locale, String)
-  DECL_ACCESSORS(numbering_system, String)
+  DECL_ACCESSORS(icu_locale, Managed<icu::Locale>)
   DECL_ACCESSORS(icu_simple_date_format, Managed<icu::SimpleDateFormat>)
   DECL_ACCESSORS(bound_format, Object)
 

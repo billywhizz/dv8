@@ -106,6 +106,7 @@ enum class TypeCheckKind : uint8_t {
   kNone,
   kSignedSmall,
   kSigned32,
+  kSigned64,
   kNumber,
   kNumberOrOddball,
   kHeapObject
@@ -119,6 +120,8 @@ inline std::ostream& operator<<(std::ostream& os, TypeCheckKind type_check) {
       return os << "SignedSmall";
     case TypeCheckKind::kSigned32:
       return os << "Signed32";
+    case TypeCheckKind::kSigned64:
+      return os << "Signed64";
     case TypeCheckKind::kNumber:
       return os << "Number";
     case TypeCheckKind::kNumberOrOddball:
@@ -169,8 +172,10 @@ class UseInfo {
   static UseInfo Float32() {
     return UseInfo(MachineRepresentation::kFloat32, Truncation::Any());
   }
-  static UseInfo TruncatingFloat64() {
-    return UseInfo(MachineRepresentation::kFloat64, Truncation::Float64());
+  static UseInfo TruncatingFloat64(
+      IdentifyZeros identify_zeros = kDistinguishZeros) {
+    return UseInfo(MachineRepresentation::kFloat64,
+                   Truncation::Float64(identify_zeros));
   }
   static UseInfo AnyTagged() {
     return UseInfo(MachineRepresentation::kTagged, Truncation::Any());
@@ -188,9 +193,11 @@ class UseInfo {
                    TypeCheckKind::kHeapObject);
   }
   static UseInfo CheckedSignedSmallAsTaggedSigned(
-      const VectorSlotPair& feedback) {
-    return UseInfo(MachineRepresentation::kTaggedSigned, Truncation::Any(),
-                   TypeCheckKind::kSignedSmall, feedback);
+      const VectorSlotPair& feedback,
+      IdentifyZeros identify_zeros = kDistinguishZeros) {
+    return UseInfo(MachineRepresentation::kTaggedSigned,
+                   Truncation::Any(identify_zeros), TypeCheckKind::kSignedSmall,
+                   feedback);
   }
   static UseInfo CheckedSignedSmallAsWord32(IdentifyZeros identify_zeros,
                                             const VectorSlotPair& feedback) {
@@ -204,17 +211,26 @@ class UseInfo {
                    Truncation::Any(identify_zeros), TypeCheckKind::kSigned32,
                    feedback);
   }
-  static UseInfo CheckedNumberAsFloat64(const VectorSlotPair& feedback) {
-    return UseInfo(MachineRepresentation::kFloat64, Truncation::Any(),
-                   TypeCheckKind::kNumber, feedback);
+  static UseInfo CheckedSigned64AsWord64(IdentifyZeros identify_zeros,
+                                         const VectorSlotPair& feedback) {
+    return UseInfo(MachineRepresentation::kWord64,
+                   Truncation::Any(identify_zeros), TypeCheckKind::kSigned64,
+                   feedback);
+  }
+  static UseInfo CheckedNumberAsFloat64(IdentifyZeros identify_zeros,
+                                        const VectorSlotPair& feedback) {
+    return UseInfo(MachineRepresentation::kFloat64,
+                   Truncation::Any(identify_zeros), TypeCheckKind::kNumber,
+                   feedback);
   }
   static UseInfo CheckedNumberAsWord32(const VectorSlotPair& feedback) {
     return UseInfo(MachineRepresentation::kWord32, Truncation::Word32(),
                    TypeCheckKind::kNumber, feedback);
   }
   static UseInfo CheckedNumberOrOddballAsFloat64(
-      const VectorSlotPair& feedback) {
-    return UseInfo(MachineRepresentation::kFloat64, Truncation::Any(),
+      IdentifyZeros identify_zeros, const VectorSlotPair& feedback) {
+    return UseInfo(MachineRepresentation::kFloat64,
+                   Truncation::Any(identify_zeros),
                    TypeCheckKind::kNumberOrOddball, feedback);
   }
   static UseInfo CheckedNumberOrOddballAsWord32(
@@ -318,7 +334,8 @@ class RepresentationChanger final {
   Node* GetBitRepresentationFor(Node* node, MachineRepresentation output_rep,
                                 Type output_type);
   Node* GetWord64RepresentationFor(Node* node, MachineRepresentation output_rep,
-                                   Type output_type);
+                                   Type output_type, Node* use_node,
+                                   UseInfo use_info);
   Node* TypeError(Node* node, MachineRepresentation output_rep,
                   Type output_type, MachineRepresentation use);
   Node* MakeTruncatedInt32Constant(double value);

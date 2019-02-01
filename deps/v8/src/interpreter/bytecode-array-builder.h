@@ -70,7 +70,7 @@ class V8_EXPORT_PRIVATE BytecodeArrayBuilder final {
 
   // Constant loads to accumulator.
   BytecodeArrayBuilder& LoadConstantPoolEntry(size_t entry);
-  BytecodeArrayBuilder& LoadLiteral(v8::internal::Smi* value);
+  BytecodeArrayBuilder& LoadLiteral(Smi value);
   BytecodeArrayBuilder& LoadLiteral(double value);
   BytecodeArrayBuilder& LoadLiteral(const AstRawString* raw_string);
   BytecodeArrayBuilder& LoadLiteral(const Scope* scope);
@@ -120,6 +120,10 @@ class V8_EXPORT_PRIVATE BytecodeArrayBuilder final {
   BytecodeArrayBuilder& LoadNamedProperty(Register object,
                                           const AstRawString* name,
                                           int feedback_slot);
+  // Named load property without feedback
+  BytecodeArrayBuilder& LoadNamedPropertyNoFeedback(Register object,
+                                                    const AstRawString* name);
+
   // Keyed load property. The key should be in the accumulator.
   BytecodeArrayBuilder& LoadKeyedProperty(Register object, int feedback_slot);
   // Named load property of the @@iterator symbol.
@@ -145,6 +149,12 @@ class V8_EXPORT_PRIVATE BytecodeArrayBuilder final {
                                            const AstRawString* name,
                                            int feedback_slot,
                                            LanguageMode language_mode);
+
+  // Store a property named by a property name without feedback slot. The value
+  // to be stored should be in the accumulator.
+  BytecodeArrayBuilder& StoreNamedPropertyNoFeedback(
+      Register object, const AstRawString* name, LanguageMode language_mode);
+
   // Store a property named by a constant from the constant pool. The value to
   // be stored should be in the accumulator.
   BytecodeArrayBuilder& StoreNamedProperty(Register object,
@@ -236,8 +246,7 @@ class V8_EXPORT_PRIVATE BytecodeArrayBuilder final {
   BytecodeArrayBuilder& CreateEmptyArrayLiteral(int literal_index);
   BytecodeArrayBuilder& CreateArrayFromIterable();
   BytecodeArrayBuilder& CreateObjectLiteral(size_t constant_properties_entry,
-                                            int literal_index, int flags,
-                                            Register output);
+                                            int literal_index, int flags);
   BytecodeArrayBuilder& CreateEmptyObjectLiteral();
   BytecodeArrayBuilder& CloneObject(Register source, int flags,
                                     int feedback_slot);
@@ -339,7 +348,7 @@ class V8_EXPORT_PRIVATE BytecodeArrayBuilder final {
                                         int feedback_slot);
   // Same as above, but lhs in the accumulator and rhs in |literal|.
   BytecodeArrayBuilder& BinaryOperationSmiLiteral(Token::Value binop,
-                                                  Smi* literal,
+                                                  Smi literal,
                                                   int feedback_slot);
 
   // Unary and Count Operators (value stored in accumulator).
@@ -512,6 +521,9 @@ class V8_EXPORT_PRIVATE BytecodeArrayBuilder final {
   }
 
   bool RequiresImplicitReturn() const { return !return_seen_in_block_; }
+  bool RemainderOfBlockIsDead() const {
+    return bytecode_array_writer_.RemainderOfBlockIsDead();
+  }
 
   // Returns the raw operand value for the given register or register list.
   uint32_t GetInputRegisterOperand(Register reg);

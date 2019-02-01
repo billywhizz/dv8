@@ -16,49 +16,14 @@
 namespace v8 {
 namespace internal {
 
-#define ROOT_ACCESSOR(type, name, CamelName)                   \
-  Handle<type> Factory::name() {                               \
-    return Handle<type>(bit_cast<type**>(                      \
-        &isolate()->heap()->roots_[RootIndex::k##CamelName])); \
+// TODO(jkummerow): Drop std::remove_pointer after the migration to ObjectPtr.
+#define ROOT_ACCESSOR(Type, name, CamelName)                           \
+  Handle<std::remove_pointer<Type>::type> Factory::name() {            \
+    return Handle<std::remove_pointer<Type>::type>(bit_cast<Address*>( \
+        &isolate()->roots_table()[RootIndex::k##CamelName]));          \
   }
 ROOT_LIST(ROOT_ACCESSOR)
-STRUCT_MAPS_LIST(ROOT_ACCESSOR)
-ALLOCATION_SITE_MAPS_LIST(ROOT_ACCESSOR)
-DATA_HANDLER_MAPS_LIST(ROOT_ACCESSOR)
 #undef ROOT_ACCESSOR
-
-#define STRING_ACCESSOR(name, str)                                           \
-  Handle<String> Factory::name() {                                           \
-    return Handle<String>(                                                   \
-        bit_cast<String**>(&isolate()->heap()->roots_[RootIndex::k##name])); \
-  }
-INTERNALIZED_STRING_LIST(STRING_ACCESSOR)
-#undef STRING_ACCESSOR
-
-#define SYMBOL_ACCESSOR(name)                                                \
-  Handle<Symbol> Factory::name() {                                           \
-    return Handle<Symbol>(                                                   \
-        bit_cast<Symbol**>(&isolate()->heap()->roots_[RootIndex::k##name])); \
-  }
-PRIVATE_SYMBOL_LIST(SYMBOL_ACCESSOR)
-#undef SYMBOL_ACCESSOR
-
-#define SYMBOL_ACCESSOR(name, description)                                   \
-  Handle<Symbol> Factory::name() {                                           \
-    return Handle<Symbol>(                                                   \
-        bit_cast<Symbol**>(&isolate()->heap()->roots_[RootIndex::k##name])); \
-  }
-PUBLIC_SYMBOL_LIST(SYMBOL_ACCESSOR)
-WELL_KNOWN_SYMBOL_LIST(SYMBOL_ACCESSOR)
-#undef SYMBOL_ACCESSOR
-
-#define ACCESSOR_INFO_ACCESSOR(accessor_name, AccessorName, ...)            \
-  Handle<AccessorInfo> Factory::accessor_name##_accessor() {                \
-    return Handle<AccessorInfo>(bit_cast<AccessorInfo**>(                   \
-        &isolate()->heap()->roots_[RootIndex::k##AccessorName##Accessor])); \
-  }
-ACCESSOR_INFO_LIST(ACCESSOR_INFO_ACCESSOR)
-#undef ACCESSOR_INFO_ACCESSOR
 
 Handle<String> Factory::InternalizeString(Handle<String> string) {
   if (string->IsInternalizedString()) return string;

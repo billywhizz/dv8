@@ -9,9 +9,13 @@
 #ifndef V8_OBJECTS_JS_RELATIVE_TIME_FORMAT_H_
 #define V8_OBJECTS_JS_RELATIVE_TIME_FORMAT_H_
 
+#include <set>
+#include <string>
+
 #include "src/heap/factory.h"
 #include "src/isolate.h"
 #include "src/objects.h"
+#include "src/objects/managed.h"
 #include "unicode/uversion.h"
 
 // Has to be the last include (doesn't have include guards):
@@ -28,18 +32,13 @@ class JSRelativeTimeFormat : public JSObject {
  public:
   // Initializes relative time format object with properties derived from input
   // locales and options.
-  V8_WARN_UNUSED_RESULT static MaybeHandle<JSRelativeTimeFormat>
-  InitializeRelativeTimeFormat(
+  V8_WARN_UNUSED_RESULT static MaybeHandle<JSRelativeTimeFormat> Initialize(
       Isolate* isolate,
       Handle<JSRelativeTimeFormat> relative_time_format_holder,
       Handle<Object> locales, Handle<Object> options);
 
   V8_WARN_UNUSED_RESULT static Handle<JSObject> ResolvedOptions(
       Isolate* isolate, Handle<JSRelativeTimeFormat> format_holder);
-
-  // Unpacks formatter object from corresponding JavaScript object.
-  V8_WARN_UNUSED_RESULT static icu::RelativeDateTimeFormatter* UnpackFormatter(
-      Handle<JSRelativeTimeFormat> relative_time_format_holder);
 
   Handle<String> StyleAsString() const;
   Handle<String> NumericAsString() const;
@@ -51,12 +50,14 @@ class JSRelativeTimeFormat : public JSObject {
       Handle<JSRelativeTimeFormat> format_holder, const char* func_name,
       bool to_parts);
 
+  static std::set<std::string> GetAvailableLocales();
+
   DECL_CAST(JSRelativeTimeFormat)
 
   // RelativeTimeFormat accessors.
-  DECL_ACCESSORS(locale, String)
+  DECL_ACCESSORS2(locale, String)
 
-  DECL_ACCESSORS(formatter, Foreign)
+  DECL_ACCESSORS(icu_formatter, Managed<icu::RelativeDateTimeFormatter>)
 
   // Style: identifying the relative time format style used.
   //
@@ -105,11 +106,17 @@ class JSRelativeTimeFormat : public JSObject {
   DECL_VERIFIER(JSRelativeTimeFormat)
 
   // Layout description.
-  static const int kJSRelativeTimeFormatOffset = JSObject::kHeaderSize;
-  static const int kLocaleOffset = kJSRelativeTimeFormatOffset + kPointerSize;
-  static const int kFormatterOffset = kLocaleOffset + kPointerSize;
-  static const int kFlagsOffset = kFormatterOffset + kPointerSize;
-  static const int kSize = kFlagsOffset + kPointerSize;
+#define JS_RELATIVE_TIME_FORMAT_FIELDS(V)     \
+  V(kJSRelativeTimeFormatOffset, kTaggedSize) \
+  V(kLocaleOffset, kTaggedSize)               \
+  V(kICUFormatterOffset, kTaggedSize)         \
+  V(kFlagsOffset, kTaggedSize)                \
+  /* Header size. */                          \
+  V(kSize, 0)
+
+  DEFINE_FIELD_OFFSET_CONSTANTS(JSObject::kHeaderSize,
+                                JS_RELATIVE_TIME_FORMAT_FIELDS)
+#undef JS_RELATIVE_TIME_FORMAT_FIELDS
 
  private:
   static Style getStyle(const char* str);

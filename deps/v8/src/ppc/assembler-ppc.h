@@ -44,7 +44,11 @@
 #include <vector>
 
 #include "src/assembler.h"
+#include "src/constant-pool.h"
 #include "src/double.h"
+#include "src/external-reference.h"
+#include "src/label.h"
+#include "src/objects/smi.h"
 #include "src/ppc/constants-ppc.h"
 
 #if V8_HOST_ARCH_PPC && \
@@ -217,7 +221,7 @@ const int kNumSafepointRegisters = 32;
 // The following constants describe the stack frame linkage area as
 // defined by the ABI.  Note that kNumRequiredStackFrameSlots must
 // satisfy alignment requirements (rounding up if required).
-#if V8_TARGET_ARCH_PPC64 && V8_TARGET_LITTLE_ENDIAN
+#if V8_TARGET_ARCH_PPC64 && V8_TARGET_LITTLE_ENDIAN  // ppc64le linux
 // [0] back chain
 // [1] condition register save area
 // [2] link register save area
@@ -230,7 +234,7 @@ const int kNumSafepointRegisters = 32;
 const int kNumRequiredStackFrameSlots = 12;
 const int kStackFrameLRSlot = 2;
 const int kStackFrameExtraParamSlot = 12;
-#elif V8_OS_AIX || V8_TARGET_ARCH_PPC64
+#else  // AIX
 // [0] back chain
 // [1] condition register save area
 // [2] link register save area
@@ -242,21 +246,9 @@ const int kStackFrameExtraParamSlot = 12;
 // [13] Parameter8 save area
 // [14] Parameter9 slot (if necessary)
 // ...
-#if V8_TARGET_ARCH_PPC64
 const int kNumRequiredStackFrameSlots = 14;
-#else
-const int kNumRequiredStackFrameSlots = 16;
-#endif
 const int kStackFrameLRSlot = 2;
 const int kStackFrameExtraParamSlot = 14;
-#else
-// [0] back chain
-// [1] link register save area
-// [2] Parameter9 slot (if necessary)
-// ...
-const int kNumRequiredStackFrameSlots = 4;
-const int kStackFrameLRSlot = 1;
-const int kStackFrameExtraParamSlot = 2;
 #endif
 
 // Define the list of registers actually saved at safepoints.
@@ -387,8 +379,8 @@ class Operand {
     value_.immediate = static_cast<intptr_t>(f.address());
   }
   explicit Operand(Handle<HeapObject> handle);
-  V8_INLINE explicit Operand(Smi* value) : rmode_(RelocInfo::NONE) {
-    value_.immediate = reinterpret_cast<intptr_t>(value);
+  V8_INLINE explicit Operand(Smi value) : rmode_(RelocInfo::NONE) {
+    value_.immediate = static_cast<intptr_t>(value.ptr());
   }
   // rm
   V8_INLINE explicit Operand(Register rm);
@@ -586,7 +578,7 @@ class Assembler : public AssemblerBase {
   // This sets the branch destination.
   // This is for calls and branches within generated code.
   inline static void deserialization_set_special_target_at(
-      Address instruction_payload, Code* code, Address target);
+      Address instruction_payload, Code code, Address target);
 
   // Get the size of the special target encoded at 'instruction_payload'.
   inline static int deserialization_special_target_size(
@@ -1449,10 +1441,13 @@ class Assembler : public AssemblerBase {
   void RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data = 0);
   ConstantPoolEntry::Access ConstantPoolAddEntry(RelocInfo::Mode rmode,
                                                  intptr_t value) {
-    bool sharing_ok = RelocInfo::IsNone(rmode) ||
-                      (!options().record_reloc_info_for_serialization &&
-                       RelocInfo::IsShareableRelocMode(rmode) &&
-                       !is_constant_pool_entry_sharing_blocked());
+    bool sharing_ok =
+        RelocInfo::IsNone(rmode) ||
+        (!options().record_reloc_info_for_serialization &&
+         RelocInfo::IsShareableRelocMode(rmode) &&
+         !is_constant_pool_entry_sharing_blocked() &&
+         // TODO(johnyan): make the following rmode shareable
+         !RelocInfo::IsWasmCall(rmode) && !RelocInfo::IsWasmStubCall(rmode));
     return constant_pool_builder_.AddEntry(pc_offset(), value, sharing_ok);
   }
   ConstantPoolEntry::Access ConstantPoolAddEntry(Double value) {
@@ -1644,6 +1639,11 @@ class PatchingAssembler : public Assembler {
                     int instructions);
   ~PatchingAssembler();
 };
+
+// Define {RegisterName} methods for the register types.
+DEFINE_REGISTER_NAMES(Register, GENERAL_REGISTERS);
+DEFINE_REGISTER_NAMES(DoubleRegister, DOUBLE_REGISTERS);
+
 
 }  // namespace internal
 }  // namespace v8

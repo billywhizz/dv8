@@ -20,6 +20,7 @@ RUN ./platform.sh && \
     ./module.sh timer && \
     ./module.sh tty && \
     ./module.sh loop && \
+    ./module.sh libz && \
     ./module.sh fs && \
     ./module.sh udp && \
     ./module.sh dns && \

@@ -9,6 +9,7 @@
 #include "src/base/bits.h"
 #include "src/external-reference-table.h"
 #include "src/globals.h"
+#include "src/msan.h"
 #include "src/snapshot/references.h"
 #include "src/v8memory.h"
 #include "src/visitors.h"
@@ -107,10 +108,13 @@ class SerializerDeserializer : public RootVisitor {
   // We also handle map space differenly.
   STATIC_ASSERT(MAP_SPACE == CODE_SPACE + 1);
 
-  // We do not support young generation large objects.
+  // We do not support young generation large objects and large code objects.
   STATIC_ASSERT(LAST_SPACE == NEW_LO_SPACE);
-  STATIC_ASSERT(LAST_SPACE - 1 == LO_SPACE);
+  STATIC_ASSERT(LAST_SPACE - 2 == LO_SPACE);
   static const int kNumberOfPreallocatedSpaces = CODE_SPACE + 1;
+
+  // The number of spaces supported by the serializer. Spaces after LO_SPACE
+  // (NEW_LO_SPACE and CODE_LO_SPACE) are not supported.
   static const int kNumberOfSpaces = LO_SPACE + 1;
 
  protected:
@@ -122,10 +126,11 @@ class SerializerDeserializer : public RootVisitor {
       const std::vector<CallHandlerInfo*>& call_handler_infos);
 
 #define UNUSED_SERIALIZER_BYTE_CODES(V) \
-  V(0x18)                               \
-  V(0x3d)                               \
+  V(0x0e)                               \
+  V(0x2e)                               \
   V(0x3e)                               \
   V(0x3f)                               \
+  V(0x4e)                               \
   V(0x58)                               \
   V(0x59)                               \
   V(0x5a)                               \
@@ -135,13 +140,12 @@ class SerializerDeserializer : public RootVisitor {
   V(0x5e)                               \
   V(0x5f)                               \
   V(0x67)                               \
+  V(0x6e)                               \
   V(0x76)                               \
-  V(0x78)                               \
   V(0x79)                               \
   V(0x7a)                               \
   V(0x7b)                               \
-  V(0x7c)                               \
-  V(0x7d)
+  V(0x7c)
 
   // ---------- byte code range 0x00..0x7f ----------
   // Byte codes in this range represent Where, HowToCode and WhereToPoint.
@@ -162,12 +166,12 @@ class SerializerDeserializer : public RootVisitor {
     // 0x07        External reference referenced by id.
     kExternalReference = 0x07,
 
-    // 0x0e        Builtin code referenced by index.
-    kBuiltin = 0x0e,
     // 0x16       Root array item.
     kRootArray = 0x16,
     // 0x17        Object provided in the attached list.
     kAttachedReference = 0x17,
+    // 0x18        Object in the read-only object cache.
+    kReadOnlyObjectCache = 0x18,
 
     // 0x0f        Misc, see below (incl. 0x2f, 0x4f, 0x6f).
     // 0x18..0x1f  Misc, see below (incl. 0x38..0x3f, 0x58..0x5f, 0x78..0x7f).
@@ -224,16 +228,17 @@ class SerializerDeserializer : public RootVisitor {
   // Used for embedder-provided serialization data for embedder fields.
   static const int kEmbedderFieldsData = 0x1f;
 
-  // Used to encode external referenced provided through the API.
-  static const int kApiReference = 0x38;
-
   static const int kVariableRawCode = 0x39;
   static const int kVariableRawData = 0x3a;
 
   static const int kInternalReference = 0x3b;
   static const int kInternalReferenceEncoded = 0x3c;
 
+  // Used to encode external references provided through the API.
+  static const int kApiReference = 0x3d;
+
   // In-place weak references
+  static const int kClearedWeakReference = 0x7d;
   static const int kWeakPrefix = 0x7e;
 
   // Encodes an off-heap instruction stream target.
@@ -348,6 +353,45 @@ class SerializedData {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(SerializedData);
+};
+
+class Checksum {
+ public:
+  explicit Checksum(Vector<const byte> payload) {
+#ifdef MEMORY_SANITIZER
+    // Computing the checksum includes padding bytes for objects like strings.
+    // Mark every object as initialized in the code serializer.
+    MSAN_MEMORY_IS_INITIALIZED(payload.start(), payload.length());
+#endif  // MEMORY_SANITIZER
+    // Fletcher's checksum. Modified to reduce 64-bit sums to 32-bit.
+    uintptr_t a = 1;
+    uintptr_t b = 0;
+    const uintptr_t* cur = reinterpret_cast<const uintptr_t*>(payload.start());
+    DCHECK(IsAligned(payload.length(), kIntptrSize));
+    const uintptr_t* end = cur + payload.length() / kIntptrSize;
+    while (cur < end) {
+      // Unsigned overflow expected and intended.
+      a += *cur++;
+      b += a;
+    }
+#if V8_HOST_ARCH_64_BIT
+    a ^= a >> 32;
+    b ^= b >> 32;
+#endif  // V8_HOST_ARCH_64_BIT
+    a_ = static_cast<uint32_t>(a);
+    b_ = static_cast<uint32_t>(b);
+  }
+
+  bool Check(uint32_t a, uint32_t b) const { return a == a_ && b == b_; }
+
+  uint32_t a() const { return a_; }
+  uint32_t b() const { return b_; }
+
+ private:
+  uint32_t a_;
+  uint32_t b_;
+
+  DISALLOW_COPY_AND_ASSIGN(Checksum);
 };
 
 }  // namespace internal

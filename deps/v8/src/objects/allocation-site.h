@@ -13,6 +13,8 @@
 namespace v8 {
 namespace internal {
 
+enum InstanceType : uint16_t;
+
 class AllocationSite : public Struct, public NeverReadOnlySpaceObject {
  public:
   static const uint32_t kMaximumArrayBytesToPretransition = 8 * 1024;
@@ -46,7 +48,7 @@ class AllocationSite : public Struct, public NeverReadOnlySpaceObject {
   DECL_INT32_ACCESSORS(pretenure_data)
 
   DECL_INT32_ACCESSORS(pretenure_create_count)
-  DECL_ACCESSORS(dependent_code, DependentCode)
+  DECL_ACCESSORS2(dependent_code, DependentCode)
 
   // heap->allocation_site_list() points to the last AllocationSite which form
   // a linked list through the weak_next property. The GC might remove elements
@@ -62,9 +64,9 @@ class AllocationSite : public Struct, public NeverReadOnlySpaceObject {
   bool IsNested();
 
   // transition_info bitfields, for constructed array transition info.
-  class ElementsKindBits : public BitField<ElementsKind, 0, 15> {};
-  class UnusedBits : public BitField<int, 15, 14> {};
-  class DoNotInlineBit : public BitField<bool, 29, 1> {};
+  class ElementsKindBits : public BitField<ElementsKind, 0, 5> {};
+  class DoNotInlineBit : public BitField<bool, 5, 1> {};
+  // Unused bits 6-30.
 
   // Bitfields for pretenure_data
   class MementoFoundCountBits : public BitField<int, 0, 26> {};
@@ -134,21 +136,21 @@ class AllocationSite : public Struct, public NeverReadOnlySpaceObject {
 // AllocationSite has to start with TransitionInfoOrboilerPlateOffset
 // and end with WeakNext field.
 #define ALLOCATION_SITE_FIELDS(V)                     \
-  V(kTransitionInfoOrBoilerplateOffset, kPointerSize) \
-  V(kNestedSiteOffset, kPointerSize)                  \
-  V(kDependentCodeOffset, kPointerSize)               \
+  V(kStartOffset, 0)                                  \
+  V(kTransitionInfoOrBoilerplateOffset, kTaggedSize)  \
+  V(kNestedSiteOffset, kTaggedSize)                   \
+  V(kDependentCodeOffset, kTaggedSize)                \
   V(kCommonPointerFieldEndOffset, 0)                  \
   V(kPretenureDataOffset, kInt32Size)                 \
   V(kPretenureCreateCountOffset, kInt32Size)          \
   /* Size of AllocationSite without WeakNext field */ \
   V(kSizeWithoutWeakNext, 0)                          \
-  V(kWeakNextOffset, kPointerSize)                    \
+  V(kWeakNextOffset, kTaggedSize)                     \
   /* Size of AllocationSite with WeakNext field */    \
   V(kSizeWithWeakNext, 0)
 
   DEFINE_FIELD_OFFSET_CONSTANTS(HeapObject::kHeaderSize, ALLOCATION_SITE_FIELDS)
-
-  static const int kStartOffset = HeapObject::kHeaderSize;
+#undef ALLOCATION_SITE_FIELDS
 
   class BodyDescriptor;
 
@@ -160,8 +162,14 @@ class AllocationSite : public Struct, public NeverReadOnlySpaceObject {
 
 class AllocationMemento : public Struct {
  public:
-  static const int kAllocationSiteOffset = HeapObject::kHeaderSize;
-  static const int kSize = kAllocationSiteOffset + kPointerSize;
+// Layout description.
+#define ALLOCATION_MEMENTO_FIELDS(V)    \
+  V(kAllocationSiteOffset, kTaggedSize) \
+  V(kSize, 0)
+
+  DEFINE_FIELD_OFFSET_CONSTANTS(HeapObject::kHeaderSize,
+                                ALLOCATION_MEMENTO_FIELDS)
+#undef ALLOCATION_MEMENTO_FIELDS
 
   DECL_ACCESSORS(allocation_site, Object)
 

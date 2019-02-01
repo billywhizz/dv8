@@ -137,8 +137,7 @@ void PropertyAccessBuilder::BuildCheckMaps(
     if (receiver_map->is_stable()) {
       for (Handle<Map> map : receiver_maps) {
         if (map.is_identical_to(receiver_map)) {
-          dependencies()->DependOnStableMap(
-              MapRef(js_heap_broker(), receiver_map));
+          dependencies()->DependOnStableMap(MapRef(broker(), receiver_map));
           return;
         }
       }
@@ -207,7 +206,7 @@ Node* PropertyAccessBuilder::TryBuildLoadConstantDataField(
           // the field.
           DCHECK(access_info.IsDataConstantField());
           DCHECK(!it.is_dictionary_holder());
-          MapRef map(js_heap_broker(),
+          MapRef map(broker(),
                      handle(it.GetHolder<HeapObject>()->map(), isolate()));
           map.SerializeOwnDescriptors();  // TODO(neis): Remove later.
           dependencies()->DependOnFieldType(map, it.GetFieldDescriptorIndex());
@@ -246,7 +245,8 @@ Node* PropertyAccessBuilder::BuildLoadDataField(
       MaybeHandle<Map>(),
       field_type,
       MachineType::TypeForRepresentation(field_representation),
-      kFullWriteBarrier};
+      kFullWriteBarrier,
+      LoadSensitivity::kCritical};
   if (field_representation == MachineRepresentation::kFloat64) {
     if (!field_index.is_inobject() || field_index.is_hidden_field() ||
         !FLAG_unbox_double_fields) {
@@ -256,7 +256,8 @@ Node* PropertyAccessBuilder::BuildLoadDataField(
                                           MaybeHandle<Map>(),
                                           Type::OtherInternal(),
                                           MachineType::TaggedPointer(),
-                                          kPointerWriteBarrier};
+                                          kPointerWriteBarrier,
+                                          LoadSensitivity::kCritical};
       storage = *effect = graph()->NewNode(
           simplified()->LoadField(storage_access), storage, *effect, *control);
       field_access.offset = HeapNumber::kValueOffset;
@@ -268,7 +269,7 @@ Node* PropertyAccessBuilder::BuildLoadDataField(
     Handle<Map> field_map;
     if (access_info.field_map().ToHandle(&field_map)) {
       if (field_map->is_stable()) {
-        dependencies()->DependOnStableMap(MapRef(js_heap_broker(), field_map));
+        dependencies()->DependOnStableMap(MapRef(broker(), field_map));
         field_access.map = field_map;
       }
     }

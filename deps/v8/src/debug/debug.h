@@ -179,7 +179,7 @@ class DebugInfoListNode {
 
  private:
   // Global (weak) handle to the debug info object.
-  DebugInfo** debug_info_;
+  Address* debug_info_;
 
   // Next pointer for linked list.
   DebugInfoListNode* next_;
@@ -368,6 +368,9 @@ class Debug {
   Address restart_fp_address() {
     return reinterpret_cast<Address>(&thread_local_.restart_fp_);
   }
+  bool will_restart() const {
+    return thread_local_.restart_fp_ != kNullAddress;
+  }
 
   StepAction last_step_action() { return thread_local_.last_step_action_; }
   bool break_on_next_function_call() const {
@@ -410,7 +413,8 @@ class Debug {
 
   bool IsExceptionBlackboxed(bool uncaught);
 
-  void OnException(Handle<Object> exception, Handle<Object> promise);
+  void OnException(Handle<Object> exception, Handle<Object> promise,
+                   v8::debug::ExceptionType exception_type);
 
   void ProcessCompileEvent(bool has_compile_error, Handle<Script> script);
 

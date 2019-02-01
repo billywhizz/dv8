@@ -29,6 +29,7 @@ Reduction RedundancyElimination::Reduce(Node* node) {
     case IrOpcode::kCheckNotTaggedHole:
     case IrOpcode::kCheckNumber:
     case IrOpcode::kCheckReceiver:
+    case IrOpcode::kCheckReceiverOrNullOrUndefined:
     case IrOpcode::kCheckSmi:
     case IrOpcode::kCheckString:
     case IrOpcode::kCheckSymbol:
@@ -36,6 +37,10 @@ Reduction RedundancyElimination::Reduce(Node* node) {
       SIMPLIFIED_CHECKED_OP_LIST(SIMPLIFIED_CHECKED_OP)
 #undef SIMPLIFIED_CHECKED_OP
       return ReduceCheckNode(node);
+    case IrOpcode::kSpeculativeNumberEqual:
+    case IrOpcode::kSpeculativeNumberLessThan:
+    case IrOpcode::kSpeculativeNumberLessThanOrEqual:
+      return ReduceSpeculativeNumberComparison(node);
     case IrOpcode::kSpeculativeNumberAdd:
     case IrOpcode::kSpeculativeNumberSubtract:
     case IrOpcode::kSpeculativeSafeIntegerAdd:
@@ -131,6 +136,9 @@ bool CheckSubsumes(Node const* a, Node const* b) {
     } else if (a->opcode() == IrOpcode::kCheckedTaggedSignedToInt32 &&
                b->opcode() == IrOpcode::kCheckedTaggedToInt32) {
       // CheckedTaggedSignedToInt32(node) implies CheckedTaggedToInt32(node)
+    } else if (a->opcode() == IrOpcode::kCheckReceiver &&
+               b->opcode() == IrOpcode::kCheckReceiverOrNullOrUndefined) {
+      // CheckReceiver(node) implies CheckReceiverOrNullOrUndefined(node)
     } else if (a->opcode() != b->opcode()) {
       return false;
     } else {
@@ -146,13 +154,17 @@ bool CheckSubsumes(Node const* a, Node const* b) {
         case IrOpcode::kCheckedTaggedSignedToInt32:
         case IrOpcode::kCheckedTaggedToTaggedPointer:
         case IrOpcode::kCheckedTaggedToTaggedSigned:
+        case IrOpcode::kCheckedUint32Bounds:
         case IrOpcode::kCheckedUint32ToInt32:
         case IrOpcode::kCheckedUint32ToTaggedSigned:
+        case IrOpcode::kCheckedUint64Bounds:
         case IrOpcode::kCheckedUint64ToInt32:
         case IrOpcode::kCheckedUint64ToTaggedSigned:
           break;
         case IrOpcode::kCheckedFloat64ToInt32:
-        case IrOpcode::kCheckedTaggedToInt32: {
+        case IrOpcode::kCheckedFloat64ToInt64:
+        case IrOpcode::kCheckedTaggedToInt32:
+        case IrOpcode::kCheckedTaggedToInt64: {
           const CheckMinusZeroParameters& ap =
               CheckMinusZeroParametersOf(a->op());
           const CheckMinusZeroParameters& bp =
@@ -266,6 +278,64 @@ Reduction RedundancyElimination::ReduceEffectPhi(Node* node) {
     Node* const input = NodeProperties::GetEffectInput(node, i);
     checks->Merge(node_checks_.Get(input));
   }
+  return UpdateChecks(node, checks);
+}
+
+Reduction RedundancyElimination::ReduceSpeculativeNumberComparison(Node* node) {
+  NumberOperationHint const hint = NumberOperationHintOf(node->op());
+  Node* const first = NodeProperties::GetValueInput(node, 0);
+  Type const first_type = NodeProperties::GetType(first);
+  Node* const second = NodeProperties::GetValueInput(node, 1);
+  Type const second_type = NodeProperties::GetType(second);
+  Node* const effect = NodeProperties::GetEffectInput(node);
+  EffectPathChecks const* checks = node_checks_.Get(effect);
+
+  // If we do not know anything about the predecessor, do not propagate just yet
+  // because we will have to recompute anyway once we compute the predecessor.
+  if (checks == nullptr) return NoChange();
+
+  // Avoid the potentially expensive lookups below if the {node}
+  // has seen non-Smi inputs in the past, which is a clear signal
+  // that the comparison is probably not performed on a value that
+  // already passed an array bounds check.
+  if (hint == NumberOperationHint::kSignedSmall) {
+    // Don't bother trying to find a CheckBounds for the {first} input
+    // if it's type is already in UnsignedSmall range, since the bounds
+    // check is only going to narrow that range further, but the result
+    // is not going to make the representation selection any better.
+    if (!first_type.Is(Type::UnsignedSmall())) {
+      if (Node* check = checks->LookupBoundsCheckFor(first)) {
+        if (!first_type.Is(NodeProperties::GetType(check))) {
+          // Replace the {first} input with the {check}. This is safe,
+          // despite the fact that {check} can truncate -0 to 0, because
+          // the regular Number comparisons in JavaScript also identify
+          // 0 and -0 (unlike special comparisons as Object.is).
+          NodeProperties::ReplaceValueInput(node, check, 0);
+          Reduction const reduction = ReduceSpeculativeNumberComparison(node);
+          return reduction.Changed() ? reduction : Changed(node);
+        }
+      }
+    }
+
+    // Don't bother trying to find a CheckBounds for the {second} input
+    // if it's type is already in UnsignedSmall range, since the bounds
+    // check is only going to narrow that range further, but the result
+    // is not going to make the representation selection any better.
+    if (!second_type.Is(Type::UnsignedSmall())) {
+      if (Node* check = checks->LookupBoundsCheckFor(second)) {
+        if (!second_type.Is(NodeProperties::GetType(check))) {
+          // Replace the {second} input with the {check}. This is safe,
+          // despite the fact that {check} can truncate -0 to 0, because
+          // the regular Number comparisons in JavaScript also identify
+          // 0 and -0 (unlike special comparisons as Object.is).
+          NodeProperties::ReplaceValueInput(node, check, 1);
+          Reduction const reduction = ReduceSpeculativeNumberComparison(node);
+          return reduction.Changed() ? reduction : Changed(node);
+        }
+      }
+    }
+  }
+
   return UpdateChecks(node, checks);
 }
 

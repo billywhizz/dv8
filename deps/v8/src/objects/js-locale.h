@@ -25,12 +25,16 @@ class JSLocale : public JSObject {
  public:
   // Initializes locale object with properties derived from input locale string
   // and options.
-  static MaybeHandle<JSLocale> InitializeLocale(Isolate* isolate,
-                                                Handle<JSLocale> locale_holder,
-                                                Handle<String> locale,
-                                                Handle<JSReceiver> options);
-  static Handle<String> Maximize(Isolate* isolate, String* locale);
-  static Handle<String> Minimize(Isolate* isolate, String* locale);
+  static MaybeHandle<JSLocale> Initialize(Isolate* isolate,
+                                          Handle<JSLocale> locale_holder,
+                                          Handle<String> locale,
+                                          Handle<JSReceiver> options);
+  static Handle<String> Maximize(Isolate* isolate, String locale);
+  static Handle<String> Minimize(Isolate* isolate, String locale);
+
+  Handle<String> CaseFirstAsString() const;
+  Handle<String> NumericAsString() const;
+  Handle<String> HourCycleAsString() const;
 
   DECL_CAST(JSLocale)
 
@@ -39,36 +43,90 @@ class JSLocale : public JSObject {
   DECL_ACCESSORS(script, Object)
   DECL_ACCESSORS(region, Object)
   DECL_ACCESSORS(base_name, Object)
-  DECL_ACCESSORS(locale, String)
+  DECL_ACCESSORS2(locale, String)
 
   // Unicode extension accessors.
   DECL_ACCESSORS(calendar, Object)
-  DECL_ACCESSORS(case_first, Object)
   DECL_ACCESSORS(collation, Object)
-  DECL_ACCESSORS(hour_cycle, Object)
-  DECL_ACCESSORS(numeric, Object)
   DECL_ACCESSORS(numbering_system, Object)
+
+  // CaseFirst: "kf"
+  //
+  // ecma402 #sec-Intl.Locale.prototype.caseFirst
+  enum class CaseFirst {
+    UPPER,  // upper case sorts before lower case
+    LOWER,  // lower case sorts before upper case
+    // (compiler does not like FALSE so we have to name it FALSE_VALUE)
+    FALSE_VALUE,  // Turn the feature off
+    COUNT
+  };
+  inline void set_case_first(CaseFirst case_first);
+  inline CaseFirst case_first() const;
+
+  // Numeric: 'kn"
+  //
+  // ecma402 #sec-Intl.Locale.prototype.numeric
+  enum class Numeric { NOTSET, TRUE_VALUE, FALSE_VALUE, COUNT };
+  inline void set_numeric(Numeric numeric);
+  inline Numeric numeric() const;
+
+  // CaseFirst: "hc"
+  //
+  // ecma402 #sec-Intl.Locale.prototype.hourCycle
+  enum class HourCycle {
+    H11,  // 12-hour format start with hour 0 and go up to 11.
+    H12,  // 12-hour format start with hour 1 and go up to 12.
+    H23,  // 24-hour format start with hour 0 and go up to 23.
+    H24,  // 24-hour format start with hour 1 and go up to 24.
+    COUNT
+  };
+  inline void set_hour_cycle(HourCycle hour_cycle);
+  inline HourCycle hour_cycle() const;
+
+// Bit positions in |flags|.
+#define FLAGS_BIT_FIELDS(V, _)      \
+  V(CaseFirstBits, CaseFirst, 2, _) \
+  V(NumericBits, Numeric, 2, _)     \
+  V(HourCycleBits, HourCycle, 2, _)
+  DEFINE_BIT_FIELDS(FLAGS_BIT_FIELDS)
+#undef FLAGS_BIT_FIELDS
+
+  STATIC_ASSERT(CaseFirst::UPPER <= CaseFirstBits::kMax);
+  STATIC_ASSERT(CaseFirst::LOWER <= CaseFirstBits::kMax);
+  STATIC_ASSERT(CaseFirst::FALSE_VALUE <= CaseFirstBits::kMax);
+  STATIC_ASSERT(Numeric::NOTSET <= NumericBits::kMax);
+  STATIC_ASSERT(Numeric::FALSE_VALUE <= NumericBits::kMax);
+  STATIC_ASSERT(Numeric::TRUE_VALUE <= NumericBits::kMax);
+  STATIC_ASSERT(HourCycle::H11 <= HourCycleBits::kMax);
+  STATIC_ASSERT(HourCycle::H12 <= HourCycleBits::kMax);
+  STATIC_ASSERT(HourCycle::H23 <= HourCycleBits::kMax);
+  STATIC_ASSERT(HourCycle::H24 <= HourCycleBits::kMax);
+
+  // [flags] Bit field containing various flags about the function.
+  DECL_INT_ACCESSORS(flags)
 
   DECL_PRINTER(JSLocale)
   DECL_VERIFIER(JSLocale)
 
   // Layout description.
-  static const int kJSLocaleOffset = JSObject::kHeaderSize;
-  // Locale fields.
-  static const int kLanguageOffset = kJSLocaleOffset + kPointerSize;
-  static const int kScriptOffset = kLanguageOffset + kPointerSize;
-  static const int kRegionOffset = kScriptOffset + kPointerSize;
-  static const int kBaseNameOffset = kRegionOffset + kPointerSize;
-  static const int kLocaleOffset = kBaseNameOffset + kPointerSize;
-  // Unicode extension fields.
-  static const int kCalendarOffset = kLocaleOffset + kPointerSize;
-  static const int kCaseFirstOffset = kCalendarOffset + kPointerSize;
-  static const int kCollationOffset = kCaseFirstOffset + kPointerSize;
-  static const int kHourCycleOffset = kCollationOffset + kPointerSize;
-  static const int kNumericOffset = kHourCycleOffset + kPointerSize;
-  static const int kNumberingSystemOffset = kNumericOffset + kPointerSize;
-  // Final size.
-  static const int kSize = kNumberingSystemOffset + kPointerSize;
+#define JS_LOCALE_FIELDS(V)              \
+  V(kJSLocaleOffset, kTaggedSize)        \
+  /* Locale fields. */                   \
+  V(kLanguageOffset, kTaggedSize)        \
+  V(kScriptOffset, kTaggedSize)          \
+  V(kRegionOffset, kTaggedSize)          \
+  V(kBaseNameOffset, kTaggedSize)        \
+  V(kLocaleOffset, kTaggedSize)          \
+  /* Unicode extension fields. */        \
+  V(kFlagsOffset, kTaggedSize)           \
+  V(kCalendarOffset, kTaggedSize)        \
+  V(kCollationOffset, kTaggedSize)       \
+  V(kNumberingSystemOffset, kTaggedSize) \
+  /* Header size. */                     \
+  V(kSize, 0)
+
+  DEFINE_FIELD_OFFSET_CONSTANTS(JSObject::kHeaderSize, JS_LOCALE_FIELDS)
+#undef JS_LOCALE_FIELDS
 
  private:
   DISALLOW_IMPLICIT_CONSTRUCTORS(JSLocale);

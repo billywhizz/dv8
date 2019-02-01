@@ -60,6 +60,10 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
   // Finalizes the schedule and exports it to be used for code generation. Note
   // that this RawMachineAssembler becomes invalid after export.
   Schedule* Export();
+  // Finalizes the schedule and transforms it into a graph that's suitable for
+  // it to be used for Turbofan optimization and re-scheduling. Note that this
+  // RawMachineAssembler becomes invalid after export.
+  Graph* ExportForOptimization();
 
   // ===========================================================================
   // The following utility methods create new nodes with specific operators and
@@ -99,10 +103,6 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
   }
   Node* HeapConstant(Handle<HeapObject> object) {
     return AddNode(common()->HeapConstant(object));
-  }
-  Node* BooleanConstant(bool value) {
-    Handle<Object> object = isolate()->factory()->ToBoolean(value);
-    return HeapConstant(Handle<HeapObject>::cast(object));
   }
   Node* ExternalConstant(ExternalReference address) {
     return AddNode(common()->ExternalConstant(address));
@@ -173,15 +173,51 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
 
   // Atomic memory operations.
   Node* AtomicLoad(MachineType type, Node* base, Node* index) {
+    if (type.representation() == MachineRepresentation::kWord64) {
+      if (machine()->Is64()) {
+        return AddNode(machine()->Word64AtomicLoad(type), base, index);
+      } else {
+        return AddNode(machine()->Word32AtomicPairLoad(), base, index);
+      }
+    }
     return AddNode(machine()->Word32AtomicLoad(type), base, index);
   }
+
+#if defined(V8_TARGET_BIG_ENDIAN)
+#define VALUE_HALVES value_high, value
+#else
+#define VALUE_HALVES value, value_high
+#endif
+
   Node* AtomicStore(MachineRepresentation rep, Node* base, Node* index,
-                    Node* value) {
+                    Node* value, Node* value_high) {
+    if (rep == MachineRepresentation::kWord64) {
+      if (machine()->Is64()) {
+        DCHECK_NULL(value_high);
+        return AddNode(machine()->Word64AtomicStore(rep), base, index, value);
+      } else {
+        return AddNode(machine()->Word32AtomicPairStore(), base, index,
+                       VALUE_HALVES);
+      }
+    }
+    DCHECK_NULL(value_high);
     return AddNode(machine()->Word32AtomicStore(rep), base, index, value);
   }
-#define ATOMIC_FUNCTION(name)                                                 \
-  Node* Atomic##name(MachineType rep, Node* base, Node* index, Node* value) { \
-    return AddNode(machine()->Word32Atomic##name(rep), base, index, value);   \
+#define ATOMIC_FUNCTION(name)                                               \
+  Node* Atomic##name(MachineType rep, Node* base, Node* index, Node* value, \
+                     Node* value_high) {                                    \
+    if (rep.representation() == MachineRepresentation::kWord64) {           \
+      if (machine()->Is64()) {                                              \
+        DCHECK_NULL(value_high);                                            \
+        return AddNode(machine()->Word64Atomic##name(rep), base, index,     \
+                       value);                                              \
+      } else {                                                              \
+        return AddNode(machine()->Word32AtomicPair##name(), base, index,    \
+                       VALUE_HALVES);                                       \
+      }                                                                     \
+    }                                                                       \
+    DCHECK_NULL(value_high);                                                \
+    return AddNode(machine()->Word32Atomic##name(rep), base, index, value); \
   }
   ATOMIC_FUNCTION(Exchange);
   ATOMIC_FUNCTION(Add);
@@ -190,9 +226,25 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
   ATOMIC_FUNCTION(Or);
   ATOMIC_FUNCTION(Xor);
 #undef ATOMIC_FUNCTION
+#undef VALUE_HALVES
 
   Node* AtomicCompareExchange(MachineType rep, Node* base, Node* index,
-                              Node* old_value, Node* new_value) {
+                              Node* old_value, Node* old_value_high,
+                              Node* new_value, Node* new_value_high) {
+    if (rep.representation() == MachineRepresentation::kWord64) {
+      if (machine()->Is64()) {
+        DCHECK_NULL(old_value_high);
+        DCHECK_NULL(new_value_high);
+        return AddNode(machine()->Word64AtomicCompareExchange(rep), base, index,
+                       old_value, new_value);
+      } else {
+        return AddNode(machine()->Word32AtomicPairCompareExchange(), base,
+                       index, old_value, old_value_high, new_value,
+                       new_value_high);
+      }
+    }
+    DCHECK_NULL(old_value_high);
+    DCHECK_NULL(new_value_high);
     return AddNode(machine()->Word32AtomicCompareExchange(rep), base, index,
                    old_value, new_value);
   }
@@ -573,28 +625,25 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
 
   // Conversions.
   Node* BitcastTaggedToWord(Node* a) {
-#ifdef ENABLE_VERIFY_CSA
-    return AddNode(machine()->BitcastTaggedToWord(), a);
-#else
+    if (FLAG_verify_csa || FLAG_optimize_csa) {
+      return AddNode(machine()->BitcastTaggedToWord(), a);
+    }
     return a;
-#endif
   }
   Node* BitcastMaybeObjectToWord(Node* a) {
-#ifdef ENABLE_VERIFY_CSA
-    return AddNode(machine()->BitcastMaybeObjectToWord(), a);
-#else
+    if (FLAG_verify_csa || FLAG_optimize_csa) {
+      return AddNode(machine()->BitcastMaybeObjectToWord(), a);
+    }
     return a;
-#endif
   }
   Node* BitcastWordToTagged(Node* a) {
     return AddNode(machine()->BitcastWordToTagged(), a);
   }
   Node* BitcastWordToTaggedSigned(Node* a) {
-#ifdef ENABLE_VERIFY_CSA
-    return AddNode(machine()->BitcastWordToTaggedSigned(), a);
-#else
+    if (FLAG_verify_csa || FLAG_optimize_csa) {
+      return AddNode(machine()->BitcastWordToTaggedSigned(), a);
+    }
     return a;
-#endif
   }
   Node* TruncateFloat64ToWord32(Node* a) {
     return AddNode(machine()->TruncateFloat64ToWord32(), a);
@@ -890,8 +939,8 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
   void Bind(RawMachineLabel* label, AssemblerDebugInfo info);
   void SetInitialDebugInformation(AssemblerDebugInfo info);
   void PrintCurrentBlock(std::ostream& os);
-  bool InsideBlock();
 #endif  // DEBUG
+  bool InsideBlock();
 
   // Add success / exception successor blocks and ends the current block ending
   // in a potentially throwing call node.
@@ -933,6 +982,18 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
   BasicBlock* Use(RawMachineLabel* label);
   BasicBlock* EnsureBlock(RawMachineLabel* label);
   BasicBlock* CurrentBlock();
+
+  // A post-processing pass to add effect and control edges so that the graph
+  // can be optimized and re-scheduled.
+  // TODO(tebbi): Move this to a separate class.
+  void MakeReschedulable();
+  Node* CreateNodeFromPredecessors(const std::vector<BasicBlock*>& predecessors,
+                                   const std::vector<Node*>& sidetable,
+                                   const Operator* op,
+                                   const std::vector<Node*>& additional_inputs);
+  void MakePhiBinary(Node* phi, int split_point, Node* left_control,
+                     Node* right_control);
+  void MarkControlDeferred(Node* control_input);
 
   Schedule* schedule() { return schedule_; }
   size_t parameter_count() const { return call_descriptor_->ParameterCount(); }

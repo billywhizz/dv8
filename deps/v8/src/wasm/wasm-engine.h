@@ -6,6 +6,7 @@
 #define V8_WASM_WASM_ENGINE_H_
 
 #include <memory>
+#include <unordered_set>
 
 #include "src/wasm/wasm-code-manager.h"
 #include "src/wasm/wasm-memory.h"
@@ -15,16 +16,18 @@
 namespace v8 {
 namespace internal {
 
+class AsmWasmData;
 class CodeTracer;
 class CompilationStatistics;
-class WasmModuleObject;
 class WasmInstanceObject;
+class WasmModuleObject;
 
 namespace wasm {
 
+class AsyncCompileJob;
 class ErrorThrower;
-struct WasmFeatures;
 struct ModuleWireBytes;
+struct WasmFeatures;
 
 class V8_EXPORT_PRIVATE CompilationResultResolver {
  public:
@@ -54,10 +57,13 @@ class V8_EXPORT_PRIVATE WasmEngine {
 
   // Synchronously compiles the given bytes that represent a translated
   // asm.js module.
-  MaybeHandle<WasmModuleObject> SyncCompileTranslatedAsmJs(
+  MaybeHandle<AsmWasmData> SyncCompileTranslatedAsmJs(
       Isolate* isolate, ErrorThrower* thrower, const ModuleWireBytes& bytes,
-      Handle<Script> asm_js_script,
-      Vector<const byte> asm_js_offset_table_bytes);
+      Vector<const byte> asm_js_offset_table_bytes,
+      Handle<HeapNumber> uses_bitset);
+  Handle<WasmModuleObject> FinalizeTranslatedAsmJs(
+      Isolate* isolate, Handle<AsmWasmData> asm_wasm_data,
+      Handle<Script> script);
 
   // Synchronously compiles the given bytes that represent an encoded WASM
   // module.
@@ -93,8 +99,8 @@ class V8_EXPORT_PRIVATE WasmEngine {
       std::shared_ptr<CompilationResultResolver> resolver);
 
   // Compiles the function with the given index at a specific compilation tier
-  // and returns true on success, false (and pending exception) otherwise. This
-  // is mostly used for testing to force a function into a specific tier.
+  // and returns true on success, false otherwise. This is mostly used for
+  // testing to force a function into a specific tier.
   bool CompileFunction(Isolate* isolate, NativeModule* native_module,
                        uint32_t function_index, ExecutionTier tier);
 
@@ -135,6 +141,10 @@ class V8_EXPORT_PRIVATE WasmEngine {
   // for tearing down an isolate, or to clean it up to be reused.
   void DeleteCompileJobsOnIsolate(Isolate* isolate);
 
+  // Manage the set of Isolates that use this WasmEngine.
+  void AddIsolate(Isolate* isolate);
+  void RemoveIsolate(Isolate* isolate);
+
   // Call on process start and exit.
   static void InitializeOncePerProcess();
   static void GlobalTearDown();
@@ -167,6 +177,9 @@ class V8_EXPORT_PRIVATE WasmEngine {
 
   std::unique_ptr<CompilationStatistics> compilation_stats_;
   std::unique_ptr<CodeTracer> code_tracer_;
+
+  // Set of isolates which use this WasmEngine. Used for cross-isolate GCs.
+  std::unordered_set<Isolate*> isolates_;
 
   // End of fields protected by {mutex_}.
   //////////////////////////////////////////////////////////////////////////////

@@ -83,7 +83,10 @@ void CpuFeatures::ProbeImpl(bool cross_compile) {
   // Only use statically determined features for cross compile (snapshot).
   if (cross_compile) return;
 
-  if (cpu.has_sse41() && FLAG_enable_sse4_1) supported_ |= 1u << SSE4_1;
+  if (cpu.has_sse41() && FLAG_enable_sse4_1) {
+    supported_ |= 1u << SSE4_1;
+    supported_ |= 1u << SSSE3;
+  }
   if (cpu.has_ssse3() && FLAG_enable_ssse3) supported_ |= 1u << SSSE3;
   if (cpu.has_sse3() && FLAG_enable_sse3) supported_ |= 1u << SSE3;
   // SAHF is not generally available in long mode.
@@ -124,20 +127,6 @@ void CpuFeatures::PrintFeatures() {
 
 // -----------------------------------------------------------------------------
 // Implementation of RelocInfo
-
-void RelocInfo::set_js_to_wasm_address(Address address,
-                                       ICacheFlushMode icache_flush_mode) {
-  DCHECK_EQ(rmode_, JS_TO_WASM_CALL);
-  Memory<Address>(pc_) = address;
-  if (icache_flush_mode != SKIP_ICACHE_FLUSH) {
-    Assembler::FlushICache(pc_, sizeof(Address));
-  }
-}
-
-Address RelocInfo::js_to_wasm_address() const {
-  DCHECK_EQ(rmode_, JS_TO_WASM_CALL);
-  return Memory<Address>(pc_);
-}
 
 uint32_t RelocInfo::wasm_call_tag() const {
   DCHECK(rmode_ == WASM_CALL || rmode_ == WASM_STUB_CALL);
@@ -458,6 +447,9 @@ Assembler::Assembler(const AssemblerOptions& options, void* buffer,
 
   ReserveCodeTargetSpace(100);
   reloc_info_writer.Reposition(buffer_ + buffer_size_, pc_);
+  if (CpuFeatures::IsSupported(SSE4_1)) {
+    EnableCpuFeature(SSSE3);
+  }
 }
 
 void Assembler::GetCode(Isolate* isolate, CodeDesc* desc) {
@@ -4996,13 +4988,8 @@ void Assembler::dq(Label* label) {
 // Relocation information implementations.
 
 void Assembler::RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data) {
-  DCHECK(!RelocInfo::IsNone(rmode));
-  if (options().disable_reloc_info_for_patching) return;
-  if (RelocInfo::IsOnlyForSerializer(rmode) &&
-      !options().record_reloc_info_for_serialization && !emit_debug_code()) {
-    return;
-  }
-  RelocInfo rinfo(reinterpret_cast<Address>(pc_), rmode, data, nullptr);
+  if (!ShouldRecordRelocInfo(rmode)) return;
+  RelocInfo rinfo(reinterpret_cast<Address>(pc_), rmode, data, Code());
   reloc_info_writer.Write(&rinfo);
 }
 

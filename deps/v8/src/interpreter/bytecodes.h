@@ -98,6 +98,8 @@ namespace interpreter {
   /* Property loads (LoadIC) operations */                                     \
   V(LdaNamedProperty, AccumulatorUse::kWrite, OperandType::kReg,               \
     OperandType::kIdx, OperandType::kIdx)                                      \
+  V(LdaNamedPropertyNoFeedback, AccumulatorUse::kWrite, OperandType::kReg,     \
+    OperandType::kIdx)                                                         \
   V(LdaKeyedProperty, AccumulatorUse::kReadWrite, OperandType::kReg,           \
     OperandType::kIdx)                                                         \
                                                                                \
@@ -110,6 +112,8 @@ namespace interpreter {
   /* Propery stores (StoreIC) operations */                                    \
   V(StaNamedProperty, AccumulatorUse::kReadWrite, OperandType::kReg,           \
     OperandType::kIdx, OperandType::kIdx)                                      \
+  V(StaNamedPropertyNoFeedback, AccumulatorUse::kReadWrite, OperandType::kReg, \
+    OperandType::kIdx, OperandType::kFlag8)                                    \
   V(StaNamedOwnProperty, AccumulatorUse::kReadWrite, OperandType::kReg,        \
     OperandType::kIdx, OperandType::kIdx)                                      \
   V(StaKeyedProperty, AccumulatorUse::kReadWrite, OperandType::kReg,           \
@@ -251,8 +255,8 @@ namespace interpreter {
     OperandType::kIdx, OperandType::kFlag8)                                    \
   V(CreateArrayFromIterable, AccumulatorUse::kReadWrite)                       \
   V(CreateEmptyArrayLiteral, AccumulatorUse::kWrite, OperandType::kIdx)        \
-  V(CreateObjectLiteral, AccumulatorUse::kNone, OperandType::kIdx,             \
-    OperandType::kIdx, OperandType::kFlag8, OperandType::kRegOut)              \
+  V(CreateObjectLiteral, AccumulatorUse::kWrite, OperandType::kIdx,            \
+    OperandType::kIdx, OperandType::kFlag8)                                    \
   V(CreateEmptyObjectLiteral, AccumulatorUse::kWrite)                          \
   V(CloneObject, AccumulatorUse::kWrite, OperandType::kReg,                    \
     OperandType::kFlag8, OperandType::kIdx)                                    \
@@ -681,6 +685,15 @@ class V8_EXPORT_PRIVATE Bytecodes final : public AllStatic {
     return bytecode == Bytecode::kCallRuntime ||
            bytecode == Bytecode::kCallRuntimeForPair ||
            bytecode == Bytecode::kInvokeIntrinsic;
+  }
+
+  // Returns true if the bytecode is an one-shot bytecode.  One-shot bytecodes
+  // don`t collect feedback and are intended for code that runs only once and
+  // shouldn`t be optimized.
+  static constexpr bool IsOneShotBytecode(Bytecode bytecode) {
+    return bytecode == Bytecode::kCallNoFeedback ||
+           bytecode == Bytecode::kLdaNamedPropertyNoFeedback ||
+           bytecode == Bytecode::kStaNamedPropertyNoFeedback;
   }
 
   // Returns true if the bytecode is a scaling prefix bytecode.

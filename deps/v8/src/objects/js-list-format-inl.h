@@ -19,8 +19,9 @@ namespace v8 {
 namespace internal {
 
 // Base list format accessors.
-ACCESSORS(JSListFormat, locale, String, kLocaleOffset)
-ACCESSORS(JSListFormat, formatter, Foreign, kFormatterOffset)
+ACCESSORS2(JSListFormat, locale, String, kLocaleOffset)
+ACCESSORS(JSListFormat, icu_formatter, Managed<icu::ListFormatter>,
+          kICUFormatterOffset)
 SMI_ACCESSORS(JSListFormat, flags, kFlagsOffset)
 
 inline void JSListFormat::set_style(Style style) {

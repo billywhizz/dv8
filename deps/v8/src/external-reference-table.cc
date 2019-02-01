@@ -20,7 +20,7 @@ namespace internal {
 
 // Forward declarations for C++ builtins.
 #define FORWARD_DECLARE(Name) \
-  Object* Builtin_##Name(int argc, Object** args, Isolate* isolate);
+  Object* Builtin_##Name(int argc, Address* args, Isolate* isolate);
 BUILTIN_LIST_C(FORWARD_DECLARE)
 #undef FORWARD_DECLARE
 
@@ -159,10 +159,10 @@ void ExternalReferenceTable::AddAccessors(int* index) {
   };
 
   static const AccessorRefTable getters[] = {
-#define ACCESSOR_INFO_DECLARATION(accessor_name, AccessorName, ...) \
-  {FUNCTION_ADDR(&Accessors::AccessorName##Getter),                 \
+#define ACCESSOR_INFO_DECLARATION(_, accessor_name, AccessorName, ...) \
+  {FUNCTION_ADDR(&Accessors::AccessorName##Getter),                    \
    "Accessors::" #AccessorName "Getter"}, /* NOLINT(whitespace/indent) */
-      ACCESSOR_INFO_LIST(ACCESSOR_INFO_DECLARATION)
+      ACCESSOR_INFO_LIST_GENERATOR(ACCESSOR_INFO_DECLARATION, /* not used */)
 #undef ACCESSOR_INFO_DECLARATION
   };
   static const AccessorRefTable setters[] = {

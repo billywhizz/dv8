@@ -23,6 +23,12 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#if defined(__MINGW64_VERSION_MAJOR)
+/* MemoryBarrier expands to __mm_mfence in some cases (x86+sse2), which may
+ * require this header in some versions of mingw64. */
+#include <intrin.h>
+#endif
+
 #include "uv.h"
 #include "internal.h"
 
@@ -118,7 +124,7 @@ int uv_thread_create(uv_thread_t *tid, void (*entry)(void *arg), void *arg) {
   ctx->arg = arg;
 
   /* Create the thread in suspended state so we have a chance to pass
-   * its own creation handle to it */   
+   * its own creation handle to it */
   thread = (HANDLE) _beginthreadex(NULL,
                                    0,
                                    uv__thread_start,
