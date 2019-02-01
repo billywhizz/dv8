@@ -59,6 +59,18 @@ docker build -t dv8 -f Dockerfile.runtime .
 docker build -t dv8-debug -f Dockerfile.debug .
 ```
 
+### Copy Source
+```
+rm -fr deps/uv/*
+rm -fr deps/v8/*
+docker run -d --rm --name v8-build v8-build sleep 10
+docker cp v8-build:/tmp/v8/include deps/v8/include
+docker cp v8-build:/tmp/v8/src deps/v8/src
+docker run -d --rm --name uv-build uv-build sleep 10
+docker cp uv-build:/source/uv/include deps/uv/include
+docker cp uv-build:/source/uv/src deps/uv/src
+```
+
 ## Debug a core dump
 ```bash
 ## debug build
