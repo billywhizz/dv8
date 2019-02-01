@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Remote Debugger",
+      "address": "127.0.0.1",
+      "port": 9222,
+      "restart": true,
+      "timeout": 10000,
+      "protocol": "inspector",
+      "localRoot": "${workspaceFolder}/examples",
+      "remoteRoot": "/app",
+      "smartStep": true,
+      "skipFiles": [],
+      "trace": true
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch",
+      "address": "127.0.0.1",
+      "port": 9222,
+      "restart": false,
+      "protocol": "inspector",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [ "run", "docker-debug" ],
+      "postDebugTask": "kill-debug",
+      "localRoot": "${workspaceFolder}/examples",
+      "remoteRoot": "/app",
+      "timeout": 10000,
+      "smartStep": true,
+      "skipFiles": [],
+      "trace": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"      
+    }
+  ]
+}

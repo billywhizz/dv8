@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
       globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
       globalInstance->Set(v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
       dv8::builtins::Buffer::Init(globalInstance);
-      //dv8::InspectorClient inspector_client(context, true);
+      dv8::InspectorClient inspector_client(context, true);
       v8::TryCatch try_catch(isolate);
 
       // compile and run the base module

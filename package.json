@@ -15,7 +15,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "docker-debug": "docker run -it --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/out/lib:/usr/local/lib -v $(pwd)/examples:/app -p 3000:3000 --name dv8-debug -p 9222:9222 dv8 dv8 httpd.js",
+    "docker-debug": "docker run -it --rm -v $(pwd)/out/bin:/usr/local/bin -v $(pwd)/out/lib:/usr/local/lib -v $(pwd)/examples:/app -p 3000:3000 --name dv8-debug -p 9222:9222 -e THREAD_BUFFER_SIZE=1048576 dv8-debug dv8 httpd.js",
     "docker-debug-kill": "docker kill dv8-debug"
   },
   "repository": {
