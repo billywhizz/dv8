@@ -8,13 +8,14 @@ sock.onClose(() => {
 let r = sock.bind('0.0.0.0', 0)
 print(`bind: ${r}`)
 sock.onSend(() => {
-  //print('onSend')
+  print('onSend')
 })
 sock.onMessage((len, address, port) => {
-  //print(`message from ${address}:${port}, ${len}`)
-  //print(rb.read(0, len))
-  sock.send(wb.write('ping', 0), '0.0.0.0', 30000)
-  //sock.stop()
+  print(`message from ${address}:${port}, ${len}`)
+  print(rb.read(0, len))
+  //sock.send(wb.write('ping', 0), '0.0.0.0', 30000)
 })
-sock.send(wb.write('ping', 0), '0.0.0.0', 30000)
+setInterval(() => {
+  sock.send(wb.write('ping', 0), '0.0.0.0', 30000)
+}, 1000)
 sock.start()
