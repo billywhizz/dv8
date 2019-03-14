@@ -19,6 +19,8 @@ function createServer () {
   })
 
   const timer = setInterval(() => {
+    stats.in = Math.floor((stats.in / (1024 * 1024)) * 100) / 100
+    stats.out = Math.floor((stats.out / (1024 * 1024)) * 100) / 100
     print(`server: ${JSON.stringify(stats, null, '  ')}`)
     stats.in = stats.out = 0
   }, 1000)
@@ -37,7 +39,13 @@ function createClient () {
   client.onConnect(() => {
     client.setup(buf, buf)
     client.resume()
+    function next() {
+      client.write(BUFFER_SIZE)
+      stats.out += BUFFER_SIZE
+      process.nextTick(next)
+    }
     client.write(BUFFER_SIZE)
+    next()
   })
 
   client.onRead(len => {
@@ -47,6 +55,8 @@ function createClient () {
   })
 
   const timer = setInterval(() => {
+    stats.in = Math.floor((stats.in / (1024 * 1024)) * 100) / 100
+    stats.out = Math.floor((stats.out / (1024 * 1024)) * 100) / 100
     print(`client: ${JSON.stringify(stats, null, '  ')}`)
     stats.in = stats.out = 0
   }, 1000)

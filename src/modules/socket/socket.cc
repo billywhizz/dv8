@@ -193,11 +193,10 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       onEnd->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     }
     ctx->stats.in.end++;
-/*
     if (uv_is_closing((uv_handle_t *)handle) == 0) {
-      uv_close((uv_handle_t *)handle, on_close);
+      //uv_close((uv_handle_t *)handle, on_close);
+      ctx->closing = true;
     }
-*/
   }
   else if (nread < 0) {
     if (s->callbacks.onError == 1)
@@ -236,6 +235,7 @@ void on_client_connection(uv_connect_t *client, int status)
   s->context = ctx;
   if (!uv_is_readable(client->handle) || !uv_is_writable(client->handle) || uv_is_closing((uv_handle_t *)client->handle))
   {
+    fprintf(stderr, "foo\n");
     return;
   }
   callback(ctx);
@@ -577,67 +577,72 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
   _context *ctx = socket->context;
   char *src = ctx->out.base + off;
   uv_buf_t buf;
+  int r = 0;
   buf.base = src;
   buf.len = len;
-  int r = uv_try_write((uv_stream_t *)ctx->handle, &buf, 1);
-  if (r == UV_EAGAIN || r == UV_ENOSYS)
-  {
-    write_req_t *wr;
-    wr = (write_req_t *)malloc(sizeof *wr);
-    char *wrb = (char *)calloc(len, 1);
-    memcpy(wrb, src, len);
-    ctx->stats.out.alloc++;
-    ctx->stats.out.eagain++;
-    wr->buf = uv_buf_init(wrb, len);
-    int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
-    r = 0;
-    if (status != 0) {
-      r = status;
-    }
-    ctx->blocked = true;
-  }
-  else if (r < 0)
-  {
-    ctx->stats.error++;
-    if (socket->callbacks.onError == 1)
+  if (!ctx->closing) {
+    r = uv_try_write((uv_stream_t *)ctx->handle, &buf, 1);
+    if (r == UV_EAGAIN || r == UV_ENOSYS)
     {
-      Local<Value> argv[1] = {Number::New(isolate, r)};
-      Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
-      Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      write_req_t *wr;
+      wr = (write_req_t *)malloc(sizeof *wr);
+      char *wrb = (char *)calloc(len, 1);
+      memcpy(wrb, src, len);
+      ctx->stats.out.alloc++;
+      ctx->stats.out.eagain++;
+      wr->buf = uv_buf_init(wrb, len);
+      int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+      r = 0;
+      if (status != 0) {
+        r = status;
+      }
+      ctx->blocked = true;
     }
-  }
-  else if ((uint32_t)r < len)
-  {
-    ctx->stats.out.incomplete++;
-    ctx->stats.out.written += r;
-    write_req_t *wr;
-    wr = (write_req_t *)malloc(sizeof *wr);
-    char *wrb = (char *)calloc(len - r, 1);
-    char *base = src + r;
-    memcpy(wrb, base, len - r);
-    ctx->stats.out.alloc++;
-    wr->buf = uv_buf_init(wrb, len - r);
-    int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
-    ctx->blocked = true;
-    if (socket->callbacks.onWrite == 1)
+    else if (r < 0)
     {
-      Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
-      Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-      onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      ctx->stats.error++;
+      if (socket->callbacks.onError == 1)
+      {
+        Local<Value> argv[1] = {Number::New(isolate, r)};
+        Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
+        Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      }
     }
-    if (status != 0)
+    else if ((uint32_t)r < len)
     {
-      r = status;
+      ctx->stats.out.incomplete++;
+      ctx->stats.out.written += r;
+      write_req_t *wr;
+      wr = (write_req_t *)malloc(sizeof *wr);
+      char *wrb = (char *)calloc(len - r, 1);
+      char *base = src + r;
+      memcpy(wrb, base, len - r);
+      ctx->stats.out.alloc++;
+      wr->buf = uv_buf_init(wrb, len - r);
+      int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+      ctx->blocked = true;
+      if (socket->callbacks.onWrite == 1)
+      {
+        Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
+        Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      }
+      if (status != 0)
+      {
+        r = status;
+      }
+    } else {
+      ctx->stats.out.full++;
+      ctx->stats.out.written += (uint64_t)r;
+      if (socket->callbacks.onWrite == 1)
+      {
+        Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
+        Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      }
     }
   } else {
-    ctx->stats.out.full++;
-    ctx->stats.out.written += (uint64_t)r;
-    if (socket->callbacks.onWrite == 1)
-    {
-      Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
-      Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-      onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
-    }
+    r = -1;
   }
   args.GetReturnValue().Set(Integer::New(isolate, r));
 }

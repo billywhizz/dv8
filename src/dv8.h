@@ -13,6 +13,7 @@
 #include <string.h>
 
 #define MICROS_PER_SEC 1e6
+#define SO_NOSIGPIPE 1
 
 extern char **environ;
 namespace dv8

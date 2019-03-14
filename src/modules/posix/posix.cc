@@ -44,7 +44,7 @@ namespace posix {
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
 		obj->data = (char *)b->_data;
 		obj->attr.mq_flags = 0;
-		obj->attr.mq_maxmsg = 10;
+		obj->attr.mq_maxmsg = 1000;
 		obj->attr.mq_msgsize = b->_length;
 		obj->attr.mq_curmsgs = 0;
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -62,9 +62,11 @@ namespace posix {
 		const char *path = *str;
 		obj->sockName = path;
 		if (type == PRODUCER) {
-			obj->mq = mq_open(path, O_CREAT | O_WRONLY | O_NONBLOCK, 0644, &obj->attr);
+			obj->mq = mq_open(path, O_CREAT | O_WRONLY, 0644, &obj->attr);
+			//obj->mq = mq_open(path, O_CREAT | O_WRONLY | O_NONBLOCK, 0644, &obj->attr);
 		} else {
-			obj->mq = mq_open(path, O_RDONLY | O_NONBLOCK);
+			obj->mq = mq_open(path, O_RDONLY, 0644, &obj->attr);
+			//obj->mq = mq_open(path, O_RDONLY | O_NONBLOCK, 0644, &obj->attr);
 		}
 		args.GetReturnValue().Set(Integer::New(isolate, obj->mq));
 	}
@@ -77,9 +79,13 @@ namespace posix {
 		v8::HandleScope handleScope(isolate);
 		Queue* obj = ObjectWrap::Unwrap<Queue>(args.Holder());
 		uint32_t len = args[0]->Uint32Value(context).ToChecked();
-		len = mq_send(obj->mq, obj->data, len, 0);
+		uint32_t status = mq_send(obj->mq, obj->data, len, 0);
+		if (status == 0) {
+			args.GetReturnValue().Set(Integer::New(isolate, len));
+			return;
+		}
 		fprintf(stderr, "errno: %i\n", errno);
-		args.GetReturnValue().Set(Integer::New(isolate, len));
+		args.GetReturnValue().Set(Integer::New(isolate, status));
 	}
 	
 	void Queue::Recv(const FunctionCallbackInfo<Value> &args)
