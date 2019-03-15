@@ -32,6 +32,7 @@
 #include "src/assembler.h"
 #include "src/eh-frame.h"
 #include "src/objects-inl.h"
+#include "src/ostreams.h"
 #include "src/snapshot/embedded-data.h"
 #include "src/source-position-table.h"
 #include "src/wasm/wasm-code-manager.h"
@@ -278,7 +279,7 @@ constexpr size_t kUnknownScriptNameStringLen =
 
 size_t GetScriptNameLength(const SourcePositionInfo& info) {
   if (!info.script.is_null()) {
-    Object* name_or_url = info.script->GetNameOrSourceURL();
+    Object name_or_url = info.script->GetNameOrSourceURL();
     if (name_or_url->IsString()) {
       String str = String::cast(name_or_url);
       if (str->IsOneByteRepresentation()) return str->length();
@@ -294,7 +295,7 @@ Vector<const char> GetScriptName(const SourcePositionInfo& info,
                                  std::unique_ptr<char[]>* storage,
                                  const DisallowHeapAllocation& no_gc) {
   if (!info.script.is_null()) {
-    Object* name_or_url = info.script->GetNameOrSourceURL();
+    Object name_or_url = info.script->GetNameOrSourceURL();
     if (name_or_url->IsSeqOneByteString()) {
       SeqOneByteString str = SeqOneByteString::cast(name_or_url);
       return {reinterpret_cast<char*>(str->GetChars(no_gc)),

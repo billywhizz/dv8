@@ -15,8 +15,8 @@
 namespace v8 {
 namespace internal {
 
-CAST_ACCESSOR2(StringSet)
-CAST_ACCESSOR2(StringTable)
+CAST_ACCESSOR(StringSet)
+CAST_ACCESSOR(StringTable)
 
 StringTable::StringTable(Address ptr)
     : HashTable<StringTable, StringTableShape>(ptr) {
@@ -27,7 +27,7 @@ StringSet::StringSet(Address ptr) : HashTable<StringSet, StringSetShape>(ptr) {
   SLOW_DCHECK(IsStringSet());
 }
 
-bool StringSetShape::IsMatch(String key, Object* value) {
+bool StringSetShape::IsMatch(String key, Object value) {
   DCHECK(value->IsString());
   return key->Equals(String::cast(value));
 }
@@ -36,7 +36,7 @@ uint32_t StringSetShape::Hash(Isolate* isolate, String key) {
   return key->Hash();
 }
 
-uint32_t StringSetShape::HashForObject(Isolate* isolate, Object* object) {
+uint32_t StringSetShape::HashForObject(Isolate* isolate, Object object) {
   return String::cast(object)->Hash();
 }
 
@@ -53,7 +53,7 @@ Handle<Object> StringTableShape::AsHandle(Isolate* isolate,
   return key->AsHandle(isolate);
 }
 
-uint32_t StringTableShape::HashForObject(Isolate* isolate, Object* object) {
+uint32_t StringTableShape::HashForObject(Isolate* isolate, Object object) {
   return String::cast(object)->Hash();
 }
 

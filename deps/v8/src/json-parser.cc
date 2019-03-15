@@ -126,7 +126,7 @@ bool JsonParseInternalizer::RecurseAndApply(Handle<JSReceiver> holder,
     desc.set_enumerable(true);
     desc.set_writable(true);
     change_result = JSReceiver::DefineOwnProperty(isolate_, holder, name, &desc,
-                                                  kDontThrow);
+                                                  Just(kDontThrow));
   }
   MAYBE_RETURN(change_result, false);
   return true;
@@ -636,17 +636,20 @@ Handle<Object> JsonParser<seq_one_byte>::ParseJsonNumber() {
     // a decimal point or exponent.
     if (IsDecimalDigit(c0_)) return ReportUnexpectedCharacter();
   } else {
-    int i = 0;
+    uint32_t i = 0;
     int digits = 0;
     if (c0_ < '1' || c0_ > '9') return ReportUnexpectedCharacter();
     do {
+      // This can overflow. That's OK, the "digits < 10" check below
+      // will discard overflown results.
       i = i * 10 + c0_ - '0';
       digits++;
       Advance();
     } while (IsDecimalDigit(c0_));
     if (c0_ != '.' && c0_ != 'e' && c0_ != 'E' && digits < 10) {
       SkipWhitespace();
-      return Handle<Smi>(Smi::FromInt((negative ? -i : i)), isolate());
+      return Handle<Smi>(Smi::FromInt((negative ? -static_cast<int>(i) : i)),
+                         isolate());
     }
   }
   if (c0_ == '.') {
@@ -890,7 +893,7 @@ Handle<String> JsonParser<seq_one_byte>::ScanJsonString() {
     uint32_t count = 1;
     Handle<String> result;
     while (true) {
-      Object* element = string_table->KeyAt(entry);
+      Object element = string_table->KeyAt(entry);
       if (element->IsUndefined(isolate())) {
         // Lookup failure.
         result =

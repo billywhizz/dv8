@@ -18,7 +18,7 @@ namespace internal {
 
 class SharedToCounterMap
     : public base::TemplateHashMapImpl<SharedFunctionInfo, uint32_t,
-                                       base::KeyEqualityMatcher<void*>,
+                                       base::KeyEqualityMatcher<Object>,
                                        base::DefaultAllocationPolicy> {
  public:
   typedef base::TemplateHashMapEntry<SharedFunctionInfo, uint32_t> Entry;
@@ -233,25 +233,6 @@ bool HaveSameSourceRange(const CoverageBlock& lhs, const CoverageBlock& rhs) {
   return lhs.start == rhs.start && lhs.end == rhs.end;
 }
 
-void MergeDuplicateSingletons(CoverageFunction* function) {
-  CoverageBlockIterator iter(function);
-
-  while (iter.Next() && iter.HasNext()) {
-    CoverageBlock& block = iter.GetBlock();
-    CoverageBlock& next_block = iter.GetNextBlock();
-
-    // Identical ranges should only occur through singleton ranges. Consider the
-    // ranges for `for (.) break;`: continuation ranges for both the `break` and
-    // `for` statements begin after the trailing semicolon.
-    // Such ranges are merged and keep the maximal execution count.
-    if (!HaveSameSourceRange(block, next_block)) continue;
-
-    DCHECK_EQ(kNoSourcePosition, block.end);  // Singleton range.
-    next_block.count = std::max(block.count, next_block.count);
-    iter.DeleteBlock();
-  }
-}
-
 void MergeDuplicateRanges(CoverageFunction* function) {
   CoverageBlockIterator iter(function);
 
@@ -424,9 +405,6 @@ void CollectBlockCoverage(CoverageFunction* function, SharedFunctionInfo info,
   // If in binary mode, only report counts of 0/1.
   if (mode == debug::Coverage::kBlockBinary) ClampToBinary(function);
 
-  // Remove duplicate singleton ranges, keeping the max count.
-  MergeDuplicateSingletons(function);
-
   // Remove singleton ranges with the same start position as a full range and
   // throw away their counts.
   // Singleton ranges are only intended to split existing full ranges and should
@@ -514,7 +492,8 @@ std::unique_ptr<Coverage> Coverage::Collect(
                   ->IsArrayList());
       DCHECK_EQ(v8::debug::Coverage::kBestEffort, collectionMode);
       HeapIterator heap_iterator(isolate->heap());
-      while (HeapObject* current_obj = heap_iterator.next()) {
+      for (HeapObject current_obj = heap_iterator.next();
+           !current_obj.is_null(); current_obj = heap_iterator.next()) {
         if (!current_obj->IsFeedbackVector()) continue;
         FeedbackVector vector = FeedbackVector::cast(current_obj);
         SharedFunctionInfo shared = vector->shared_function_info();
@@ -530,7 +509,8 @@ std::unique_ptr<Coverage> Coverage::Collect(
   // between source ranges and invocation counts.
   std::unique_ptr<Coverage> result(new Coverage());
   Script::Iterator scripts(isolate);
-  while (Script* script = scripts.Next()) {
+  for (Script script = scripts.Next(); !script.is_null();
+       script = scripts.Next()) {
     if (!script->IsUserJavaScript()) continue;
 
     // Create and add new script data.
@@ -630,7 +610,8 @@ void Coverage::SelectMode(Isolate* isolate, debug::Coverage::Mode mode) {
       isolate->MaybeInitializeVectorListFromHeap();
 
       HeapIterator heap_iterator(isolate->heap());
-      while (HeapObject* o = heap_iterator.next()) {
+      for (HeapObject o = heap_iterator.next(); !o.is_null();
+           o = heap_iterator.next()) {
         if (IsBinaryMode(mode) && o->IsSharedFunctionInfo()) {
           // If collecting binary coverage, reset
           // SFI::has_reported_binary_coverage to avoid optimizing / inlining

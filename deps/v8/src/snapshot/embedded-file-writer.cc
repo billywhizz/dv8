@@ -4,7 +4,10 @@
 
 #include "src/snapshot/embedded-file-writer.h"
 
+#include <algorithm>
 #include <cinttypes>
+
+#include "src/objects/code-inl.h"
 
 namespace v8 {
 namespace internal {
@@ -15,6 +18,25 @@ namespace internal {
 // windows sets both __clang__ and _MSC_VER, MSVC sets only _MSC_VER.
 #if defined(_MSC_VER) && !defined(__clang__)
 #define V8_COMPILER_IS_MSVC
+#endif
+
+// MSVC uses MASM for x86 and x64, while it has a ARMASM for ARM32 and
+// ARMASM64 for ARM64. Since ARMASM and ARMASM64 accept a slightly tweaked
+// version of ARM assembly language, they are referred to together in Visual
+// Studio project files as MARMASM.
+//
+// ARM assembly language docs:
+// http://infocenter.arm.com/help/topic/com.arm.doc.dui0802b/index.html
+// Microsoft ARM assembler and assembly language docs:
+// https://docs.microsoft.com/en-us/cpp/assembler/arm/arm-assembler-reference
+#if defined(V8_COMPILER_IS_MSVC)
+#if defined(V8_TARGET_ARCH_ARM64) || defined(V8_TARGET_ARCH_ARM)
+#define V8_ASSEMBLER_IS_MARMASM
+#elif defined(V8_TARGET_ARCH_IA32) || defined(V8_TARGET_ARCH_X64)
+#define V8_ASSEMBLER_IS_MASM
+#else
+#error Unknown Windows assembler target architecture.
+#endif
 #endif
 
 // Name mangling.
@@ -32,10 +54,10 @@ namespace internal {
 namespace {
 
 DataDirective PointerSizeDirective() {
-  if (kPointerSize == 8) {
+  if (kSystemPointerSize == 8) {
     return kQuad;
   } else {
-    CHECK_EQ(4, kPointerSize);
+    CHECK_EQ(4, kSystemPointerSize);
     return kLong;
   }
 }
@@ -43,7 +65,7 @@ DataDirective PointerSizeDirective() {
 }  // namespace
 
 const char* DirectiveAsString(DataDirective directive) {
-#if defined(V8_OS_WIN) && defined(V8_COMPILER_IS_MSVC)
+#if defined(V8_OS_WIN) && defined(V8_ASSEMBLER_IS_MASM)
   switch (directive) {
     case kByte:
       return "BYTE";
@@ -51,6 +73,17 @@ const char* DirectiveAsString(DataDirective directive) {
       return "DWORD";
     case kQuad:
       return "QWORD";
+    default:
+      UNREACHABLE();
+  }
+#elif defined(V8_OS_WIN) && defined(V8_ASSEMBLER_IS_MARMASM)
+  switch (directive) {
+    case kByte:
+      return "DCB";
+    case kLong:
+      return "DCDU";
+    case kQuad:
+      return "DCQU";
     default:
       UNREACHABLE();
   }
@@ -80,10 +113,26 @@ const char* DirectiveAsString(DataDirective directive) {
 #endif
 }
 
+void EmbeddedFileWriter::PrepareBuiltinSourcePositionMap(Builtins* builtins) {
+  for (int i = 0; i < Builtins::builtin_count; i++) {
+    // Retrieve the SourcePositionTable and copy it.
+    Code code = builtins->builtin(i);
+    // Verify that the code object is still the "real code" and not a
+    // trampoline (which wouldn't have source positions).
+    DCHECK(!code->is_off_heap_trampoline());
+    std::vector<unsigned char> data(
+        code->SourcePositionTable()->GetDataStartAddress(),
+        code->SourcePositionTable()->GetDataEndAddress());
+    source_positions_[i] = data;
+  }
+}
+
 // V8_OS_MACOSX
+// Fuchsia target is explicitly excluded here for Mac hosts. This is to avoid
+// generating uncompilable assembly files for the Fuchsia target.
 // -----------------------------------------------------------------------------
 
-#if defined(V8_OS_MACOSX)
+#if defined(V8_OS_MACOSX) && !defined(V8_TARGET_OS_FUCHSIA)
 
 void PlatformDependentEmbeddedFileWriter::SectionText() {
   fprintf(fp_, ".text\n");
@@ -136,6 +185,10 @@ void PlatformDependentEmbeddedFileWriter::DeclareLabel(const char* name) {
   fprintf(fp_, "_%s:\n", name);
 }
 
+void PlatformDependentEmbeddedFileWriter::SourceInfo(int fileid, int line) {
+  fprintf(fp_, ".loc %d %d\n", fileid, line);
+}
+
 void PlatformDependentEmbeddedFileWriter::DeclareFunctionBegin(
     const char* name) {
   DeclareLabel(name);
@@ -152,6 +205,11 @@ int PlatformDependentEmbeddedFileWriter::HexLiteral(uint64_t value) {
 }
 
 void PlatformDependentEmbeddedFileWriter::FilePrologue() {}
+
+void PlatformDependentEmbeddedFileWriter::DeclareExternalFilename(
+    int fileid, const char* filename) {
+  fprintf(fp_, ".file %d \"%s\"\n", fileid, filename);
+}
 
 void PlatformDependentEmbeddedFileWriter::FileEpilogue() {}
 
@@ -215,6 +273,10 @@ void PlatformDependentEmbeddedFileWriter::DeclareLabel(const char* name) {
   fprintf(fp_, "%s:\n", name);
 }
 
+void PlatformDependentEmbeddedFileWriter::SourceInfo(int fileid, int line) {
+  fprintf(fp_, ".loc %d %d\n", fileid, line);
+}
+
 void PlatformDependentEmbeddedFileWriter::DeclareFunctionBegin(
     const char* name) {
   Newline();
@@ -235,6 +297,11 @@ int PlatformDependentEmbeddedFileWriter::HexLiteral(uint64_t value) {
 
 void PlatformDependentEmbeddedFileWriter::FilePrologue() {}
 
+void PlatformDependentEmbeddedFileWriter::DeclareExternalFilename(
+    int fileid, const char* filename) {
+  fprintf(fp_, ".file %d \"%s\"\n", fileid, filename);
+}
+
 void PlatformDependentEmbeddedFileWriter::FileEpilogue() {}
 
 int PlatformDependentEmbeddedFileWriter::IndentedDataDirective(
@@ -245,7 +312,7 @@ int PlatformDependentEmbeddedFileWriter::IndentedDataDirective(
 // V8_OS_WIN (MSVC)
 // -----------------------------------------------------------------------------
 
-#elif defined(V8_OS_WIN) && defined(V8_COMPILER_IS_MSVC)
+#elif defined(V8_OS_WIN) && defined(V8_ASSEMBLER_IS_MASM)
 
 // For MSVC builds we emit assembly in MASM syntax.
 // See https://docs.microsoft.com/en-us/cpp/assembler/masm/directives-reference.
@@ -298,6 +365,11 @@ void PlatformDependentEmbeddedFileWriter::DeclareLabel(const char* name) {
           DirectiveAsString(kByte));
 }
 
+void PlatformDependentEmbeddedFileWriter::SourceInfo(int fileid, int line) {
+  // TODO(mvstanton): output source information for MSVC.
+  // It's syntax is #line <line> "<filename>"
+}
+
 void PlatformDependentEmbeddedFileWriter::DeclareFunctionBegin(
     const char* name) {
   fprintf(fp_, "%s%s PROC\n", SYMBOL_PREFIX, name);
@@ -317,6 +389,9 @@ void PlatformDependentEmbeddedFileWriter::FilePrologue() {
 #endif
 }
 
+void PlatformDependentEmbeddedFileWriter::DeclareExternalFilename(
+    int fileid, const char* filename) {}
+
 void PlatformDependentEmbeddedFileWriter::FileEpilogue() {
   fprintf(fp_, "END\n");
 }
@@ -325,6 +400,106 @@ int PlatformDependentEmbeddedFileWriter::IndentedDataDirective(
     DataDirective directive) {
   return fprintf(fp_, "  %s ", DirectiveAsString(directive));
 }
+
+#undef V8_ASSEMBLER_IS_MASM
+
+#elif defined(V8_OS_WIN) && defined(V8_ASSEMBLER_IS_MARMASM)
+
+// The the AARCH64 ABI requires instructions be 4-byte-aligned and Windows does
+// not have a stricter alignment requirement (see the TEXTAREA macro of
+// kxarm64.h in the Windows SDK), so code is 4-byte-aligned.
+// The data fields in the emitted assembly tend to be accessed with 8-byte
+// LDR instructions, so data is 8-byte-aligned.
+//
+// armasm64's warning A4228 states
+//     Alignment value exceeds AREA alignment; alignment not guaranteed
+// To ensure that ALIGN directives are honored, their values are defined as
+// equal to their corresponding AREA's ALIGN attributes.
+
+#define ARM64_DATA_ALIGNMENT_POWER (3)
+#define ARM64_DATA_ALIGNMENT (1 << ARM64_DATA_ALIGNMENT_POWER)
+#define ARM64_CODE_ALIGNMENT_POWER (2)
+#define ARM64_CODE_ALIGNMENT (1 << ARM64_CODE_ALIGNMENT_POWER)
+
+void PlatformDependentEmbeddedFileWriter::SectionText() {
+  fprintf(fp_, "  AREA |.text|, CODE, ALIGN=%d, READONLY\n",
+          ARM64_CODE_ALIGNMENT_POWER);
+}
+
+void PlatformDependentEmbeddedFileWriter::SectionData() {
+  fprintf(fp_, "  AREA |.data|, DATA, ALIGN=%d, READWRITE\n",
+          ARM64_DATA_ALIGNMENT_POWER);
+}
+
+void PlatformDependentEmbeddedFileWriter::SectionRoData() {
+  fprintf(fp_, "  AREA |.rodata|, DATA, ALIGN=%d, READONLY\n",
+          ARM64_DATA_ALIGNMENT_POWER);
+}
+
+void PlatformDependentEmbeddedFileWriter::DeclareUint32(const char* name,
+                                                        uint32_t value) {
+  DeclareSymbolGlobal(name);
+  fprintf(fp_, "%s%s %s %d\n", SYMBOL_PREFIX, name, DirectiveAsString(kLong),
+          value);
+}
+
+void PlatformDependentEmbeddedFileWriter::DeclarePointerToSymbol(
+    const char* name, const char* target) {
+  DeclareSymbolGlobal(name);
+  fprintf(fp_, "%s%s %s %s%s\n", SYMBOL_PREFIX, name,
+          DirectiveAsString(PointerSizeDirective()), SYMBOL_PREFIX, target);
+}
+
+void PlatformDependentEmbeddedFileWriter::DeclareSymbolGlobal(
+    const char* name) {
+  fprintf(fp_, "  EXPORT %s%s\n", SYMBOL_PREFIX, name);
+}
+
+void PlatformDependentEmbeddedFileWriter::AlignToCodeAlignment() {
+  fprintf(fp_, "  ALIGN %d\n", ARM64_CODE_ALIGNMENT);
+}
+
+void PlatformDependentEmbeddedFileWriter::AlignToDataAlignment() {
+  fprintf(fp_, "  ALIGN %d\n", ARM64_DATA_ALIGNMENT);
+}
+
+void PlatformDependentEmbeddedFileWriter::Comment(const char* string) {
+  fprintf(fp_, "; %s\n", string);
+}
+
+void PlatformDependentEmbeddedFileWriter::DeclareLabel(const char* name) {
+  fprintf(fp_, "%s%s\n", SYMBOL_PREFIX, name);
+}
+
+void PlatformDependentEmbeddedFileWriter::DeclareFunctionBegin(
+    const char* name) {
+  fprintf(fp_, "%s%s FUNCTION\n", SYMBOL_PREFIX, name);
+}
+
+void PlatformDependentEmbeddedFileWriter::DeclareFunctionEnd(const char* name) {
+  fprintf(fp_, "  ENDFUNC\n");
+}
+
+int PlatformDependentEmbeddedFileWriter::HexLiteral(uint64_t value) {
+  return fprintf(fp_, "0x%" PRIx64, value);
+}
+
+void PlatformDependentEmbeddedFileWriter::FilePrologue() {}
+
+void PlatformDependentEmbeddedFileWriter::FileEpilogue() {
+  fprintf(fp_, "  END\n");
+}
+
+int PlatformDependentEmbeddedFileWriter::IndentedDataDirective(
+    DataDirective directive) {
+  return fprintf(fp_, "  %s ", DirectiveAsString(directive));
+}
+
+#undef V8_ASSEMBLER_IS_MARMASM
+#undef ARM64_DATA_ALIGNMENT_POWER
+#undef ARM64_DATA_ALIGNMENT
+#undef ARM64_CODE_ALIGNMENT_POWER
+#undef ARM64_CODE_ALIGNMENT
 
 // Everything but AIX, Windows with MSVC, or OSX.
 // -----------------------------------------------------------------------------
@@ -344,7 +519,11 @@ void PlatformDependentEmbeddedFileWriter::SectionData() {
 }
 
 void PlatformDependentEmbeddedFileWriter::SectionRoData() {
+#if defined(V8_OS_WIN)
+  fprintf(fp_, ".section .rdata\n");
+#else
   fprintf(fp_, ".section .rodata\n");
+#endif
 }
 
 void PlatformDependentEmbeddedFileWriter::DeclareUint32(const char* name,
@@ -374,13 +553,11 @@ void PlatformDependentEmbeddedFileWriter::AlignToCodeAlignment() {
 }
 
 void PlatformDependentEmbeddedFileWriter::AlignToDataAlignment() {
-#if defined(V8_OS_WIN) && defined(V8_TARGET_ARCH_ARM64)
-  // On Windows ARM64, instruction "ldr xt,[xn,v8_Default_embedded_blob_]" is
-  // generated by clang-cl to load elements in v8_Default_embedded_blob_.
-  // The generated instruction has scale 3 which requires the load target to be
-  // aligned at 8 bytes (2^3).
+  // On Windows ARM64, s390, PPC and possibly more platforms, aligned load
+  // instructions are used to retrieve v8_Default_embedded_blob_ and/or
+  // v8_Default_embedded_blob_size_. The generated instructions require the
+  // load target to be aligned at 8 bytes (2^3).
   fprintf(fp_, ".balign 8\n");
-#endif
 }
 
 void PlatformDependentEmbeddedFileWriter::Comment(const char* string) {
@@ -389,6 +566,10 @@ void PlatformDependentEmbeddedFileWriter::Comment(const char* string) {
 
 void PlatformDependentEmbeddedFileWriter::DeclareLabel(const char* name) {
   fprintf(fp_, "%s%s:\n", SYMBOL_PREFIX, name);
+}
+
+void PlatformDependentEmbeddedFileWriter::SourceInfo(int fileid, int line) {
+  fprintf(fp_, ".loc %d %d\n", fileid, line);
 }
 
 void PlatformDependentEmbeddedFileWriter::DeclareFunctionBegin(
@@ -428,6 +609,15 @@ int PlatformDependentEmbeddedFileWriter::HexLiteral(uint64_t value) {
 }
 
 void PlatformDependentEmbeddedFileWriter::FilePrologue() {}
+
+void PlatformDependentEmbeddedFileWriter::DeclareExternalFilename(
+    int fileid, const char* filename) {
+  // Replace any Windows style paths (backslashes) with forward
+  // slashes.
+  std::string fixed_filename(filename);
+  std::replace(fixed_filename.begin(), fixed_filename.end(), '\\', '/');
+  fprintf(fp_, ".file %d \"%s\"\n", fileid, fixed_filename.c_str());
+}
 
 void PlatformDependentEmbeddedFileWriter::FileEpilogue() {}
 

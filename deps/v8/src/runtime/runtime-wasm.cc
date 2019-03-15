@@ -26,7 +26,7 @@ namespace internal {
 
 namespace {
 
-WasmInstanceObject* GetWasmInstanceOnStackTop(Isolate* isolate) {
+WasmInstanceObject GetWasmInstanceOnStackTop(Isolate* isolate) {
   StackFrameIterator it(isolate, isolate->thread_local_top());
   // On top: C entry stub.
   DCHECK_EQ(StackFrame::EXIT, it.frame()->type());
@@ -55,6 +55,20 @@ class ClearThreadInWasmScope {
 };
 
 }  // namespace
+
+RUNTIME_FUNCTION(Runtime_WasmIsValidAnyFuncValue) {
+  HandleScope scope(isolate);
+  DCHECK_EQ(1, args.length());
+  CONVERT_ARG_HANDLE_CHECKED(Object, function, 0);
+
+  if (function->IsNull(isolate)) {
+    return Smi::FromInt(true);
+  }
+  if (WasmExportedFunction::IsWasmExportedFunction(*function)) {
+    return Smi::FromInt(true);
+  }
+  return Smi::FromInt(false);
+}
 
 RUNTIME_FUNCTION(Runtime_WasmMemoryGrow) {
   HandleScope scope(isolate);
@@ -106,22 +120,22 @@ RUNTIME_FUNCTION(Runtime_WasmThrowCreate) {
   DCHECK_EQ(2, args.length());
   DCHECK(isolate->context().is_null());
   isolate->set_context(GetNativeContextFromWasmInstanceOnStackTop(isolate));
-  CONVERT_ARG_CHECKED(HeapObject, tag_raw, 0);
+  CONVERT_ARG_CHECKED(WasmExceptionTag, tag_raw, 0);
   CONVERT_SMI_ARG_CHECKED(size, 1);
   // TODO(mstarzinger): Manually box because parameters are not visited yet.
   Handle<Object> tag(tag_raw, isolate);
   Handle<Object> exception = isolate->factory()->NewWasmRuntimeError(
       MessageTemplate::kWasmExceptionError);
-  CHECK(
-      !JSReceiver::SetProperty(isolate, exception,
-                               isolate->factory()->wasm_exception_tag_symbol(),
-                               tag, LanguageMode::kStrict)
-           .is_null());
+  CHECK(!Object::SetProperty(isolate, exception,
+                             isolate->factory()->wasm_exception_tag_symbol(),
+                             tag, StoreOrigin::kMaybeKeyed,
+                             Just(ShouldThrow::kThrowOnError))
+             .is_null());
   Handle<FixedArray> values = isolate->factory()->NewFixedArray(size);
-  CHECK(!JSReceiver::SetProperty(
-             isolate, exception,
-             isolate->factory()->wasm_exception_values_symbol(), values,
-             LanguageMode::kStrict)
+  CHECK(!Object::SetProperty(isolate, exception,
+                             isolate->factory()->wasm_exception_values_symbol(),
+                             values, StoreOrigin::kMaybeKeyed,
+                             Just(ShouldThrow::kThrowOnError))
              .is_null());
   return *exception;
 }
@@ -135,16 +149,7 @@ RUNTIME_FUNCTION(Runtime_WasmExceptionGetTag) {
   CONVERT_ARG_CHECKED(Object, except_obj_raw, 0);
   // TODO(mstarzinger): Manually box because parameters are not visited yet.
   Handle<Object> except_obj(except_obj_raw, isolate);
-  if (!except_obj.is_null() && except_obj->IsJSReceiver()) {
-    Handle<JSReceiver> exception(JSReceiver::cast(*except_obj), isolate);
-    Handle<Object> tag;
-    if (JSReceiver::GetProperty(isolate, exception,
-                                isolate->factory()->wasm_exception_tag_symbol())
-            .ToHandle(&tag)) {
-      return *tag;
-    }
-  }
-  return ReadOnlyRoots(isolate).undefined_value();
+  return *WasmExceptionPackage::GetExceptionTag(isolate, except_obj);
 }
 
 RUNTIME_FUNCTION(Runtime_WasmExceptionGetValues) {
@@ -156,18 +161,7 @@ RUNTIME_FUNCTION(Runtime_WasmExceptionGetValues) {
   CONVERT_ARG_CHECKED(Object, except_obj_raw, 0);
   // TODO(mstarzinger): Manually box because parameters are not visited yet.
   Handle<Object> except_obj(except_obj_raw, isolate);
-  if (!except_obj.is_null() && except_obj->IsJSReceiver()) {
-    Handle<JSReceiver> exception(JSReceiver::cast(*except_obj), isolate);
-    Handle<Object> values;
-    if (JSReceiver::GetProperty(
-            isolate, exception,
-            isolate->factory()->wasm_exception_values_symbol())
-            .ToHandle(&values)) {
-      DCHECK(values->IsFixedArray());
-      return *values;
-    }
-  }
-  return ReadOnlyRoots(isolate).undefined_value();
+  return *WasmExceptionPackage::GetExceptionValues(isolate, except_obj);
 }
 
 RUNTIME_FUNCTION(Runtime_WasmRunInterpreter) {
@@ -181,7 +175,7 @@ RUNTIME_FUNCTION(Runtime_WasmRunInterpreter) {
   // cast it back to the raw pointer.
   CHECK(!arg_buffer_obj->IsHeapObject());
   CHECK(arg_buffer_obj->IsSmi());
-  Address arg_buffer = reinterpret_cast<Address>(*arg_buffer_obj);
+  Address arg_buffer = arg_buffer_obj->ptr();
 
   ClearThreadInWasmScope wasm_flag;
 
@@ -254,7 +248,7 @@ RUNTIME_FUNCTION(Runtime_WasmCompileLazy) {
 
   Address entrypoint = wasm::CompileLazy(
       isolate, instance->module_object()->native_module(), func_index);
-  return reinterpret_cast<Object*>(entrypoint);
+  return Object(entrypoint);
 }
 
 // Should be called from within a handle scope
@@ -321,5 +315,55 @@ RUNTIME_FUNCTION(Runtime_WasmI64AtomicWait) {
                                 timeout_ms);
 }
 
+namespace {
+Object ThrowTableOutOfBounds(Isolate* isolate,
+                             Handle<WasmInstanceObject> instance) {
+  // Handle out-of-bounds access here in the runtime call, rather
+  // than having the lower-level layers deal with JS exceptions.
+  if (isolate->context().is_null()) {
+    isolate->set_context(instance->native_context());
+  }
+  Handle<Object> error_obj = isolate->factory()->NewWasmRuntimeError(
+      MessageTemplate::kWasmTrapTableOutOfBounds);
+  return isolate->Throw(*error_obj);
+}
+}  // namespace
+
+RUNTIME_FUNCTION(Runtime_WasmTableInit) {
+  HandleScope scope(isolate);
+  DCHECK_EQ(5, args.length());
+  auto instance =
+      Handle<WasmInstanceObject>(GetWasmInstanceOnStackTop(isolate), isolate);
+  CONVERT_UINT32_ARG_CHECKED(table_index, 0);
+  CONVERT_UINT32_ARG_CHECKED(elem_segment_index, 1);
+  CONVERT_UINT32_ARG_CHECKED(dst, 2);
+  CONVERT_UINT32_ARG_CHECKED(src, 3);
+  CONVERT_UINT32_ARG_CHECKED(count, 4);
+
+  DCHECK(isolate->context().is_null());
+  isolate->set_context(instance->native_context());
+
+  bool oob = !WasmInstanceObject::InitTableEntries(
+      isolate, instance, table_index, elem_segment_index, dst, src, count);
+  if (oob) return ThrowTableOutOfBounds(isolate, instance);
+  return ReadOnlyRoots(isolate).undefined_value();
+}
+
+RUNTIME_FUNCTION(Runtime_WasmTableCopy) {
+  HandleScope scope(isolate);
+  DCHECK_EQ(5, args.length());
+  auto instance =
+      Handle<WasmInstanceObject>(GetWasmInstanceOnStackTop(isolate), isolate);
+  CONVERT_UINT32_ARG_CHECKED(table_src_index, 0);
+  CONVERT_UINT32_ARG_CHECKED(table_dst_index, 1);
+  CONVERT_UINT32_ARG_CHECKED(dst, 2);
+  CONVERT_UINT32_ARG_CHECKED(src, 3);
+  CONVERT_UINT32_ARG_CHECKED(count, 4);
+
+  bool oob = !WasmInstanceObject::CopyTableEntries(
+      isolate, instance, table_src_index, table_dst_index, dst, src, count);
+  if (oob) return ThrowTableOutOfBounds(isolate, instance);
+  return ReadOnlyRoots(isolate).undefined_value();
+}
 }  // namespace internal
 }  // namespace v8

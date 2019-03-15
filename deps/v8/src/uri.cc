@@ -416,7 +416,7 @@ static MaybeHandle<String> UnescapePrivate(Isolate* isolate,
   int index;
   {
     DisallowHeapAllocation no_allocation;
-    StringSearch<uint8_t, Char> search(isolate, STATIC_CHAR_VECTOR("%"));
+    StringSearch<uint8_t, Char> search(isolate, StaticCharVector("%"));
     index = search.Search(source->GetCharVector<Char>(no_allocation), 0);
     if (index < 0) return source;
   }
@@ -493,7 +493,7 @@ static MaybeHandle<String> EscapePrivate(Isolate* isolate,
 MaybeHandle<String> Uri::Escape(Isolate* isolate, Handle<String> string) {
   Handle<String> result;
   string = String::Flatten(isolate, string);
-  return string->IsOneByteRepresentationUnderneath()
+  return String::IsOneByteRepresentationUnderneath(*string)
              ? EscapePrivate<uint8_t>(isolate, string)
              : EscapePrivate<uc16>(isolate, string);
 }
@@ -501,7 +501,7 @@ MaybeHandle<String> Uri::Escape(Isolate* isolate, Handle<String> string) {
 MaybeHandle<String> Uri::Unescape(Isolate* isolate, Handle<String> string) {
   Handle<String> result;
   string = String::Flatten(isolate, string);
-  return string->IsOneByteRepresentationUnderneath()
+  return String::IsOneByteRepresentationUnderneath(*string)
              ? UnescapePrivate<uint8_t>(isolate, string)
              : UnescapePrivate<uc16>(isolate, string);
 }

@@ -17,6 +17,10 @@
 namespace v8 {
 namespace internal {
 
+OBJECT_CONSTRUCTORS_IMPL(Script, Struct)
+
+NEVER_READ_ONLY_SPACE_IMPL(Script)
+
 CAST_ACCESSOR(Script)
 
 ACCESSORS(Script, source, Object, kSourceOffset)
@@ -32,12 +36,12 @@ ACCESSORS_CHECKED(Script, eval_from_shared_or_wrapped_arguments, Object,
                   this->type() != TYPE_WASM)
 SMI_ACCESSORS_CHECKED(Script, eval_from_position, kEvalFromPositionOffset,
                       this->type() != TYPE_WASM)
-ACCESSORS2(Script, shared_function_infos, WeakFixedArray,
-           kSharedFunctionInfosOffset)
+ACCESSORS(Script, shared_function_infos, WeakFixedArray,
+          kSharedFunctionInfosOffset)
 SMI_ACCESSORS(Script, flags, kFlagsOffset)
 ACCESSORS(Script, source_url, Object, kSourceUrlOffset)
 ACCESSORS(Script, source_mapping_url, Object, kSourceMappingUrlOffset)
-ACCESSORS2(Script, host_defined_options, FixedArray, kHostDefinedOptionsOffset)
+ACCESSORS(Script, host_defined_options, FixedArray, kHostDefinedOptionsOffset)
 ACCESSORS_CHECKED(Script, wasm_module_object, Object,
                   kEvalFromSharedOrWrappedArgumentsOffset,
                   this->type() == TYPE_WASM)
@@ -99,7 +103,7 @@ void Script::set_origin_options(ScriptOriginOptions origin_options) {
 }
 
 bool Script::HasValidSource() {
-  Object* src = this->source();
+  Object src = this->source();
   if (!src->IsString()) return true;
   String src_str = String::cast(src);
   if (!StringShape(src_str).IsExternal()) return true;

@@ -5,7 +5,8 @@
 #if V8_TARGET_ARCH_S390
 
 #include "src/interface-descriptors.h"
-#include "src/macro-assembler.h"
+
+#include "src/frames.h"
 
 namespace v8 {
 namespace internal {
@@ -252,6 +253,12 @@ void FrameDropperTrampolineDescriptor::InitializePlatformSpecific(
   Register registers[] = {
       r3,  // loaded new FP
   };
+  data->InitializePlatformSpecific(arraysize(registers), registers);
+}
+
+void RunMicrotasksEntryDescriptor::InitializePlatformSpecific(
+    CallInterfaceDescriptorData* data) {
+  Register registers[] = {r2, r3};
   data->InitializePlatformSpecific(arraysize(registers), registers);
 }
 

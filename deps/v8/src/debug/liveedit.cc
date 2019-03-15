@@ -14,6 +14,7 @@
 #include "src/debug/debug.h"
 #include "src/frames-inl.h"
 #include "src/isolate-inl.h"
+#include "src/log.h"
 #include "src/objects-inl.h"
 #include "src/objects/hash-table-inl.h"
 #include "src/objects/js-generator-inl.h"
@@ -21,6 +22,7 @@
 #include "src/parsing/parsing.h"
 #include "src/source-position-table.h"
 #include "src/v8.h"
+#include "src/v8threads.h"
 
 namespace v8 {
 namespace internal {
@@ -813,7 +815,7 @@ class FunctionDataMap : public ThreadVisitor {
     if (!sfi->script()->IsScript() || start_position == -1) {
       return false;
     }
-    Script* script = Script::cast(sfi->script());
+    Script script = Script::cast(sfi->script());
     return Lookup(GetFuncId(script->id(), sfi), data);
   }
 
@@ -825,20 +827,21 @@ class FunctionDataMap : public ThreadVisitor {
   void Fill(Isolate* isolate, Address* restart_frame_fp) {
     {
       HeapIterator iterator(isolate->heap(), HeapIterator::kFilterUnreachable);
-      while (HeapObject* obj = iterator.next()) {
+      for (HeapObject obj = iterator.next(); !obj.is_null();
+           obj = iterator.next()) {
         if (obj->IsSharedFunctionInfo()) {
           SharedFunctionInfo sfi = SharedFunctionInfo::cast(obj);
           FunctionData* data = nullptr;
           if (!Lookup(sfi, &data)) continue;
           data->shared = handle(sfi, isolate);
         } else if (obj->IsJSFunction()) {
-          JSFunction* js_function = JSFunction::cast(obj);
+          JSFunction js_function = JSFunction::cast(obj);
           SharedFunctionInfo sfi = js_function->shared();
           FunctionData* data = nullptr;
           if (!Lookup(sfi, &data)) continue;
           data->js_functions.emplace_back(js_function, isolate);
         } else if (obj->IsJSGeneratorObject()) {
-          JSGeneratorObject* gen = JSGeneratorObject::cast(obj);
+          JSGeneratorObject gen = JSGeneratorObject::cast(obj);
           if (gen->is_closed()) continue;
           SharedFunctionInfo sfi = gen->function()->shared();
           FunctionData* data = nullptr;
@@ -1128,12 +1131,13 @@ void LiveEdit::PatchScript(Isolate* isolate, Handle<Script> script,
     start_position_to_unchanged_id[mapping.second->start_position()] =
         mapping.second->function_literal_id();
 
-    if (sfi->HasUncompiledDataWithPreParsedScope()) {
-      sfi->ClearPreParsedScopeData();
+    if (sfi->HasUncompiledDataWithPreparseData()) {
+      sfi->ClearPreparseData();
     }
 
     for (auto& js_function : data->js_functions) {
-      js_function->set_feedback_cell(*isolate->factory()->many_closures_cell());
+      js_function->set_raw_feedback_cell(
+          *isolate->factory()->many_closures_cell());
       if (!js_function->is_compiled()) continue;
       JSFunction::EnsureFeedbackVector(js_function);
     }
@@ -1173,7 +1177,8 @@ void LiveEdit::PatchScript(Isolate* isolate, Handle<Script> script,
       js_function->set_shared(*new_sfi);
       js_function->set_code(js_function->shared()->GetCode());
 
-      js_function->set_feedback_cell(*isolate->factory()->many_closures_cell());
+      js_function->set_raw_feedback_cell(
+          *isolate->factory()->many_closures_cell());
       if (!js_function->is_compiled()) continue;
       JSFunction::EnsureFeedbackVector(js_function);
     }

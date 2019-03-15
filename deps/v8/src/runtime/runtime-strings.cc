@@ -309,7 +309,7 @@ RUNTIME_FUNCTION(Runtime_StringBuilderConcat) {
     if (array_length == 0) {
       return ReadOnlyRoots(isolate).empty_string();
     } else if (array_length == 1) {
-      Object* first = fixed_array->get(0);
+      Object first = fixed_array->get(0);
       if (first->IsString()) return first;
     }
     length = StringBuilderConcatLength(special_length, fixed_array,
@@ -365,7 +365,7 @@ RUNTIME_FUNCTION(Runtime_StringBuilderJoin) {
   if (array_length == 0) {
     return ReadOnlyRoots(isolate).empty_string();
   } else if (array_length == 1) {
-    Object* first = fixed_array->get(0);
+    Object first = fixed_array->get(0);
     CHECK(first->IsString());
     return first;
   }
@@ -379,7 +379,7 @@ RUNTIME_FUNCTION(Runtime_StringBuilderJoin) {
   }
   int length = (array_length - 1) * separator_length;
   for (int i = 0; i < array_length; i++) {
-    Object* element_obj = fixed_array->get(i);
+    Object element_obj = fixed_array->get(i);
     CHECK(element_obj->IsString());
     String element = String::cast(element_obj);
     int increment = element->length();
@@ -581,23 +581,20 @@ static int CopyCachedOneByteCharsToArray(Heap* heap, const uint8_t* chars,
                                          FixedArray elements, int length) {
   DisallowHeapAllocation no_gc;
   FixedArray one_byte_cache = heap->single_character_string_cache();
-  Object* undefined = ReadOnlyRoots(heap).undefined_value();
+  Object undefined = ReadOnlyRoots(heap).undefined_value();
   int i;
   WriteBarrierMode mode = elements->GetWriteBarrierMode(no_gc);
   for (i = 0; i < length; ++i) {
-    Object* value = one_byte_cache->get(chars[i]);
+    Object value = one_byte_cache->get(chars[i]);
     if (value == undefined) break;
     elements->set(i, value, mode);
   }
   if (i < length) {
-    static_assert(Smi::kZero.ptr() == kNullAddress,
-                  "Can use memset since Smi::kZero is 0");
-    memset(elements->RawFieldOfElementAt(i).ToVoidPtr(), 0,
-           kPointerSize * (length - i));
+    MemsetTagged(elements->RawFieldOfElementAt(i), Smi::kZero, length - i);
   }
 #ifdef DEBUG
   for (int j = 0; j < length; ++j) {
-    Object* element = elements->get(j);
+    Object element = elements->get(j);
     DCHECK(element == Smi::kZero ||
            (element->IsString() && String::cast(element)->LooksValid()));
   }
@@ -631,8 +628,8 @@ RUNTIME_FUNCTION(Runtime_StringToArray) {
       position = CopyCachedOneByteCharsToArray(isolate->heap(), chars.start(),
                                                *elements, length);
     } else {
-      MemsetPointer(elements->data_start(),
-                    ReadOnlyRoots(isolate).undefined_value(), length);
+      MemsetTagged(elements->data_start(),
+                   ReadOnlyRoots(isolate).undefined_value(), length);
     }
   } else {
     elements = isolate->factory()->NewFixedArray(length);

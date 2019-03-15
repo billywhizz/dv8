@@ -25,7 +25,7 @@ CompilationCacheTable::CompilationCacheTable(Address ptr)
 }
 
 NEVER_READ_ONLY_SPACE_IMPL(CompilationCacheTable)
-CAST_ACCESSOR2(CompilationCacheTable)
+CAST_ACCESSOR(CompilationCacheTable)
 
 uint32_t CompilationCacheShape::RegExpHash(String string, Smi flags) {
   return string->Hash() + flags->value();
@@ -42,7 +42,7 @@ uint32_t CompilationCacheShape::StringSharedHash(String source,
     // script source code and the start position of the calling scope.
     // We do this to ensure that the cache entries can survive garbage
     // collection.
-    Script* script(Script::cast(shared->script()));
+    Script script(Script::cast(shared->script()));
     hash ^= String::cast(script->source())->Hash();
     STATIC_ASSERT(LanguageModeSize == 2);
     if (is_strict(language_mode)) hash ^= 0x8000;
@@ -51,8 +51,7 @@ uint32_t CompilationCacheShape::StringSharedHash(String source,
   return hash;
 }
 
-uint32_t CompilationCacheShape::HashForObject(Isolate* isolate,
-                                              Object* object) {
+uint32_t CompilationCacheShape::HashForObject(Isolate* isolate, Object object) {
   if (object->IsNumber()) return static_cast<uint32_t>(object->Number());
 
   FixedArray val = FixedArray::cast(object);
@@ -72,7 +71,7 @@ uint32_t CompilationCacheShape::HashForObject(Isolate* isolate,
 }
 
 InfoCellPair::InfoCellPair(SharedFunctionInfo shared,
-                           FeedbackCell* feedback_cell)
+                           FeedbackCell feedback_cell)
     : is_compiled_scope_(!shared.is_null() ? shared->is_compiled_scope()
                                            : IsCompiledScope()),
       shared_(shared),

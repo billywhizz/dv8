@@ -17,6 +17,8 @@
 namespace v8 {
 namespace internal {
 
+OBJECT_CONSTRUCTORS_IMPL(PrototypeInfo, Struct)
+
 CAST_ACCESSOR(PrototypeInfo)
 
 Map PrototypeInfo::ObjectCreateMap() {

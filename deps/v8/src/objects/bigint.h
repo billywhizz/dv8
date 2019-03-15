@@ -22,7 +22,7 @@ class ValueSerializer;
 
 // BigIntBase is just the raw data object underlying a BigInt. Use with care!
 // Most code should be using BigInts instead.
-class BigIntBase : public HeapObjectPtr {
+class BigIntBase : public HeapObject {
  public:
   inline int length() const {
     int32_t bitfield = RELAXED_READ_INT32_FIELD(this, kBitfieldOffset);
@@ -35,7 +35,7 @@ class BigIntBase : public HeapObjectPtr {
     return LengthBits::decode(static_cast<uint32_t>(bitfield));
   }
 
-  static inline BigIntBase unchecked_cast(ObjectPtr o) {
+  static inline BigIntBase unchecked_cast(Object o) {
     return bit_cast<BigIntBase>(o);
   }
 
@@ -96,7 +96,7 @@ class BigIntBase : public HeapObjectPtr {
   // Only serves to make macros happy; other code should use IsBigInt.
   bool IsBigIntBase() const { return true; }
 
-  OBJECT_CONSTRUCTORS(BigIntBase, HeapObjectPtr);
+  OBJECT_CONSTRUCTORS(BigIntBase, HeapObject);
 };
 
 class FreshlyAllocatedBigInt : public BigIntBase {
@@ -112,14 +112,14 @@ class FreshlyAllocatedBigInt : public BigIntBase {
   //   (and no explicit operator is provided either).
 
  public:
-  inline static FreshlyAllocatedBigInt cast(Object* object);
-  inline static FreshlyAllocatedBigInt unchecked_cast(ObjectPtr o) {
+  inline static FreshlyAllocatedBigInt cast(Object object);
+  inline static FreshlyAllocatedBigInt unchecked_cast(Object o) {
     return bit_cast<FreshlyAllocatedBigInt>(o);
   }
 
   // Clear uninitialized padding space.
   inline void clear_padding() {
-    if (FIELD_SIZE(kOptionalPaddingOffset)) {
+    if (FIELD_SIZE(kOptionalPaddingOffset) != 0) {
       DCHECK_EQ(4, FIELD_SIZE(kOptionalPaddingOffset));
       memset(reinterpret_cast<void*>(address() + kOptionalPaddingOffset), 0,
              FIELD_SIZE(kOptionalPaddingOffset));
@@ -181,6 +181,8 @@ class V8_EXPORT_PRIVATE BigInt : public BigIntBase {
     return is_zero() ? 0 : ComputeLongHash(static_cast<uint64_t>(digit(0)));
   }
 
+  bool IsNegative() const { return sign(); }
+
   static bool EqualToString(Isolate* isolate, Handle<BigInt> x,
                             Handle<String> y);
   static bool EqualToNumber(Handle<BigInt> x, Handle<Object> y);
@@ -204,7 +206,7 @@ class V8_EXPORT_PRIVATE BigInt : public BigIntBase {
   int Words64Count();
   void ToWordsArray64(int* sign_bit, int* words64_count, uint64_t* words);
 
-  DECL_CAST2(BigInt)
+  DECL_CAST(BigInt)
   DECL_VERIFIER(BigInt)
   DECL_PRINTER(BigInt)
   void BigIntShortPrint(std::ostream& os);

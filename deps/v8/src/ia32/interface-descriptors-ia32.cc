@@ -5,7 +5,8 @@
 #if V8_TARGET_ARCH_IA32
 
 #include "src/interface-descriptors.h"
-#include "src/macro-assembler.h"
+
+#include "src/frames.h"
 
 namespace v8 {
 namespace internal {
@@ -254,6 +255,11 @@ void FrameDropperTrampolineDescriptor::InitializePlatformSpecific(
       eax,  // loaded new FP
   };
   data->InitializePlatformSpecific(arraysize(registers), registers);
+}
+
+void RunMicrotasksEntryDescriptor::InitializePlatformSpecific(
+    CallInterfaceDescriptorData* data) {
+  data->InitializePlatformSpecific(0, nullptr);
 }
 
 }  // namespace internal

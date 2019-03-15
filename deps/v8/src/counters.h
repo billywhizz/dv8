@@ -8,6 +8,7 @@
 #include "include/v8.h"
 #include "src/allocation.h"
 #include "src/base/atomic-utils.h"
+#include "src/base/optional.h"
 #include "src/base/platform/elapsed-timer.h"
 #include "src/base/platform/time.h"
 #include "src/globals.h"
@@ -349,13 +350,6 @@ class AsyncTimedHistogram {
     histogram_->AssertReportsToCounters(async_counters_.get());
     histogram_->Start(&timer_, nullptr);
   }
-
-  ~AsyncTimedHistogram() = default;
-
-  AsyncTimedHistogram(const AsyncTimedHistogram& other) = default;
-  AsyncTimedHistogram& operator=(const AsyncTimedHistogram& other) = default;
-  AsyncTimedHistogram(AsyncTimedHistogram&& other) = default;
-  AsyncTimedHistogram& operator=(AsyncTimedHistogram&& other) = default;
 
   // Records the time elapsed to |histogram_| and stops |timer_|.
   void RecordDone() { histogram_->Stop(&timer_, nullptr); }
@@ -715,7 +709,7 @@ class RuntimeCallTimer final {
 
 #define FOR_EACH_API_COUNTER(V)                            \
   V(ArrayBuffer_Cast)                                      \
-  V(ArrayBuffer_Neuter)                                    \
+  V(ArrayBuffer_Detach)                                    \
   V(ArrayBuffer_New)                                       \
   V(Array_CloneElementAt)                                  \
   V(Array_New)                                             \
@@ -845,6 +839,7 @@ class RuntimeCallTimer final {
   V(SymbolObject_New)                                      \
   V(SymbolObject_SymbolValue)                              \
   V(SyntaxError_New)                                       \
+  V(TracedGlobal_New)                                      \
   V(TryCatch_StackTrace)                                   \
   V(TypeError_New)                                         \
   V(Uint16Array_New)                                       \
@@ -1101,7 +1096,7 @@ class WorkerThreadRuntimeCallStats final {
   ~WorkerThreadRuntimeCallStats();
 
   // Returns the TLS key associated with this WorkerThreadRuntimeCallStats.
-  base::Thread::LocalStorageKey GetKey() const { return tls_key_; }
+  base::Thread::LocalStorageKey GetKey();
 
   // Returns a new worker thread runtime call stats table managed by this
   // WorkerThreadRuntimeCallStats.
@@ -1113,7 +1108,7 @@ class WorkerThreadRuntimeCallStats final {
  private:
   base::Mutex mutex_;
   std::vector<std::unique_ptr<RuntimeCallStats>> tables_;
-  base::Thread::LocalStorageKey tls_key_;
+  base::Optional<base::Thread::LocalStorageKey> tls_key_;
 };
 
 // Creating a WorkerThreadRuntimeCallStatsScope will provide a thread-local
@@ -1151,7 +1146,7 @@ class RuntimeCallTimerScope {
                                RuntimeCallCounterId counter_id);
   // This constructor is here just to avoid calling GetIsolate() when the
   // stats are disabled and the isolate is not directly available.
-  inline RuntimeCallTimerScope(Isolate* isolate, HeapObject* heap_object,
+  inline RuntimeCallTimerScope(Isolate* isolate, HeapObject heap_object,
                                RuntimeCallCounterId counter_id);
   inline RuntimeCallTimerScope(RuntimeCallStats* stats,
                                RuntimeCallCounterId counter_id) {
@@ -1399,10 +1394,6 @@ class RuntimeCallTimerScope {
   SC(store_buffer_overflows, V8.StoreBufferOverflows)
 
 #define STATS_COUNTER_LIST_2(SC)                                               \
-  /* Number of code stubs. */                                                  \
-  SC(code_stubs, V8.CodeStubs)                                                 \
-  /* Amount of stub code. */                                                   \
-  SC(total_stubs_code_size, V8.TotalStubsCodeSize)                             \
   /* Amount of (JS) compiled code. */                                          \
   SC(total_compiled_code_size, V8.TotalCompiledCodeSize)                       \
   SC(gc_compactor_caused_by_request, V8.GCCompactorCausedByRequest)            \

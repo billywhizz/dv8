@@ -26,7 +26,7 @@ TransitionArray TransitionsAccessor::transitions() {
 
 OBJECT_CONSTRUCTORS_IMPL(TransitionArray, WeakFixedArray)
 
-CAST_ACCESSOR2(TransitionArray)
+CAST_ACCESSOR(TransitionArray)
 
 bool TransitionArray::HasPrototypeTransitions() {
   return Get(kPrototypeTransitionsIndex) != MaybeObject::FromSmi(Smi::zero());
@@ -34,7 +34,7 @@ bool TransitionArray::HasPrototypeTransitions() {
 
 WeakFixedArray TransitionArray::GetPrototypeTransitions() {
   DCHECK(HasPrototypeTransitions());  // Callers must check first.
-  Object* prototype_transitions =
+  Object prototype_transitions =
       Get(kPrototypeTransitionsIndex)->GetHeapObjectAssumeStrong();
   return WeakFixedArray::cast(prototype_transitions);
 }
@@ -153,7 +153,7 @@ void TransitionArray::SetRawTarget(int transition_number, MaybeObject value) {
 bool TransitionArray::GetTargetIfExists(int transition_number, Isolate* isolate,
                                         Map* target) {
   MaybeObject raw = GetRawTarget(transition_number);
-  HeapObject* heap_object;
+  HeapObject heap_object;
   if (raw->GetHeapObjectIfStrong(&heap_object) &&
       heap_object->IsUndefined(isolate)) {
     return false;

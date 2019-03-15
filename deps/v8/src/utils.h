@@ -21,7 +21,7 @@
 #include "src/base/platform/platform.h"
 #include "src/base/v8-fallthrough.h"
 #include "src/globals.h"
-#include "src/objects/slots.h"
+#include "src/third_party/siphash/halfsiphash.h"
 #include "src/vector.h"
 
 #if defined(V8_OS_AIX)
@@ -71,6 +71,12 @@ inline constexpr bool IsInRange(T value, U lower_limit, U higher_limit) {
                                  static_cast<unsigned_T>(lower_limit)) <=
          static_cast<unsigned_T>(static_cast<unsigned_T>(higher_limit) -
                                  static_cast<unsigned_T>(lower_limit));
+}
+
+// Checks if [index, index+length) is in range [0, max). Note that this check
+// works even if {index+length} would wrap around.
+inline constexpr bool IsInBounds(size_t index, size_t length, size_t max) {
+  return length <= max && index <= (max - length);
 }
 
 // X must be a power of 2.  Returns the number of trailing zeros.
@@ -229,7 +235,11 @@ inline double Modulo(double x, double y) {
   // dividend is a zero and divisor is nonzero finite => result equals dividend
   if (!(std::isfinite(x) && (!std::isfinite(y) && !std::isnan(y))) &&
       !(x == 0 && (y != 0 && std::isfinite(y)))) {
-    x = fmod(x, y);
+    double result = fmod(x, y);
+    // Workaround MS bug in VS CRT in some OS versions, https://crbug.com/915045
+    // fmod(-17, +/-1) should equal -0.0 but now returns 0.0.
+    if (x < 0 && result == 0) result = -0.0;
+    x = result;
   }
   return x;
 #elif defined(V8_OS_AIX)
@@ -457,10 +467,10 @@ class BitSetComputer {
 // macro definition are omitted here to please the compiler)
 //
 // #define MAP_FIELDS(V)
-//   V(kField1Offset, kPointerSize)
+//   V(kField1Offset, kTaggedSize)
 //   V(kField2Offset, kIntSize)
 //   V(kField3Offset, kIntSize)
-//   V(kField4Offset, kPointerSize)
+//   V(kField4Offset, kSystemPointerSize)
 //   V(kSize, 0)
 //
 // DEFINE_FIELD_OFFSET_CONSTANTS(HeapObject::kHeaderSize, MAP_FIELDS)
@@ -506,7 +516,11 @@ inline uint32_t ComputeLongHash(uint64_t key) {
 }
 
 inline uint32_t ComputeSeededHash(uint32_t key, uint64_t seed) {
+#ifdef V8_USE_SIPHASH
+  return halfsiphash(key, seed);
+#else
   return ComputeLongHash(static_cast<uint64_t>(key) ^ seed);
+#endif  // V8_USE_SIPHASH
 }
 
 inline uint32_t ComputePointerHash(void* ptr) {
@@ -613,13 +627,12 @@ class EmbeddedVector : public Vector<T> {
   }
 
   // When copying, make underlying Vector to reference our buffer.
-  EmbeddedVector(const EmbeddedVector& rhs)
-      : Vector<T>(rhs) {
+  EmbeddedVector(const EmbeddedVector& rhs) V8_NOEXCEPT : Vector<T>(rhs) {
     MemCopy(buffer_, rhs.buffer_, sizeof(T) * kSize);
     this->set_start(buffer_);
   }
 
-  EmbeddedVector& operator=(const EmbeddedVector& rhs) {
+  EmbeddedVector& operator=(const EmbeddedVector& rhs) V8_NOEXCEPT {
     if (this == &rhs) return *this;
     Vector<T>::operator=(rhs);
     MemCopy(buffer_, rhs.buffer_, sizeof(T) * kSize);
@@ -787,42 +800,6 @@ class SimpleStringBuilder {
 
  private:
   DISALLOW_IMPLICIT_CONSTRUCTORS(SimpleStringBuilder);
-};
-
-
-// A poor man's version of STL's bitset: A bit set of enums E (without explicit
-// values), fitting into an integral type T.
-template <class E, class T = int>
-class EnumSet {
- public:
-  explicit EnumSet(T bits = 0) : bits_(bits) {}
-  bool IsEmpty() const { return bits_ == 0; }
-  bool Contains(E element) const { return (bits_ & Mask(element)) != 0; }
-  bool ContainsAnyOf(const EnumSet& set) const {
-    return (bits_ & set.bits_) != 0;
-  }
-  void Add(E element) { bits_ |= Mask(element); }
-  void Add(const EnumSet& set) { bits_ |= set.bits_; }
-  void Remove(E element) { bits_ &= ~Mask(element); }
-  void Remove(const EnumSet& set) { bits_ &= ~set.bits_; }
-  void RemoveAll() { bits_ = 0; }
-  void Intersect(const EnumSet& set) { bits_ &= set.bits_; }
-  T ToIntegral() const { return bits_; }
-  bool operator==(const EnumSet& set) { return bits_ == set.bits_; }
-  bool operator!=(const EnumSet& set) { return bits_ != set.bits_; }
-  EnumSet operator|(const EnumSet& set) const {
-    return EnumSet(bits_ | set.bits_);
-  }
-
- private:
-  static_assert(std::is_enum<E>::value, "EnumSet can only be used with enums");
-
-  T Mask(E element) const {
-    DCHECK_GT(sizeof(T) * CHAR_BIT, static_cast<int>(element));
-    return T{1} << static_cast<typename std::underlying_type<E>::type>(element);
-  }
-
-  T bits_;
 };
 
 // Bit field extraction.
@@ -1088,34 +1065,30 @@ bool StringToArrayIndex(Stream* stream, uint32_t* index);
 // return an address significantly above the actual current stack position.
 V8_NOINLINE uintptr_t GetCurrentStackPosition();
 
-template <typename V>
-static inline V ByteReverse(V value) {
-  size_t size_of_v = sizeof(value);
-  switch (size_of_v) {
-    case 2:
+static inline uint16_t ByteReverse16(uint16_t value) {
 #if V8_HAS_BUILTIN_BSWAP16
-      return static_cast<V>(__builtin_bswap16(static_cast<uint16_t>(value)));
+      return __builtin_bswap16(value);
 #else
       return value << 8 | (value >> 8 & 0x00FF);
 #endif
-    case 4:
+}
+
+static inline uint32_t ByteReverse32(uint32_t value) {
 #if V8_HAS_BUILTIN_BSWAP32
-      return static_cast<V>(__builtin_bswap32(static_cast<uint32_t>(value)));
+      return __builtin_bswap32(value);
 #else
-    {
-      size_t bits_of_v = size_of_v * kBitsPerByte;
-      return value << (bits_of_v - 8) |
-             ((value << (bits_of_v - 24)) & 0x00FF0000) |
-             ((value >> (bits_of_v - 24)) & 0x0000FF00) |
-             ((value >> (bits_of_v - 8)) & 0x00000FF);
-    }
+      return value << 24 |
+             ((value << 8) & 0x00FF0000) |
+             ((value >> 8) & 0x0000FF00) |
+             ((value >> 24) & 0x00000FF);
 #endif
-    case 8:
+}
+
+static inline uint64_t ByteReverse64(uint64_t value) {
 #if V8_HAS_BUILTIN_BSWAP64
-      return static_cast<V>(__builtin_bswap64(static_cast<uint64_t>(value)));
+      return __builtin_bswap64(value);
 #else
-    {
-      size_t bits_of_v = size_of_v * kBitsPerByte;
+      size_t bits_of_v = sizeof(value) * kBitsPerByte;
       return value << (bits_of_v - 8) |
              ((value << (bits_of_v - 24)) & 0x00FF000000000000) |
              ((value << (bits_of_v - 40)) & 0x0000FF0000000000) |
@@ -1124,8 +1097,21 @@ static inline V ByteReverse(V value) {
              ((value >> (bits_of_v - 40)) & 0x0000000000FF0000) |
              ((value >> (bits_of_v - 24)) & 0x000000000000FF00) |
              ((value >> (bits_of_v - 8)) & 0x00000000000000FF);
-    }
 #endif
+}
+
+template <typename V>
+static inline V ByteReverse(V value) {
+  size_t size_of_v = sizeof(value);
+  switch (size_of_v) {
+    case 1:
+      return value;
+    case 2:
+      return static_cast<V>(ByteReverse16(static_cast<uint16_t>(value)));
+    case 4:
+      return static_cast<V>(ByteReverse32(static_cast<uint32_t>(value)));
+    case 8:
+      return static_cast<V>(ByteReverse64(static_cast<uint64_t>(value)));
     default:
       UNREACHABLE();
   }

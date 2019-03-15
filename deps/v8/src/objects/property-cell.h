@@ -5,7 +5,7 @@
 #ifndef V8_OBJECTS_PROPERTY_CELL_H_
 #define V8_OBJECTS_PROPERTY_CELL_H_
 
-#include "src/objects.h"
+#include "src/objects/heap-object.h"
 
 // Has to be the last include (doesn't have include guards):
 #include "src/objects/object-macros.h"
@@ -16,14 +16,14 @@ namespace internal {
 class PropertyCell : public HeapObject {
  public:
   // [name]: the name of the global property.
-  DECL_ACCESSORS2(name, Name)
+  DECL_ACCESSORS(name, Name)
   // [property_details]: details of the global property.
   DECL_ACCESSORS(property_details_raw, Object)
   // [value]: value of the global property.
   DECL_ACCESSORS(value, Object)
   // [dependent_code]: dependent code that depends on the type of the global
   // property.
-  DECL_ACCESSORS2(dependent_code, DependentCode)
+  DECL_ACCESSORS(dependent_code, DependentCode)
 
   inline PropertyDetails property_details() const;
   inline void set_property_details(PropertyDetails details);
@@ -56,17 +56,21 @@ class PropertyCell : public HeapObject {
   DECL_PRINTER(PropertyCell)
   DECL_VERIFIER(PropertyCell)
 
-  // Layout description.
-  static const int kDetailsOffset = HeapObject::kHeaderSize;
-  static const int kNameOffset = kDetailsOffset + kPointerSize;
-  static const int kValueOffset = kNameOffset + kPointerSize;
-  static const int kDependentCodeOffset = kValueOffset + kPointerSize;
-  static const int kSize = kDependentCodeOffset + kPointerSize;
+// Layout description.
+#define PROPERTY_CELL_FIELDS(V)        \
+  V(kDetailsOffset, kTaggedSize)       \
+  V(kNameOffset, kTaggedSize)          \
+  V(kValueOffset, kTaggedSize)         \
+  V(kDependentCodeOffset, kTaggedSize) \
+  /* Total size. */                    \
+  V(kSize, 0)
+
+  DEFINE_FIELD_OFFSET_CONSTANTS(HeapObject::kHeaderSize, PROPERTY_CELL_FIELDS)
+#undef PROPERTY_CELL_FIELDS
 
   typedef FixedBodyDescriptor<kNameOffset, kSize, kSize> BodyDescriptor;
 
- private:
-  DISALLOW_IMPLICIT_CONSTRUCTORS(PropertyCell);
+  OBJECT_CONSTRUCTORS(PropertyCell, HeapObject);
 };
 
 }  // namespace internal

@@ -644,8 +644,7 @@ class ELF {
   void WriteHeader(Writer* w) {
     DCHECK_EQ(w->position(), 0);
     Writer::Slot<ELFHeader> header = w->CreateSlotHere<ELFHeader>();
-#if (V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_ARM || \
-     (V8_TARGET_ARCH_X64 && V8_TARGET_ARCH_32_BIT))
+#if (V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_ARM)
     const uint8_t ident[16] = {0x7F, 'E', 'L', 'F', 1, 1, 1, 0,
                                0,    0,   0,   0,   0, 0, 0, 0};
 #elif(V8_TARGET_ARCH_X64 && V8_TARGET_ARCH_64_BIT) || \
@@ -781,7 +780,6 @@ class ELFSymbol {
     return static_cast<Binding>(info >> 4);
   }
 #if (V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_ARM ||     \
-     (V8_TARGET_ARCH_X64 && V8_TARGET_ARCH_32_BIT) || \
      (V8_TARGET_ARCH_S390 && V8_TARGET_ARCH_32_BIT))
   struct SerializedLayout {
     SerializedLayout(uint32_t name,
@@ -991,7 +989,7 @@ class CodeDescription {
     return !shared_info_.is_null() && shared_info_->script()->IsScript();
   }
 
-  Script* script() { return Script::cast(shared_info_->script()); }
+  Script script() { return Script::cast(shared_info_->script()); }
 
   bool IsLineInfoAvailable() { return lineinfo_ != nullptr; }
 
@@ -1838,7 +1836,7 @@ extern "C" {
   JITDescriptor __jit_debug_descriptor = {1, 0, nullptr, nullptr};
 
 #ifdef OBJECT_PRINT
-  void __gdb_print_v8_object(Object* object) {
+  void __gdb_print_v8_object(Object object) {
     StdoutStream os;
     object->Print(os);
     os << std::flush;

@@ -16,9 +16,11 @@
 #include "src/isolate.h"
 #include "src/maybe-handles-inl.h"
 #include "src/objects-inl.h"
+#include "src/objects/heap-number-inl.h"
 #include "src/objects/js-array-inl.h"
 #include "src/objects/js-collection-inl.h"
 #include "src/objects/js-regexp-inl.h"
+#include "src/objects/oddball-inl.h"
 #include "src/objects/ordered-hash-table-inl.h"
 #include "src/objects/smi.h"
 #include "src/snapshot/code-serializer.h"
@@ -277,7 +279,7 @@ void ValueSerializer::WriteBigIntContents(BigInt bigint) {
 
 void ValueSerializer::WriteRawBytes(const void* source, size_t length) {
   uint8_t* dest;
-  if (ReserveRawBytes(length).To(&dest)) {
+  if (ReserveRawBytes(length).To(&dest) && length > 0) {
     memcpy(dest, source, length);
   }
 }
@@ -343,7 +345,11 @@ void ValueSerializer::TransferArrayBuffer(uint32_t transfer_id,
 }
 
 Maybe<bool> ValueSerializer::WriteObject(Handle<Object> object) {
-  out_of_memory_ = false;
+  // There is no sense in trying to proceed if we've previously run out of
+  // memory. Bail immediately, as this likely implies that some write has
+  // previously failed and so the buffer is corrupt.
+  if (V8_UNLIKELY(out_of_memory_)) return ThrowIfOutOfMemory();
+
   if (object->IsSmi()) {
     WriteSmi(Smi::cast(*object));
     return ThrowIfOutOfMemory();
@@ -393,7 +399,7 @@ Maybe<bool> ValueSerializer::WriteObject(Handle<Object> object) {
   }
 }
 
-void ValueSerializer::WriteOddball(Oddball* oddball) {
+void ValueSerializer::WriteOddball(Oddball oddball) {
   SerializationTag tag = SerializationTag::kUndefined;
   switch (oddball->kind()) {
     case Oddball::kUndefined:
@@ -421,12 +427,12 @@ void ValueSerializer::WriteSmi(Smi smi) {
   WriteZigZag<int32_t>(smi->value());
 }
 
-void ValueSerializer::WriteHeapNumber(HeapNumber* number) {
+void ValueSerializer::WriteHeapNumber(HeapNumber number) {
   WriteTag(SerializationTag::kDouble);
   WriteDouble(number->value());
 }
 
-void ValueSerializer::WriteMutableHeapNumber(MutableHeapNumber* number) {
+void ValueSerializer::WriteMutableHeapNumber(MutableHeapNumber number) {
   WriteTag(SerializationTag::kDouble);
   WriteDouble(number->value());
 }
@@ -710,13 +716,13 @@ Maybe<bool> ValueSerializer::WriteJSArray(Handle<JSArray> array) {
   return ThrowIfOutOfMemory();
 }
 
-void ValueSerializer::WriteJSDate(JSDate* date) {
+void ValueSerializer::WriteJSDate(JSDate date) {
   WriteTag(SerializationTag::kDate);
   WriteDouble(date->value()->Number());
 }
 
 Maybe<bool> ValueSerializer::WriteJSValue(Handle<JSValue> value) {
-  Object* inner_value = value->value();
+  Object inner_value = value->value();
   if (inner_value->IsTrue(isolate_)) {
     WriteTag(SerializationTag::kTrueObject);
   } else if (inner_value->IsFalse(isolate_)) {
@@ -738,7 +744,7 @@ Maybe<bool> ValueSerializer::WriteJSValue(Handle<JSValue> value) {
   return ThrowIfOutOfMemory();
 }
 
-void ValueSerializer::WriteJSRegExp(JSRegExp* regexp) {
+void ValueSerializer::WriteJSRegExp(JSRegExp regexp) {
   WriteTag(SerializationTag::kRegExp);
   WriteString(handle(regexp->Pattern(), isolate_));
   WriteVarint(static_cast<uint32_t>(regexp->GetFlags()));
@@ -751,11 +757,11 @@ Maybe<bool> ValueSerializer::WriteJSMap(Handle<JSMap> map) {
   Handle<FixedArray> entries = isolate_->factory()->NewFixedArray(length);
   {
     DisallowHeapAllocation no_gc;
-    Oddball* the_hole = ReadOnlyRoots(isolate_).the_hole_value();
+    Oddball the_hole = ReadOnlyRoots(isolate_).the_hole_value();
     int capacity = table->UsedCapacity();
     int result_index = 0;
     for (int i = 0; i < capacity; i++) {
-      Object* key = table->KeyAt(i);
+      Object key = table->KeyAt(i);
       if (key == the_hole) continue;
       entries->set(result_index++, key);
       entries->set(result_index++, table->ValueAt(i));
@@ -782,11 +788,11 @@ Maybe<bool> ValueSerializer::WriteJSSet(Handle<JSSet> set) {
   Handle<FixedArray> entries = isolate_->factory()->NewFixedArray(length);
   {
     DisallowHeapAllocation no_gc;
-    Oddball* the_hole = ReadOnlyRoots(isolate_).the_hole_value();
+    Oddball the_hole = ReadOnlyRoots(isolate_).the_hole_value();
     int capacity = table->UsedCapacity();
     int result_index = 0;
     for (int i = 0; i < capacity; i++) {
-      Object* key = table->KeyAt(i);
+      Object key = table->KeyAt(i);
       if (key == the_hole) continue;
       entries->set(result_index++, key);
     }
@@ -829,8 +835,8 @@ Maybe<bool> ValueSerializer::WriteJSArrayBuffer(
     WriteVarint(*transfer_entry);
     return ThrowIfOutOfMemory();
   }
-  if (array_buffer->was_neutered()) {
-    ThrowDataCloneError(MessageTemplate::kDataCloneErrorNeuteredArrayBuffer);
+  if (array_buffer->was_detached()) {
+    ThrowDataCloneError(MessageTemplate::kDataCloneErrorDetachedArrayBuffer);
     return Nothing<bool>();
   }
   double byte_length = array_buffer->byte_length();
@@ -844,7 +850,7 @@ Maybe<bool> ValueSerializer::WriteJSArrayBuffer(
   return ThrowIfOutOfMemory();
 }
 
-Maybe<bool> ValueSerializer::WriteJSArrayBufferView(JSArrayBufferView* view) {
+Maybe<bool> ValueSerializer::WriteJSArrayBufferView(JSArrayBufferView view) {
   if (treat_array_buffer_views_as_host_objects_) {
     return WriteHostObject(handle(view, isolate_));
   }
@@ -874,7 +880,7 @@ Maybe<bool> ValueSerializer::WriteWasmModule(Handle<WasmModuleObject> object) {
     // TODO(titzer): introduce a Utils::ToLocal for WasmModuleObject.
     Maybe<uint32_t> transfer_id = delegate_->GetWasmModuleTransferId(
         reinterpret_cast<v8::Isolate*>(isolate_),
-        v8::Local<v8::WasmCompiledModule>::Cast(
+        v8::Local<v8::WasmModuleObject>::Cast(
             Utils::ToLocal(Handle<JSObject>::cast(object))));
     RETURN_VALUE_IF_SCHEDULED_EXCEPTION(isolate_, Nothing<bool>());
     uint32_t id = 0;
@@ -897,7 +903,7 @@ Maybe<bool> ValueSerializer::WriteWasmModule(Handle<WasmModuleObject> object) {
     memcpy(destination, wire_bytes.start(), wire_bytes.size());
   }
 
-  wasm::WasmSerializer wasm_serializer(isolate_, native_module);
+  wasm::WasmSerializer wasm_serializer(native_module);
   size_t module_size = wasm_serializer.GetSerializedNativeModuleSize();
   CHECK_GE(std::numeric_limits<uint32_t>::max(), module_size);
   WriteVarint<uint32_t>(static_cast<uint32_t>(module_size));
@@ -932,8 +938,10 @@ Maybe<bool> ValueSerializer::WriteHostObject(Handle<JSObject> object) {
   Maybe<bool> result =
       delegate_->WriteHostObject(v8_isolate, Utils::ToLocal(object));
   RETURN_VALUE_IF_SCHEDULED_EXCEPTION(isolate_, Nothing<bool>());
+  USE(result);
   DCHECK(!result.IsNothing());
-  return result;
+  DCHECK(result.ToChecked());
+  return ThrowIfOutOfMemory();
 }
 
 Maybe<uint32_t> ValueSerializer::WriteJSObjectPropertiesSlow(
@@ -1146,6 +1154,9 @@ void ValueDeserializer::TransferArrayBuffer(
 
 MaybeHandle<Object> ValueDeserializer::ReadObject() {
   DisallowJavascriptExecution no_js(isolate_);
+  // If we are at the end of the stack, abort. This function may recurse.
+  STACK_CHECK(isolate_, MaybeHandle<Object>());
+
   MaybeHandle<Object> result = ReadObjectInternal();
 
   // ArrayBufferView is special in that it consumes the value before it, even
@@ -1471,7 +1482,9 @@ MaybeHandle<JSArray> ValueDeserializer::ReadDenseJSArray() {
     if (version_ < 11 && element->IsUndefined(isolate_)) continue;
 
     // Safety check.
-    CHECK_LT(i, static_cast<uint32_t>(elements->length()));
+    if (i >= static_cast<uint32_t>(elements->length())) {
+      return MaybeHandle<JSArray>();
+    }
 
     elements->set(i, *element);
   }
@@ -1684,7 +1697,9 @@ MaybeHandle<JSArrayBuffer> ValueDeserializer::ReadJSArrayBuffer(
                                           should_initialize)) {
     return MaybeHandle<JSArrayBuffer>();
   }
-  memcpy(array_buffer->backing_store(), position_, byte_length);
+  if (byte_length > 0) {
+    memcpy(array_buffer->backing_store(), position_, byte_length);
+  }
   position_ += byte_length;
   AddObjectWithID(id, array_buffer);
   return array_buffer;
@@ -1985,8 +2000,7 @@ Maybe<uint32_t> ValueDeserializer::ReadJSObjectProperties(
       bool success;
       LookupIterator it = LookupIterator::PropertyOrElement(
           isolate_, object, key, &success, LookupIterator::OWN);
-      CHECK_EQ(LookupIterator::NOT_FOUND, it.state());
-      if (!success ||
+      if (!success || it.state() != LookupIterator::NOT_FOUND ||
           JSObject::DefineOwnPropertyIgnoreAttributes(&it, value, NONE)
               .is_null()) {
         return Nothing<uint32_t>();
@@ -2020,8 +2034,7 @@ Maybe<uint32_t> ValueDeserializer::ReadJSObjectProperties(
     bool success;
     LookupIterator it = LookupIterator::PropertyOrElement(
         isolate_, object, key, &success, LookupIterator::OWN);
-    CHECK_EQ(LookupIterator::NOT_FOUND, it.state());
-    if (!success ||
+    if (!success || it.state() != LookupIterator::NOT_FOUND ||
         JSObject::DefineOwnPropertyIgnoreAttributes(&it, value, NONE)
             .is_null()) {
       return Nothing<uint32_t>();
@@ -2038,7 +2051,7 @@ MaybeHandle<JSReceiver> ValueDeserializer::GetObjectWithID(uint32_t id) {
   if (id >= static_cast<unsigned>(id_map_->length())) {
     return MaybeHandle<JSReceiver>();
   }
-  Object* value = id_map_->get(id);
+  Object value = id_map_->get(id);
   if (value->IsTheHole(isolate_)) return MaybeHandle<JSReceiver>();
   DCHECK(value->IsJSReceiver());
   return Handle<JSReceiver>(JSReceiver::cast(value), isolate_);
@@ -2068,8 +2081,7 @@ static Maybe<bool> SetPropertiesFromKeyValuePairs(Isolate* isolate,
     bool success;
     LookupIterator it = LookupIterator::PropertyOrElement(
         isolate, object, key, &success, LookupIterator::OWN);
-    CHECK_EQ(LookupIterator::NOT_FOUND, it.state());
-    if (!success ||
+    if (!success || it.state() != LookupIterator::NOT_FOUND ||
         JSObject::DefineOwnPropertyIgnoreAttributes(&it, value, NONE)
             .is_null()) {
       return Nothing<bool>();

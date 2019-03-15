@@ -4,6 +4,7 @@
 
 #include "src/compiler/raw-machine-assembler.h"
 
+#include "src/compiler/compiler-source-position-table.h"
 #include "src/compiler/node-properties.h"
 #include "src/compiler/pipeline.h"
 #include "src/compiler/scheduler.h"
@@ -21,8 +22,10 @@ RawMachineAssembler::RawMachineAssembler(
     : isolate_(isolate),
       graph_(graph),
       schedule_(new (zone()) Schedule(zone())),
+      source_positions_(new (zone()) SourcePositionTable(graph)),
       machine_(zone(), word, flags, alignment_requirements),
       common_(zone()),
+      simplified_(zone()),
       call_descriptor_(call_descriptor),
       target_parameter_(nullptr),
       parameters_(parameter_count(), zone()),
@@ -40,6 +43,14 @@ RawMachineAssembler::RawMachineAssembler(
         AddNode(common()->Parameter(static_cast<int>(i)), graph->start());
   }
   graph->SetEnd(graph->NewNode(common_.End(0)));
+  source_positions_->AddDecorator();
+}
+
+void RawMachineAssembler::SetSourcePosition(const char* file, int line) {
+  int file_id = isolate()->LookupOrAddExternallyCompiledFilename(file);
+  SourcePosition p = SourcePosition::External(line, file_id);
+  DCHECK(p.ExternalLine() == line);
+  source_positions()->SetCurrentPosition(p);
 }
 
 Node* RawMachineAssembler::NullConstant() {
@@ -52,9 +63,14 @@ Node* RawMachineAssembler::UndefinedConstant() {
 
 Node* RawMachineAssembler::RelocatableIntPtrConstant(intptr_t value,
                                                      RelocInfo::Mode rmode) {
-  return kPointerSize == 8
+  return kSystemPointerSize == 8
              ? RelocatableInt64Constant(value, rmode)
              : RelocatableInt32Constant(static_cast<int>(value), rmode);
+}
+
+Node* RawMachineAssembler::OptimizedAllocate(Node* size,
+                                             PretenureFlag pretenure) {
+  return AddNode(simplified()->AllocateRaw(Type::Any(), pretenure), size);
 }
 
 Schedule* RawMachineAssembler::Export() {
@@ -72,6 +88,7 @@ Schedule* RawMachineAssembler::Export() {
     StdoutStream{} << *schedule_;
   }
   // Invalidate RawMachineAssembler.
+  source_positions_->RemoveDecorator();
   Schedule* schedule = schedule_;
   schedule_ = nullptr;
   return schedule;
@@ -547,8 +564,11 @@ void RawMachineAssembler::Unreachable() {
   current_block_ = nullptr;
 }
 
-void RawMachineAssembler::Comment(const char* msg) {
-  AddNode(machine()->Comment(msg));
+void RawMachineAssembler::Comment(std::string msg) {
+  size_t length = msg.length() + 1;
+  char* zone_buffer = zone()->NewArray<char>(length);
+  MemCopy(zone_buffer, msg.c_str(), length);
+  AddNode(machine()->Comment(zone_buffer));
 }
 
 Node* RawMachineAssembler::CallN(CallDescriptor* call_descriptor,

@@ -603,9 +603,8 @@ v8::MaybeLocal<v8::Value> V8Debugger::getTargetScopes(
 
   for (; !iterator->Done(); iterator->Advance()) {
     v8::Local<v8::Object> scope = v8::Object::New(m_isolate);
-    if (!addInternalObject(context, scope, V8InternalValueType::kScope)) {
+    if (!addInternalObject(context, scope, V8InternalValueType::kScope))
       return v8::MaybeLocal<v8::Value>();
-    }
     String16 nameSuffix = toProtocolStringWithTypeCheck(
         m_isolate, iterator->GetFunctionDebugName());
     String16 description;
@@ -647,8 +646,7 @@ v8::MaybeLocal<v8::Value> V8Debugger::getTargetScopes(
                        toV8StringInternalized(m_isolate, "object"), object);
     createDataProperty(context, result, result->Length(), scope);
   }
-  if (!addInternalObject(context, v8::Local<v8::Array>::Cast(result),
-                         V8InternalValueType::kScopeList))
+  if (!addInternalObject(context, result, V8InternalValueType::kScopeList))
     return v8::MaybeLocal<v8::Value>();
   return result;
 }
@@ -693,30 +691,12 @@ v8::MaybeLocal<v8::Array> V8Debugger::collectionsEntries(
       createDataProperty(context, wrapper,
                          toV8StringInternalized(isolate, "value"), value);
     }
-    if (!addInternalObject(context, wrapper, V8InternalValueType::kEntry)) {
+    if (!addInternalObject(context, wrapper, V8InternalValueType::kEntry))
       continue;
-    }
     createDataProperty(context, wrappedEntries, wrappedEntries->Length(),
                        wrapper);
   }
   return wrappedEntries;
-}
-
-v8::MaybeLocal<v8::Uint32> V8Debugger::stableObjectId(
-    v8::Local<v8::Context> context, v8::Local<v8::Value> value) {
-  DCHECK(value->IsObject());
-  if (m_stableObjectId.IsEmpty()) {
-    m_stableObjectId.Reset(m_isolate, v8::debug::WeakMap::New(m_isolate));
-  }
-  v8::Local<v8::debug::WeakMap> stableObjectId =
-      m_stableObjectId.Get(m_isolate);
-  v8::Local<v8::Value> idValue;
-  if (!stableObjectId->Get(context, value).ToLocal(&idValue) ||
-      !idValue->IsUint32()) {
-    idValue = v8::Integer::NewFromUnsigned(m_isolate, ++m_lastStableObjectId);
-    stableObjectId->Set(context, value, idValue).ToLocalChecked();
-  }
-  return idValue.As<v8::Uint32>();
 }
 
 v8::MaybeLocal<v8::Array> V8Debugger::internalProperties(
@@ -724,15 +704,6 @@ v8::MaybeLocal<v8::Array> V8Debugger::internalProperties(
   v8::Local<v8::Array> properties;
   if (!v8::debug::GetInternalProperties(m_isolate, value).ToLocal(&properties))
     return v8::MaybeLocal<v8::Array>();
-  if (value->IsObject()) {
-    v8::Local<v8::Uint32> id;
-    if (stableObjectId(context, value).ToLocal(&id)) {
-      createDataProperty(
-          context, properties, properties->Length(),
-          toV8StringInternalized(m_isolate, "[[StableObjectId]]"));
-      createDataProperty(context, properties, properties->Length(), id);
-    }
-  }
   v8::Local<v8::Array> entries;
   if (collectionsEntries(context, value).ToLocal(&entries)) {
     createDataProperty(context, properties, properties->Length(),
@@ -1117,26 +1088,10 @@ std::pair<int64_t, int64_t> V8Debugger::debuggerIdFor(
 bool V8Debugger::addInternalObject(v8::Local<v8::Context> context,
                                    v8::Local<v8::Object> object,
                                    V8InternalValueType type) {
-  if (m_internalObjects.IsEmpty()) {
-    m_internalObjects.Reset(m_isolate, v8::debug::WeakMap::New(m_isolate));
-  }
-  return !m_internalObjects.Get(m_isolate)
-              ->Set(context, object,
-                    v8::Integer::New(m_isolate, static_cast<int>(type)))
-              .IsEmpty();
-}
-
-V8InternalValueType V8Debugger::getInternalType(v8::Local<v8::Context> context,
-                                                v8::Local<v8::Object> object) {
-  if (m_internalObjects.IsEmpty()) return V8InternalValueType::kNone;
-  v8::Local<v8::Value> typeValue;
-  if (!m_internalObjects.Get(m_isolate)
-           ->Get(context, object)
-           .ToLocal(&typeValue) ||
-      !typeValue->IsUint32()) {
-    return V8InternalValueType::kNone;
-  }
-  return static_cast<V8InternalValueType>(typeValue.As<v8::Int32>()->Value());
+  int contextId = InspectedContext::contextId(context);
+  InspectedContext* inspectedContext = m_inspector->getContext(contextId);
+  return inspectedContext ? inspectedContext->addInternalObject(object, type)
+                          : false;
 }
 
 void V8Debugger::dumpAsyncTaskStacksStateForTest() {

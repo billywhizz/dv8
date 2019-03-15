@@ -15,10 +15,12 @@
 #include "src/deoptimize-reason.h"
 #include "src/feedback-vector.h"
 #include "src/frame-constants.h"
+#include "src/frames.h"
 #include "src/globals.h"
 #include "src/isolate.h"
-#include "src/macro-assembler.h"
+#include "src/label.h"
 #include "src/objects/shared-function-info.h"
+#include "src/register-arch.h"
 #include "src/source-position.h"
 #include "src/zone/zone-chunk-list.h"
 
@@ -30,13 +32,14 @@ class TranslationIterator;
 class DeoptimizedFrameInfo;
 class TranslatedState;
 class RegisterValues;
+class MacroAssembler;
 
 class TranslatedValue {
  public:
   // Allocation-less getter of the value.
   // Returns ReadOnlyRoots::arguments_marker() if allocation would be necessary
   // to get the value.
-  Object* GetRawValue() const;
+  Object GetRawValue() const;
 
   // Getter for the value, takes care of materializing the subgraph
   // reachable from this value.
@@ -92,7 +95,7 @@ class TranslatedValue {
   static TranslatedValue NewInt64(TranslatedState* container, int64_t value);
   static TranslatedValue NewUInt32(TranslatedState* container, uint32_t value);
   static TranslatedValue NewBool(TranslatedState* container, uint32_t value);
-  static TranslatedValue NewTagged(TranslatedState* container, Object* literal);
+  static TranslatedValue NewTagged(TranslatedState* container, Object literal);
   static TranslatedValue NewInvalid(TranslatedState* container);
 
   Isolate* isolate() const;
@@ -125,7 +128,7 @@ class TranslatedValue {
 
   union {
     // kind kTagged. After handlification it is always nullptr.
-    Object* raw_literal_;
+    Object raw_literal_;
     // kind is kUInt32 or kBoolBit.
     uint32_t uint32_value_;
     // kind is kInt32.
@@ -141,7 +144,7 @@ class TranslatedValue {
   };
 
   // Checked accessors for the union members.
-  Object* raw_literal() const;
+  Object raw_literal() const;
   int32_t int32_value() const;
   int64_t int64_value() const;
   uint32_t uint32_value() const;
@@ -404,7 +407,7 @@ class TranslatedState {
 class OptimizedFunctionVisitor {
  public:
   virtual ~OptimizedFunctionVisitor() = default;
-  virtual void VisitFunction(JSFunction* function) = 0;
+  virtual void VisitFunction(JSFunction function) = 0;
 };
 
 class Deoptimizer : public Malloced {
@@ -458,7 +461,7 @@ class Deoptimizer : public Malloced {
   // Number of created JS frames. Not all created frames are necessarily JS.
   int jsframe_count() const { return jsframe_count_; }
 
-  static Deoptimizer* New(JSFunction* function, DeoptimizeKind kind,
+  static Deoptimizer* New(Address raw_function, DeoptimizeKind kind,
                           unsigned bailout_id, Address from, int fp_to_sp_delta,
                           Isolate* isolate);
   static Deoptimizer* Grab(Isolate* isolate);
@@ -473,7 +476,7 @@ class Deoptimizer : public Malloced {
   // again and any activations of the optimized code will get deoptimized when
   // execution returns. If {code} is specified then the given code is targeted
   // instead of the function code (e.g. OSR code not installed on function).
-  static void DeoptimizeFunction(JSFunction* function, Code code = Code());
+  static void DeoptimizeFunction(JSFunction function, Code code = Code());
 
   // Deoptimize all code in the given isolate.
   static void DeoptimizeAll(Isolate* isolate);
@@ -489,10 +492,7 @@ class Deoptimizer : public Malloced {
 
   static void ComputeOutputFrames(Deoptimizer* deoptimizer);
 
-  static Address GetDeoptimizationEntry(Isolate* isolate, int id,
-                                        DeoptimizeKind kind);
-  static int GetDeoptimizationId(Isolate* isolate, Address addr,
-                                 DeoptimizeKind kind);
+  static Address GetDeoptimizationEntry(Isolate* isolate, DeoptimizeKind kind);
 
   // Returns true if {addr} is a deoptimization entry and stores its type in
   // {type}. Returns false if {addr} is not a deoptimization entry.
@@ -514,51 +514,28 @@ class Deoptimizer : public Malloced {
 
   static const int kNotDeoptimizationEntry = -1;
 
-  // Generators for the deoptimization entry code.
-  class TableEntryGenerator {
-   public:
-    TableEntryGenerator(MacroAssembler* masm, DeoptimizeKind kind, int count)
-        : masm_(masm), deopt_kind_(kind), count_(count) {}
-
-    void Generate();
-
-   protected:
-    MacroAssembler* masm() const { return masm_; }
-    DeoptimizeKind deopt_kind() const { return deopt_kind_; }
-    Isolate* isolate() const { return masm_->isolate(); }
-
-    void GeneratePrologue();
-
-   private:
-    int count() const { return count_; }
-
-    MacroAssembler* masm_;
-    DeoptimizeKind deopt_kind_;
-    int count_;
-  };
-
   static void EnsureCodeForDeoptimizationEntry(Isolate* isolate,
                                                DeoptimizeKind kind);
-  static void EnsureCodeForMaxDeoptimizationEntries(Isolate* isolate);
+  static void EnsureCodeForDeoptimizationEntries(Isolate* isolate);
 
   Isolate* isolate() const { return isolate_; }
 
- private:
-  friend class FrameWriter;
-  void QueueValueForMaterialization(Address output_address, Object* obj,
-                                    const TranslatedFrame::iterator& iterator);
-
-  static const int kMinNumberOfEntries = 64;
   static const int kMaxNumberOfEntries = 16384;
 
-  Deoptimizer(Isolate* isolate, JSFunction* function, DeoptimizeKind kind,
+ private:
+  friend class FrameWriter;
+  void QueueValueForMaterialization(Address output_address, Object obj,
+                                    const TranslatedFrame::iterator& iterator);
+
+
+  Deoptimizer(Isolate* isolate, JSFunction function, DeoptimizeKind kind,
               unsigned bailout_id, Address from, int fp_to_sp_delta);
   Code FindOptimizedCode();
   void PrintFunctionName();
   void DeleteFrameDescriptions();
 
-  static bool IsInDeoptimizationTable(Isolate* isolate, Address addr,
-                                      DeoptimizeKind type);
+  static bool IsDeoptimizationEntry(Isolate* isolate, Address addr,
+                                    DeoptimizeKind type);
 
   void DoComputeOutputFrames();
   void DoComputeInterpretedFrame(TranslatedFrame* translated_frame,
@@ -592,7 +569,8 @@ class Deoptimizer : public Malloced {
   static unsigned ComputeIncomingArgumentSize(SharedFunctionInfo shared);
   static unsigned ComputeOutgoingArgumentSize(Code code, unsigned bailout_id);
 
-  static void GenerateDeoptimizationEntries(MacroAssembler* masm, int count,
+  static void GenerateDeoptimizationEntries(MacroAssembler* masm,
+                                            Isolate* isolate,
                                             DeoptimizeKind kind);
 
   // Marks all the code in the given context for deoptimization.
@@ -611,7 +589,7 @@ class Deoptimizer : public Malloced {
   Code FindDeoptimizingCode(Address addr);
 
   Isolate* isolate_;
-  JSFunction* function_;
+  JSFunction function_;
   Code compiled_code_;
   unsigned bailout_id_;
   DeoptimizeKind deopt_kind_;
@@ -716,9 +694,9 @@ class FrameDescription {
   explicit FrameDescription(uint32_t frame_size, int parameter_count = 0);
 
   void* operator new(size_t size, uint32_t frame_size) {
-    // Subtracts kPointerSize, as the member frame_content_ already supplies
-    // the first element of the area to store the frame.
-    return malloc(size + frame_size - kPointerSize);
+    // Subtracts kSystemPointerSize, as the member frame_content_ already
+    // supplies the first element of the area to store the frame.
+    return malloc(size + frame_size - kSystemPointerSize);
   }
 
   void operator delete(void* pointer, uint32_t frame_size) {
@@ -742,7 +720,7 @@ class FrameDescription {
   unsigned GetLastArgumentSlotOffset() {
     int parameter_slots = parameter_count();
     if (kPadArguments) parameter_slots = RoundUp(parameter_slots, 2);
-    return GetFrameSize() - parameter_slots * kPointerSize;
+    return GetFrameSize() - parameter_slots * kSystemPointerSize;
   }
 
   Address GetFramePointerAddress() {
@@ -862,6 +840,15 @@ class DeoptimizerData {
  public:
   explicit DeoptimizerData(Heap* heap);
   ~DeoptimizerData();
+
+#ifdef DEBUG
+  bool IsDeoptEntryCode(Code code) const {
+    for (int i = 0; i < kLastDeoptimizeKind + 1; i++) {
+      if (code == deopt_entry_code_[i]) return true;
+    }
+    return false;
+  }
+#endif  // DEBUG
 
  private:
   Heap* heap_;

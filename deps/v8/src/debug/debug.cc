@@ -13,7 +13,6 @@
 #include "src/base/platform/mutex.h"
 #include "src/bootstrapper.h"
 #include "src/builtins/builtins.h"
-#include "src/code-stubs.h"
 #include "src/compilation-cache.h"
 #include "src/compiler.h"
 #include "src/counters.h"
@@ -28,7 +27,6 @@
 #include "src/interpreter/bytecode-array-iterator.h"
 #include "src/interpreter/interpreter.h"
 #include "src/isolate-inl.h"
-#include "src/log.h"
 #include "src/message-template.h"
 #include "src/objects/api-callbacks-inl.h"
 #include "src/objects/debug-objects-inl.h"
@@ -37,6 +35,7 @@
 #include "src/objects/slots.h"
 #include "src/snapshot/natives.h"
 #include "src/snapshot/snapshot.h"
+#include "src/v8threads.h"
 #include "src/wasm/wasm-objects-inl.h"
 
 namespace v8 {
@@ -133,14 +132,13 @@ void BreakLocation::AllAtCurrentStatement(
   }
 }
 
-JSGeneratorObject* BreakLocation::GetGeneratorObjectForSuspendedFrame(
+JSGeneratorObject BreakLocation::GetGeneratorObjectForSuspendedFrame(
     JavaScriptFrame* frame) const {
   DCHECK(IsSuspend());
   DCHECK_GE(generator_obj_reg_index_, 0);
 
-  Object* generator_obj =
-      InterpretedFrame::cast(frame)->ReadInterpreterRegister(
-          generator_obj_reg_index_);
+  Object generator_obj = InterpretedFrame::cast(frame)->ReadInterpreterRegister(
+      generator_obj_reg_index_);
 
   return JSGeneratorObject::cast(generator_obj);
 }
@@ -383,20 +381,20 @@ int Debug::ArchiveSpacePerThread() { return sizeof(ThreadLocal); }
 
 void Debug::Iterate(RootVisitor* v) {
   v->VisitRootPointer(Root::kDebug, nullptr,
-                      ObjectSlot(&thread_local_.return_value_));
+                      FullObjectSlot(&thread_local_.return_value_));
   v->VisitRootPointer(Root::kDebug, nullptr,
-                      ObjectSlot(&thread_local_.suspended_generator_));
-  v->VisitRootPointer(Root::kDebug, nullptr,
-                      ObjectSlot(&thread_local_.ignore_step_into_function_));
+                      FullObjectSlot(&thread_local_.suspended_generator_));
+  v->VisitRootPointer(
+      Root::kDebug, nullptr,
+      FullObjectSlot(&thread_local_.ignore_step_into_function_));
 }
 
-DebugInfoListNode::DebugInfoListNode(Isolate* isolate, DebugInfo* debug_info)
+DebugInfoListNode::DebugInfoListNode(Isolate* isolate, DebugInfo debug_info)
     : next_(nullptr) {
   // Globalize the request debug info object and make it weak.
   GlobalHandles* global_handles = isolate->global_handles();
   debug_info_ = global_handles->Create(debug_info).location();
 }
-
 
 DebugInfoListNode::~DebugInfoListNode() {
   if (debug_info_ == nullptr) return;
@@ -688,7 +686,7 @@ void Debug::ApplyBreakPoints(Handle<DebugInfo> debug_info) {
     FixedArray break_points = debug_info->break_points();
     for (int i = 0; i < break_points->length(); i++) {
       if (break_points->get(i)->IsUndefined(isolate_)) continue;
-      BreakPointInfo* info = BreakPointInfo::cast(break_points->get(i));
+      BreakPointInfo info = BreakPointInfo::cast(break_points->get(i));
       if (info->GetBreakPointCount(isolate_) == 0) continue;
       DCHECK(debug_info->HasInstrumentedBytecodeArray());
       BreakIterator it(debug_info);
@@ -1093,7 +1091,7 @@ Handle<Object> Debug::GetSourceBreakLocations(
   int count = 0;
   for (int i = 0; i < debug_info->break_points()->length(); ++i) {
     if (!debug_info->break_points()->get(i)->IsUndefined(isolate)) {
-      BreakPointInfo* break_point_info =
+      BreakPointInfo break_point_info =
           BreakPointInfo::cast(debug_info->break_points()->get(i));
       int break_points = break_point_info->GetBreakPointCount(isolate);
       if (break_points == 0) continue;
@@ -1146,7 +1144,7 @@ class RedirectActiveFunctions : public ThreadVisitor {
   void VisitThread(Isolate* isolate, ThreadLocalTop* top) override {
     for (JavaScriptFrameIterator it(isolate, top); !it.done(); it.Advance()) {
       JavaScriptFrame* frame = it.frame();
-      JSFunction* function = frame->function();
+      JSFunction function = frame->function();
       if (!frame->is_interpreted()) continue;
       if (function->shared() != shared_) continue;
       InterpretedFrame* interpreted_frame =
@@ -1252,12 +1250,13 @@ void Debug::InstallDebugBreakTrampoline() {
   std::vector<Handle<JSFunction>> needs_compile;
   {
     HeapIterator iterator(isolate_->heap());
-    while (HeapObject* obj = iterator.next()) {
+    for (HeapObject obj = iterator.next(); !obj.is_null();
+         obj = iterator.next()) {
       if (needs_to_clear_ic && obj->IsFeedbackVector()) {
         FeedbackVector::cast(obj)->ClearSlots(isolate_);
         continue;
       } else if (obj->IsJSFunction()) {
-        JSFunction* fun = JSFunction::cast(obj);
+        JSFunction fun = JSFunction::cast(obj);
         SharedFunctionInfo shared = fun->shared();
         if (!shared->HasDebugInfo()) continue;
         if (!shared->GetDebugInfo()->CanBreakAtEntry()) continue;
@@ -1369,11 +1368,11 @@ bool Debug::GetPossibleBreakpoints(Handle<Script> script, int start_position,
 class SharedFunctionInfoFinder {
  public:
   explicit SharedFunctionInfoFinder(int target_position)
-      : current_candidate_closure_(nullptr),
-        current_start_position_(kNoSourcePosition),
+      : current_start_position_(kNoSourcePosition),
         target_position_(target_position) {}
 
-  void NewCandidate(SharedFunctionInfo shared, JSFunction* closure = nullptr) {
+  void NewCandidate(SharedFunctionInfo shared,
+                    JSFunction closure = JSFunction()) {
     if (!shared->IsSubjectToDebugging()) return;
     int start_position = shared->function_token_position();
     if (start_position == kNoSourcePosition) {
@@ -1387,7 +1386,7 @@ class SharedFunctionInfoFinder {
       if (current_start_position_ == start_position &&
           shared->EndPosition() == current_candidate_->EndPosition()) {
         // If we already have a matching closure, do not throw it away.
-        if (current_candidate_closure_ != nullptr && closure == nullptr) return;
+        if (!current_candidate_closure_.is_null() && closure.is_null()) return;
         // If a top-level function contains only one function
         // declaration the source for the top-level and the function
         // is the same. In that case prefer the non top-level function.
@@ -1405,11 +1404,11 @@ class SharedFunctionInfoFinder {
 
   SharedFunctionInfo Result() { return current_candidate_; }
 
-  JSFunction* ResultClosure() { return current_candidate_closure_; }
+  JSFunction ResultClosure() { return current_candidate_closure_; }
 
  private:
   SharedFunctionInfo current_candidate_;
-  JSFunction* current_candidate_closure_;
+  JSFunction current_candidate_closure_;
   int current_start_position_;
   int target_position_;
   DisallowHeapAllocation no_gc_;
@@ -1649,8 +1648,8 @@ Handle<FixedArray> Debug::GetLoadedScripts() {
   int length = 0;
   {
     Script::Iterator iterator(isolate_);
-    Script* script;
-    while ((script = iterator.Next()) != nullptr) {
+    for (Script script = iterator.Next(); !script.is_null();
+         script = iterator.Next()) {
       if (script->HasValidSource()) results->set(length++, script);
     }
   }
@@ -1725,7 +1724,8 @@ void Debug::OnException(Handle<Object> exception, Handle<Object> promise,
     Handle<JSObject> jspromise = Handle<JSObject>::cast(promise);
     // Mark the promise as already having triggered a message.
     Handle<Symbol> key = isolate_->factory()->promise_debug_marker_symbol();
-    JSObject::SetProperty(isolate_, jspromise, key, key, LanguageMode::kStrict)
+    Object::SetProperty(isolate_, jspromise, key, key, StoreOrigin::kMaybeKeyed,
+                        Just(ShouldThrow::kThrowOnError))
         .Assert();
     // Check whether the promise reject is considered an uncaught exception.
     uncaught = !isolate_->PromiseHasUserDefinedRejectHandler(jspromise);
@@ -1782,7 +1782,7 @@ void Debug::OnDebugBreak(Handle<FixedArray> break_points_hit) {
   int inspector_break_points_count = 0;
   // This array contains breakpoints installed using JS debug API.
   for (int i = 0; i < break_points_hit->length(); ++i) {
-    BreakPoint* break_point = BreakPoint::cast(break_points_hit->get(i));
+    BreakPoint break_point = BreakPoint::cast(break_points_hit->get(i));
     inspector_break_points_hit.push_back(break_point->id());
     ++inspector_break_points_count;
   }
@@ -1954,8 +1954,8 @@ void Debug::HandleDebugBreak(IgnoreBreakMode ignore_break_mode) {
 
   { JavaScriptFrameIterator it(isolate_);
     DCHECK(!it.done());
-    Object* fun = it.frame()->function();
-    if (fun && fun->IsJSFunction()) {
+    Object fun = it.frame()->function();
+    if (fun->IsJSFunction()) {
       HandleScope scope(isolate_);
       Handle<JSFunction> function(JSFunction::cast(fun), isolate_);
       // Don't stop in builtin and blackboxed functions.
@@ -2209,7 +2209,7 @@ bool Debug::PerformSideEffectCheckForCallback(
   if (!callback_info.is_null()) {
     if (callback_info->IsAccessorInfo()) {
       // List of whitelisted internal accessors can be found in accessors.h.
-      AccessorInfo* info = AccessorInfo::cast(*callback_info);
+      AccessorInfo info = AccessorInfo::cast(*callback_info);
       DCHECK_NE(kNotAccessor, accessor_kind);
       switch (accessor_kind == kSetter ? info->setter_side_effect_type()
                                        : info->getter_side_effect_type()) {
@@ -2233,13 +2233,13 @@ bool Debug::PerformSideEffectCheckForCallback(
         PrintF("' may cause side effect.\n");
       }
     } else if (callback_info->IsInterceptorInfo()) {
-      InterceptorInfo* info = InterceptorInfo::cast(*callback_info);
+      InterceptorInfo info = InterceptorInfo::cast(*callback_info);
       if (info->has_no_side_effect()) return true;
       if (FLAG_trace_side_effect_free_debug_evaluate) {
         PrintF("[debug-evaluate] API Interceptor may cause side effect.\n");
       }
     } else if (callback_info->IsCallHandlerInfo()) {
-      CallHandlerInfo* info = CallHandlerInfo::cast(*callback_info);
+      CallHandlerInfo info = CallHandlerInfo::cast(*callback_info);
       if (info->IsSideEffectFreeCallHandlerInfo()) return true;
       if (FLAG_trace_side_effect_free_debug_evaluate) {
         PrintF("[debug-evaluate] API CallHandlerInfo may cause side effect.\n");
