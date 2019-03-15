@@ -3,31 +3,27 @@
 
 #include <dv8.h>
 
-namespace dv8
-{
+namespace dv8 {
 
-namespace dns
-{
-class DNS : public dv8::ObjectWrap
-{
-  public:
-	static void Init(v8::Local<v8::Object> exports);
-	static void NewInstance(const v8::FunctionCallbackInfo<v8::Value> &args);
+namespace dns {
 
-  private:
-	DNS()
-	{
-	}
+class DNS : public dv8::ObjectWrap {
+	public:
+		static void Init(v8::Local<v8::Object> exports);
 
-	~DNS()
-	{
-	}
+	private:
 
-	static void New(const v8::FunctionCallbackInfo<v8::Value> &args);
-	static void Hello(const v8::FunctionCallbackInfo<v8::Value> &args);
-	static v8::Persistent<v8::Function> constructor;
+		DNS() {
+		}
+
+		~DNS() {
+		}
+
+		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Hello(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 };
 
-} // namespace dns
-} // namespace dv8
+}
+}
 #endif

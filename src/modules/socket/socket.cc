@@ -21,24 +21,9 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
-Persistent<Function> Socket::constructor;
-static int contextid = 0; // incrementing counter for context ids
-static _context *contextMap[MAX_CONTEXTS];
-
 _context *context_init(uv_stream_t *handle, Socket *s)
 {
-  _context *ctx;
-  if (contexts.empty())
-  {
-    ctx = (_context *)calloc(1, sizeof(_context));
-    ctx->fd = contextid++;
-    contextMap[ctx->fd] = ctx;
-  }
-  else
-  {
-    ctx = contexts.front();
-    contexts.pop();
-  }
+  _context* ctx = s->context;
   ctx->handle = handle;
   ctx->closing = false;
   ctx->blocked = false;
@@ -59,13 +44,14 @@ _context *context_init(uv_stream_t *handle, Socket *s)
   ctx->stats.out.free = 0;
   ctx->stats.out.eagain = 0;
   handle->data = ctx;
+  ctx->data = s;
   return ctx;
 }
 
 void context_free(uv_handle_t *handle)
 {
   _context *context = (_context *)handle->data;
-  contexts.push(context);
+  free(context);
   free(handle);
 }
 
@@ -74,7 +60,8 @@ void after_write(uv_write_t *req, int status)
   Isolate *isolate = Isolate::GetCurrent();
   v8::HandleScope handleScope(isolate);
   write_req_t *wr = (write_req_t *)req;
-  _context *ctx = contextMap[wr->fd];
+  uv_stream_t *stream = (uv_stream_t *)req->handle;
+  _context *ctx = (_context*)stream->data;
   Socket *socket = (Socket *)ctx->data;
   if (socket->callbacks.onWrite == 1)
   {
@@ -96,7 +83,6 @@ void after_write(uv_write_t *req, int status)
     }
     return;
   }
-  uv_stream_t *stream = (uv_stream_t *)req->handle;
   size_t queueSize = stream->write_queue_size;
   if (queueSize > ctx->stats.out.maxQueue)
   {
@@ -142,10 +128,23 @@ void on_close(uv_handle_t *peer)
     onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
   }
   context_free(peer);
+  if (s->first) {
+    s->first->onClose(s->first);
+  }
 }
 
 void on_close2(uv_handle_t *peer)
 {
+  Isolate *isolate = Isolate::GetCurrent();
+  v8::HandleScope handleScope(isolate);
+  baton_t *baton = (baton_t *)peer->data;
+  Socket *s = (Socket *)baton->object;
+  if (s->callbacks.onClose == 1)
+  {
+    Local<Value> argv[0] = {};
+    Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
+    onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+  }
   free(peer);
 }
 
@@ -175,6 +174,10 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   if (nread > 0) {
     ctx->stats.in.read += (uint64_t)nread;
     ctx->stats.in.data++;
+    //TODO: allow returning a different length from onRead - if reader wantes to transform the buffer and the transformation has a different length
+    if (s->first) {
+      uint32_t r = s->first->onRead(nread, s->first);
+    }
     if (s->callbacks.onRead == 1)
     {
       Local<Value> argv[1] = {Number::New(isolate, nread)};
@@ -190,11 +193,10 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
       onEnd->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     }
     ctx->stats.in.end++;
-/*
     if (uv_is_closing((uv_handle_t *)handle) == 0) {
-      uv_close((uv_handle_t *)handle, on_close);
+      //uv_close((uv_handle_t *)handle, on_close);
+      ctx->closing = true;
     }
-*/
   }
   else if (nread < 0) {
     if (s->callbacks.onError == 1)
@@ -209,9 +211,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   } else {
       // nread = 0, we got an EAGAIN or EWOULDBLOCK
   }
-  if (try_catch.HasCaught())
-  {
-    DecorateErrorStack(isolate, try_catch);
+  if (try_catch.HasCaught()) {
+			dv8::ReportException(isolate, &try_catch);
   }
 }
 
@@ -231,8 +232,10 @@ void on_client_connection(uv_connect_t *client, int status)
   Socket *s = (Socket *)baton->object;
   _context *ctx = (_context *)client->handle->data;
   ctx->data = s;
+  s->context = ctx;
   if (!uv_is_readable(client->handle) || !uv_is_writable(client->handle) || uv_is_closing((uv_handle_t *)client->handle))
   {
+    fprintf(stderr, "foo\n");
     return;
   }
   callback(ctx);
@@ -247,6 +250,7 @@ void on_connection(uv_stream_t *server, int status)
   cb callback = (cb)baton->callback;
   Socket *s = (Socket *)baton->object;
   Isolate *isolate = Isolate::GetCurrent();
+  v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
   if (s->socktype == TCP)
@@ -261,9 +265,19 @@ void on_connection(uv_stream_t *server, int status)
     status = uv_pipe_init(env->loop, (uv_pipe_t *)stream, 0);
   }
   status = uv_accept(server, stream);
-  _context *ctx = context_init(stream, s);
-  ctx->data = baton->object;
-  callback(ctx);
+  if (s->callbacks.onConnect == 1) {
+      Local<Value> argv[0] = {};
+      Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
+      v8::TryCatch try_catch(isolate);
+      Local<Value> result = foo->Call(context->Global(), 0, argv);
+      if (try_catch.HasCaught()) {
+        dv8::ReportException(isolate, &try_catch);
+      }
+      Local<Object> sock;
+      bool ok = result->ToObject(context).ToLocal(&sock);
+      Socket *s = ObjectWrap::Unwrap<Socket>(sock);
+      _context *ctx = context_init(stream, s);
+  }
   status = uv_read_start(stream, alloc_chunk, after_read);
   assert(status == 0);
 }
@@ -281,6 +295,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "bind", Bind);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", Close);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Write);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "splice", Splice);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", Setup);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setNoDelay", SetNoDelay);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pause", Pause);
@@ -290,6 +305,9 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "error", Error);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "queueSize", QueueSize);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", Stats);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", UnRef);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", Open);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "portNumber", PortNumber);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onConnect", onConnect);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onClose", onClose);
@@ -299,11 +317,17 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", onError);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onEnd", onEnd);
 
-  constructor.Reset(isolate, tpl->GetFunction());
   DV8_SET_EXPORT(isolate, tpl, "Socket", exports);
 
   DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, TCP), "TCP", exports);
   DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "UNIX", exports);
+}
+
+void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  Socket* sock = static_cast<Socket *>(wrap);
 }
 
 void Socket::QueueSize(const FunctionCallbackInfo<Value> &args)
@@ -365,10 +389,10 @@ void Socket::New(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   HandleScope handle_scope(isolate);
-  if (args.IsConstructCall())
-  {
+  if (args.IsConstructCall()) {
     Local<Context> context = isolate->GetCurrentContext();
     Socket *obj = new Socket();
+    obj->context = (_context *)calloc(1, sizeof(_context));
     int len = args.Length();
     if (len > 0) {
       obj->socktype = (socket_type)args[0]->Uint32Value(context).ToChecked();
@@ -384,24 +408,6 @@ void Socket::New(const FunctionCallbackInfo<Value> &args)
     obj->Wrap(args.This());
     args.GetReturnValue().Set(args.This());
   }
-  else
-  {
-    Local<Function> cons = Local<Function>::New(isolate, constructor);
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
-    args.GetReturnValue().Set(instance);
-  }
-}
-
-void Socket::NewInstance(const FunctionCallbackInfo<Value> &args)
-{
-  Isolate *isolate = args.GetIsolate();
-  const unsigned argc = 2;
-  Local<Value> argv[argc] = {args[0], args[1]};
-  Local<Function> cons = Local<Function>::New(isolate, constructor);
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-  args.GetReturnValue().Set(instance);
 }
 
 void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
@@ -410,24 +416,22 @@ void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
   v8::HandleScope handleScope(isolate);
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   struct sockaddr_storage address;
-  if (args.Length() > 0)
+  _context *ctx = s->context;
+  int addrlen = sizeof(address);
+  int r = uv_tcp_getpeername((uv_tcp_t *)ctx->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
+  if (r)
   {
-    _context *ctx = s->context;
-    int addrlen = sizeof(address);
-    int r = uv_tcp_getpeername((uv_tcp_t *)ctx->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
-    if (r)
-    {
-      return;
-    }
-    const sockaddr *addr = reinterpret_cast<const sockaddr *>(&address);
-    char ip[INET6_ADDRSTRLEN];
-    const sockaddr_in *a4;
-    a4 = reinterpret_cast<const sockaddr_in *>(addr);
-    int len = sizeof ip;
-    uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
-    args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
     return;
   }
+  const sockaddr *addr = reinterpret_cast<const sockaddr *>(&address);
+  char ip[INET_ADDRSTRLEN];
+  const sockaddr_in *a4;
+  a4 = reinterpret_cast<const sockaddr_in *>(addr);
+  int len = sizeof ip;
+  uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
+  len = strlen(ip);
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
+  return;
 }
 
 void Socket::Close(const FunctionCallbackInfo<Value> &args)
@@ -473,9 +477,13 @@ int onNewConnection(_context *ctx)
   v8::HandleScope handleScope(isolate);
   if (obj->callbacks.onConnect == 1)
   {
-    Local<Value> argv[1] = {Integer::New(isolate, ctx->fd)};
+    Local<Value> argv[0] = {};
     Local<Function> foo = Local<Function>::New(isolate, obj->_onConnect);
-    foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+    v8::TryCatch try_catch(isolate);
+    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    if (try_catch.HasCaught()) {
+      dv8::ReportException(isolate, &try_catch);
+    }
   }
   return 0;
 }
@@ -485,16 +493,12 @@ void Socket::Setup(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   v8::HandleScope handleScope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
-  int fd = args[0]->Int32Value(context).ToChecked();
-  _context *ctx = contextMap[fd];
-  ctx->data = s;
-  s->context = ctx;
-  Buffer *b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
+  _context* ctx = s->context;
+  Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
   size_t len = b->_length;
   ctx->in = uv_buf_init((char *)b->_data, len);
   ctx->readBufferLength = len;
-  b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
+  b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
   len = b->_length;
   ctx->out = uv_buf_init((char *)b->_data, len);
   ctx->readBufferLength = len;
@@ -507,10 +511,18 @@ void Socket::SetKeepAlive(const FunctionCallbackInfo<Value> &args)
   Local<Context> context = isolate->GetCurrentContext();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
-  int enable = static_cast<int>(args[1]->BooleanValue(context).ToChecked());
-  unsigned int delay = args[2]->Uint32Value(context).ToChecked();
+  int enable = static_cast<int>(args[0]->BooleanValue(context).ToChecked());
+  unsigned int delay = args[1]->Uint32Value(context).ToChecked();
   int r = uv_tcp_keepalive((uv_tcp_t *)ctx->handle, enable, delay);
   args.GetReturnValue().Set(Integer::New(isolate, r));
+}
+
+void Socket::UnRef(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
+  uv_unref((uv_handle_t*)ctx->handle);
 }
 
 void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
@@ -519,7 +531,7 @@ void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
   Local<Context> context = isolate->GetCurrentContext();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
-  int enable = static_cast<int>(args[1]->BooleanValue(context).ToChecked());
+  int enable = static_cast<int>(args[0]->BooleanValue(context).ToChecked());
   int r = uv_tcp_nodelay((uv_tcp_t *)ctx->handle, enable);
   args.GetReturnValue().Set(Integer::New(isolate, r));
 }
@@ -565,9 +577,102 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
   _context *ctx = socket->context;
   char *src = ctx->out.base + off;
   uv_buf_t buf;
+  int r = 0;
   buf.base = src;
   buf.len = len;
-  int r = uv_try_write((uv_stream_t *)ctx->handle, &buf, 1);
+  if (!ctx->closing) {
+    r = uv_try_write((uv_stream_t *)ctx->handle, &buf, 1);
+    if (r == UV_EAGAIN || r == UV_ENOSYS)
+    {
+      write_req_t *wr;
+      wr = (write_req_t *)malloc(sizeof *wr);
+      char *wrb = (char *)calloc(len, 1);
+      memcpy(wrb, src, len);
+      ctx->stats.out.alloc++;
+      ctx->stats.out.eagain++;
+      wr->buf = uv_buf_init(wrb, len);
+      int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+      r = 0;
+      if (status != 0) {
+        r = status;
+      }
+      ctx->blocked = true;
+    }
+    else if (r < 0)
+    {
+      ctx->stats.error++;
+      if (socket->callbacks.onError == 1)
+      {
+        Local<Value> argv[1] = {Number::New(isolate, r)};
+        Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
+        Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      }
+    }
+    else if ((uint32_t)r < len)
+    {
+      ctx->stats.out.incomplete++;
+      ctx->stats.out.written += r;
+      write_req_t *wr;
+      wr = (write_req_t *)malloc(sizeof *wr);
+      char *wrb = (char *)calloc(len - r, 1);
+      char *base = src + r;
+      memcpy(wrb, base, len - r);
+      ctx->stats.out.alloc++;
+      wr->buf = uv_buf_init(wrb, len - r);
+      int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
+      ctx->blocked = true;
+      if (socket->callbacks.onWrite == 1)
+      {
+        Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
+        Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      }
+      if (status != 0)
+      {
+        r = status;
+      }
+    } else {
+      ctx->stats.out.full++;
+      ctx->stats.out.written += (uint64_t)r;
+      if (socket->callbacks.onWrite == 1)
+      {
+        Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
+        Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
+        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      }
+    }
+  } else {
+    r = -1;
+  }
+  args.GetReturnValue().Set(Integer::New(isolate, r));
+}
+
+void Socket::Splice(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *socket = ObjectWrap::Unwrap<Socket>(args.Holder());
+  Local<Context> context = isolate->GetCurrentContext();
+  int argc = args.Length();
+  uint32_t off = 0;
+  uint32_t len = args[0]->Uint32Value(context).ToChecked();
+  if (argc > 1) {
+    off = args[1]->Int32Value(context).ToChecked();
+  }
+  _context *ctx = socket->context;
+  char *src = ctx->out.base + off;
+
+  int fd;
+  uv_fileno((uv_handle_t *)ctx->handle, &fd);
+  fprintf(stderr, "fd: %i\n", fd);
+  struct iovec iov { src, len };
+  int r = vmsplice(fd, &iov, 1, SPLICE_F_NONBLOCK);
+  fprintf(stderr, "vmsplice: %i\n", r);
+  fprintf(stderr, "errno: %i\n", errno);
+/*
+  uv_buf_t buf;
+  buf.base = src;
+  buf.len = len;
+  r = uv_try_write((uv_stream_t *)ctx->handle, &buf, 1);
   if (r == UV_EAGAIN || r == UV_ENOSYS)
   {
     write_req_t *wr;
@@ -577,7 +682,6 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     ctx->stats.out.alloc++;
     ctx->stats.out.eagain++;
     wr->buf = uv_buf_init(wrb, len);
-    wr->fd = ctx->fd;
     int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
     r = 0;
     if (status != 0) {
@@ -606,7 +710,6 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
     memcpy(wrb, base, len - r);
     ctx->stats.out.alloc++;
     wr->buf = uv_buf_init(wrb, len - r);
-    wr->fd = ctx->fd;
     int status = uv_write(&wr->req, ctx->handle, &wr->buf, 1, after_write);
     ctx->blocked = true;
     if (socket->callbacks.onWrite == 1)
@@ -629,6 +732,7 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
       onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
     }
   }
+*/
   args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
@@ -638,6 +742,7 @@ void Socket::Connect(const FunctionCallbackInfo<Value> &args)
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
   Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  s->isServer = false;
   if (s->socktype == TCP)
   {
     String::Utf8Value str(args.GetIsolate(), args[0]);
@@ -777,10 +882,24 @@ void Socket::onConnect(const v8::FunctionCallbackInfo<v8::Value> &args)
   }
 }
 
+void Socket::PortNumber(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  uv_tcp_t* sock = (uv_tcp_t*)s->_stream;
+  struct sockaddr_storage address;
+  int addrlen = sizeof(address);
+  int status = uv_tcp_getsockname(sock, reinterpret_cast<sockaddr *>(&address), &addrlen);
+  const sockaddr *addr2 = reinterpret_cast<const sockaddr *>(&address);
+  const sockaddr_in *a4 = reinterpret_cast<const sockaddr_in *>(addr2);
+  args.GetReturnValue().Set(Integer::New(isolate, ntohs(a4->sin_port)));
+}
+
 void Socket::Listen(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  s->isServer = true;
   if (args[0]->IsNumber())
   { // we have been passed a socket handle that has already been bound
     Local<Context> context = isolate->GetCurrentContext();
@@ -806,7 +925,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
         args.GetReturnValue().Set(Integer::New(isolate, status));
         return;
       }
-      status = uv_listen((uv_stream_t *)sock, 1024, on_connection);
+      status = uv_listen((uv_stream_t *)sock, SOMAXCONN, on_connection);
       if (status)
       {
         args.GetReturnValue().Set(Integer::New(isolate, status));
@@ -904,6 +1023,12 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
       args.GetReturnValue().Set(Integer::New(isolate, status));
       return;
     }
+/*
+    int fd;
+    uv_fileno((uv_handle_t *)sock, &fd);
+    int on = 1;
+    setsockopt(fd, SOL_SOCKET, SOCK_ZEROCOPY, &on, sizeof(on));
+*/
     status = uv_pipe_bind(sock, path);
     if (status)
     {
@@ -924,6 +1049,60 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
     return;
   }
   args.GetReturnValue().Set(Integer::New(isolate, 0));
+}
+
+void Socket::Open(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  int argc = args.Length();
+  if (argc == 0) {
+    int fd[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+    uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+    sock->data = s;
+    baton_t *baton = (baton_t *)malloc(sizeof(baton_t));
+    baton->callback = (void *)onNewConnection;
+    baton->object = sock->data;
+    sock->data = baton;
+    int status = uv_pipe_init(env->loop, sock, 0);
+    if (status)
+    {
+      args.GetReturnValue().Set(Integer::New(isolate, status));
+      return;
+    }
+    status = uv_pipe_open(sock, fd[0]);
+    if (status)
+    {
+      args.GetReturnValue().Set(Integer::New(isolate, status));
+      return;
+    }
+    _context *ctx = context_init((uv_stream_t*)sock, s);
+    ctx->paused = true;
+    onNewConnection(ctx);
+    args.GetReturnValue().Set(Integer::New(isolate, fd[1]));
+  } else {
+    uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+    sock->data = s;
+    baton_t *baton = (baton_t *)malloc(sizeof(baton_t));
+    baton->callback = (void *)onNewConnection;
+    baton->object = sock->data;
+    sock->data = baton;
+    int status = uv_pipe_init(env->loop, sock, 0);
+    if (status)
+    {
+      args.GetReturnValue().Set(Integer::New(isolate, status));
+      return;
+    }
+    int fd = args[0]->Int32Value(context).ToChecked();
+    status = uv_pipe_open(sock, fd);
+    _context *ctx = context_init((uv_stream_t*)sock, s);
+    ctx->paused = true;
+    onNewConnection(ctx);
+    args.GetReturnValue().Set(Integer::New(isolate, status));
+  }
 }
 
 void Socket::Bind(const FunctionCallbackInfo<Value> &args)

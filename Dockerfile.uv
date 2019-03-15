@@ -1,0 +1,14 @@
+## Build libuv
+FROM alpine:3.8 as uv-build
+WORKDIR /source
+RUN apk update \
+    && apk add --no-cache --virtual .build-deps make g++ python gcc git
+RUN wget "https://github.com/libuv/libuv/archive/v1.25.0.tar.gz" \
+    && tar -zxvf v1.25.0.tar.gz \
+    && mv libuv-1.25.0 uv
+RUN cd uv \
+    && git clone https://chromium.googlesource.com/external/gyp build/gyp
+RUN cd uv \
+    && ./gyp_uv.py -f make \
+    && BUILDTYPE=Release make -C out
+CMD ["/bin/sh"]

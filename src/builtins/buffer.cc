@@ -5,8 +5,6 @@ namespace dv8
 
 namespace builtins
 {
-using dv8::OnFatalError;
-using dv8::ShouldAbortOnUncaughtException;
 using v8::Array;
 using v8::ArrayBuffer;
 using v8::ArrayBufferCreationMode;
@@ -26,8 +24,8 @@ using v8::Persistent;
 using v8::String;
 using v8::Uint8Array;
 using v8::Value;
-
-Persistent<Function> Buffer::constructor;
+using v8::EscapableHandleScope;
+using v8::WeakCallbackInfo;
 
 void Buffer::Init(Local<Object> exports)
 {
@@ -43,7 +41,6 @@ void Buffer::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Buffer::Write);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "copy", Buffer::Copy);
 
-  constructor.Reset(isolate, tpl->GetFunction());
   DV8_SET_EXPORT(isolate, tpl, "Buffer", exports);
 }
 
@@ -51,51 +48,50 @@ void Buffer::New(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   HandleScope handle_scope(isolate);
-  if (args.IsConstructCall())
-  {
+  if (args.IsConstructCall()) {
     Buffer *obj = new Buffer();
     obj->Wrap(args.This());
     args.GetReturnValue().Set(args.This());
   }
-  else
-  {
-    Local<Function> cons = Local<Function>::New(isolate, constructor);
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
-    args.GetReturnValue().Set(instance);
-  }
 }
 
-void Buffer::NewInstance(const FunctionCallbackInfo<Value> &args)
-{
-  Isolate *isolate = args.GetIsolate();
-  const unsigned argc = 2;
-  Local<Value> argv[argc] = {args[0], args[1]};
-  Local<Function> cons = Local<Function>::New(isolate, constructor);
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-  args.GetReturnValue().Set(instance);
+// TODO: figure out how to do shared buffers across threads
+void Buffer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  Buffer* b = static_cast<Buffer *>(wrap);
+  isolate->AdjustAmountOfExternalAllocatedMemory((int64_t)b->_length * -1);
+  free(b->_data);
+  fprintf(stderr, "Buffer::Destroy\n");
 }
 
 void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
-  v8::HandleScope handleScope(isolate);
+  EscapableHandleScope scope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  uint32_t length = args[0]->Uint32Value(context).ToChecked();
-  Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
-  b->_length = 0;
-  if (length > 0)
-  {
-    b->_data = (char *)calloc(length, 1);
-    if (b->_data == nullptr)
+  int argc = args.Length();
+  if (argc > 0) {
+    uint32_t length = args[0]->Uint32Value(context).ToChecked();
+    Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+    b->_length = 0;
+    if (length > 0)
     {
-      return;
+      b->_data = (char *)calloc(length, 1);
+      if (b->_data == nullptr)
+      {
+        return;
+      }
+      Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kExternalized);
+      b->_length = length;
+      isolate->AdjustAmountOfExternalAllocatedMemory(length);
+      args.GetReturnValue().Set(scope.Escape(ab));
     }
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kInternalized);
-    //isolate->AdjustAmountOfExternalAllocatedMemory(length);
-    args.GetReturnValue().Set(ab);
-    b->_length = length;
+  } else {
+    Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, b->_length, ArrayBufferCreationMode::kExternalized);
+    args.GetReturnValue().Set(scope.Escape(ab));
   }
 }
 
@@ -115,6 +111,7 @@ void Buffer::Free(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+  isolate->AdjustAmountOfExternalAllocatedMemory(b->_length * -1);
   free(b->_data);
 }
 

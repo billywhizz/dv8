@@ -1,0 +1,263 @@
+// Copyright 2018 the V8 project authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include 'src/builtins/builtins-typed-array-gen.h'
+
+namespace typed_array {
+  struct TypedArrayElementsInfo {
+    size: PositiveSmi;
+    map: Map;
+    kind: ElementsKind;
+  }
+
+  extern runtime TypedArraySortFast(Context, Object): JSTypedArray;
+  extern macro TypedArrayBuiltinsAssembler::ValidateTypedArray(
+      Context, Object, constexpr string): JSTypedArray;
+
+  extern macro TypedArrayBuiltinsAssembler::GetTypedArrayElementsInfo(
+      JSTypedArray): TypedArrayElementsInfo;
+  extern macro LoadFixedTypedArrayElementAsTagged(
+      RawPtr, Smi, constexpr ElementsKind, constexpr ParameterMode): Object;
+  extern macro StoreFixedTypedArrayElementFromTagged(
+      Context, FixedTypedArrayBase, Smi, Object, constexpr ElementsKind,
+      constexpr ParameterMode);
+
+  type LoadFn = builtin(Context, JSTypedArray, Smi) => Object;
+  type StoreFn = builtin(Context, JSTypedArray, Smi, Object) => Object;
+
+  // These UnsafeCast specializations are necessary becuase there is no
+  // way to definitively test whether an Object is a Torque function
+  // with a specific signature, and the default UnsafeCast implementation
+  // would try to check this through an assert(Is<>), so the test
+  // is bypassed in this specialization.
+  UnsafeCast<LoadFn>(implicit context: Context)(o: Object): LoadFn {
+    return %RawDownCast<LoadFn>(o);
+  }
+  UnsafeCast<StoreFn>(implicit context: Context)(o: Object): StoreFn {
+    return %RawDownCast<StoreFn>(o);
+  }
+
+  macro KindForArrayType<T: type>(): constexpr ElementsKind;
+  KindForArrayType<FixedUint8Array>(): constexpr ElementsKind {
+    return UINT8_ELEMENTS;
+  }
+  KindForArrayType<FixedInt8Array>(): constexpr ElementsKind {
+    return INT8_ELEMENTS;
+  }
+  KindForArrayType<FixedUint16Array>(): constexpr ElementsKind {
+    return UINT16_ELEMENTS;
+  }
+  KindForArrayType<FixedInt16Array>(): constexpr ElementsKind {
+    return INT16_ELEMENTS;
+  }
+  KindForArrayType<FixedUint32Array>(): constexpr ElementsKind {
+    return UINT32_ELEMENTS;
+  }
+  KindForArrayType<FixedInt32Array>(): constexpr ElementsKind {
+    return INT32_ELEMENTS;
+  }
+  KindForArrayType<FixedFloat32Array>(): constexpr ElementsKind {
+    return FLOAT32_ELEMENTS;
+  }
+  KindForArrayType<FixedFloat64Array>(): constexpr ElementsKind {
+    return FLOAT64_ELEMENTS;
+  }
+  KindForArrayType<FixedUint8ClampedArray>(): constexpr ElementsKind {
+    return UINT8_CLAMPED_ELEMENTS;
+  }
+  KindForArrayType<FixedBigUint64Array>(): constexpr ElementsKind {
+    return BIGUINT64_ELEMENTS;
+  }
+  KindForArrayType<FixedBigInt64Array>(): constexpr ElementsKind {
+    return BIGINT64_ELEMENTS;
+  }
+
+  builtin LoadFixedElement<T: type>(
+      context: Context, array: JSTypedArray, index: Smi): Object {
+    return LoadFixedTypedArrayElementAsTagged(
+        array.data_ptr, index, KindForArrayType<T>(), SMI_PARAMETERS);
+  }
+
+  builtin StoreFixedElement<T: type>(
+      context: Context, array: JSTypedArray, index: Smi,
+      value: Object): Object {
+    const elements: FixedTypedArrayBase =
+        UnsafeCast<FixedTypedArrayBase>(array.elements);
+    StoreFixedTypedArrayElementFromTagged(
+        context, elements, index, value, KindForArrayType<T>(), SMI_PARAMETERS);
+    return Undefined;
+  }
+
+  transitioning macro CallCompare(
+      implicit context: Context, array: JSTypedArray,
+      comparefn: Callable)(a: Object, b: Object): Number {
+    // a. Let v be ? ToNumber(? Call(comparefn, undefined, x, y)).
+    const v: Number =
+        ToNumber_Inline(context, Call(context, comparefn, Undefined, a, b));
+
+    // b. If IsDetachedBuffer(buffer) is true, throw a TypeError exception.
+    if (IsDetachedBuffer(array.buffer)) {
+      ThrowTypeError(
+          context, kDetachedOperation, '%TypedArray%.prototype.sort');
+    }
+
+    // c. If v is NaN, return +0.
+    if (NumberIsNaN(v)) return 0;
+
+    // d. return v.
+    return v;
+  }
+
+  // Merges two sorted runs [from, middle) and [middle, to)
+  // from "source" into "target".
+  transitioning macro
+  TypedArrayMerge(
+      implicit context: Context, array: JSTypedArray, comparefn: Callable)(
+      source: FixedArray, from: Smi, middle: Smi, to: Smi, target: FixedArray) {
+    let left: Smi = from;
+    let right: Smi = middle;
+
+    for (let targetIndex: Smi = from; targetIndex < to; ++targetIndex) {
+      if (left < middle && right >= to) {
+        // If the left run has elements, but the right does not, we take
+        // from the left.
+        target[targetIndex] = source[left++];
+      } else if (left < middle) {
+        // If both have elements, we need to compare.
+        const leftElement: Object = source[left];
+        const rightElement: Object = source[right];
+        if (CallCompare(leftElement, rightElement) <= 0) {
+          target[targetIndex] = leftElement;
+          left++;
+        } else {
+          target[targetIndex] = rightElement;
+          right++;
+        }
+      } else {
+        // No elements on the left, but the right does, so we take
+        // from the right.
+        assert(left == middle);
+        target[targetIndex] = source[right++];
+      }
+    }
+  }
+
+  transitioning builtin
+  TypedArrayMergeSort(
+      implicit context: Context, array: JSTypedArray, comparefn: Callable)(
+      source: FixedArray, from: Smi, to: Smi, target: FixedArray): Object {
+    assert(to - from > 1);
+    const middle: Smi = from + ((to - from) >> 1);
+
+    // On the next recursion step source becomes target and vice versa.
+    // This saves the copy of the relevant range from the original
+    // array into a work array on each recursion step.
+    if (middle - from > 1) TypedArrayMergeSort(target, from, middle, source);
+    if (to - middle > 1) TypedArrayMergeSort(target, middle, to, source);
+
+    TypedArrayMerge(source, from, middle, to, target);
+
+    return Undefined;
+  }
+
+  // https://tc39.github.io/ecma262/#sec-%typedarray%.prototype.sort
+  transitioning javascript builtin TypedArrayPrototypeSort(
+      context: Context, receiver: Object, ...arguments): JSTypedArray {
+    // 1. If comparefn is not undefined and IsCallable(comparefn) is false,
+    //    throw a TypeError exception.
+    const comparefnObj: Object =
+        arguments.length > 0 ? arguments[0] : Undefined;
+    if (comparefnObj != Undefined && !TaggedIsCallable(comparefnObj)) {
+      ThrowTypeError(context, kBadSortComparisonFunction, comparefnObj);
+    }
+
+    // 2. Let obj be the this value.
+    const obj: Object = receiver;
+
+    // 3. Let buffer be ? ValidateTypedArray(obj).
+    //    ValidateTypedArray currently returns the array, not the ViewBuffer.
+    const array: JSTypedArray =
+        ValidateTypedArray(context, obj, '%TypedArray%.prototype.sort');
+
+    // Default sorting is done in C++ using std::sort
+    if (comparefnObj == Undefined) {
+      return TypedArraySortFast(context, obj);
+    }
+
+    // 4. Let len be obj.[[ArrayLength]].
+    const len: Smi = array.length;
+
+    // Arrays of length 1 or less are considered sorted.
+    if (len < 2) return array;
+
+    const comparefn: Callable =
+        Cast<Callable>(comparefnObj) otherwise unreachable;
+    let loadfn: LoadFn;
+    let storefn: StoreFn;
+
+    let elementsKind: ElementsKind = array.elements_kind;
+
+    if (IsElementsKindGreaterThan(elementsKind, UINT32_ELEMENTS)) {
+      if (elementsKind == INT32_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedInt32Array>;
+        storefn = StoreFixedElement<FixedInt32Array>;
+      } else if (elementsKind == FLOAT32_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedFloat32Array>;
+        storefn = StoreFixedElement<FixedFloat32Array>;
+      } else if (elementsKind == FLOAT64_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedFloat64Array>;
+        storefn = StoreFixedElement<FixedFloat64Array>;
+      } else if (elementsKind == UINT8_CLAMPED_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedUint8ClampedArray>;
+        storefn = StoreFixedElement<FixedUint8ClampedArray>;
+      } else if (elementsKind == BIGUINT64_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedBigUint64Array>;
+        storefn = StoreFixedElement<FixedBigUint64Array>;
+      } else if (elementsKind == BIGINT64_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedBigInt64Array>;
+        storefn = StoreFixedElement<FixedBigInt64Array>;
+      } else {
+        unreachable;
+      }
+    } else {
+      if (elementsKind == UINT8_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedUint8Array>;
+        storefn = StoreFixedElement<FixedUint8Array>;
+      } else if (elementsKind == INT8_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedInt8Array>;
+        storefn = StoreFixedElement<FixedInt8Array>;
+      } else if (elementsKind == UINT16_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedUint16Array>;
+        storefn = StoreFixedElement<FixedUint16Array>;
+      } else if (elementsKind == INT16_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedInt16Array>;
+        storefn = StoreFixedElement<FixedInt16Array>;
+      } else if (elementsKind == UINT32_ELEMENTS) {
+        loadfn = LoadFixedElement<FixedUint32Array>;
+        storefn = StoreFixedElement<FixedUint32Array>;
+      } else {
+        unreachable;
+      }
+    }
+
+    // Prepare the two work arrays. All numbers are converted to tagged
+    // objects first, and merge sorted between the two FixedArrays.
+    // The result is then written back into the JSTypedArray.
+    const work1: FixedArray = AllocateZeroedFixedArray(Convert<intptr>(len));
+    const work2: FixedArray = AllocateZeroedFixedArray(Convert<intptr>(len));
+
+    for (let i: Smi = 0; i < len; ++i) {
+      const element: Object = loadfn(context, array, i);
+      work1[i] = element;
+      work2[i] = element;
+    }
+
+    TypedArrayMergeSort(work2, 0, len, work1);
+
+    // work1 contains the sorted numbers. Write them back.
+    for (let i: Smi = 0; i < len; ++i) storefn(context, array, i, work1[i]);
+
+    return array;
+  }
+}

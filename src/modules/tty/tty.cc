@@ -23,8 +23,6 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
-Persistent<Function> TTY::constructor;
-
 void on_close(uv_handle_t *handle)
 {
     Isolate *isolate = Isolate::GetCurrent();
@@ -141,7 +139,7 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         // nread = 0, we got an EAGAIN or EWOULDBLOCK
     }
     if (try_catch.HasCaught()) {
-        DecorateErrorStack(isolate, try_catch);
+        dv8::ReportException(isolate, &try_catch);
     }
 }
 
@@ -178,7 +176,6 @@ void TTY::Init(Local<Object> exports)
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", TTY::onError);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onEnd", TTY::onEnd);
 
-    constructor.Reset(isolate, tpl->GetFunction());
     DV8_SET_EXPORT(isolate, tpl, "TTY", exports);
 
     DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 0), "UV_TTY_MODE_NORMAL", exports);
@@ -193,8 +190,7 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
-    if (args.IsConstructCall())
-    {
+    if (args.IsConstructCall()) {
         Local<Context> context = isolate->GetCurrentContext();
         Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
 
@@ -242,24 +238,6 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
         obj->Wrap(args.This());
         args.GetReturnValue().Set(args.This());
     }
-    else
-    {
-        Local<Function> cons = Local<Function>::New(isolate, constructor);
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
-        args.GetReturnValue().Set(instance);
-    }
-}
-
-void TTY::NewInstance(const FunctionCallbackInfo<Value> &args)
-{
-    Isolate *isolate = args.GetIsolate();
-    const unsigned argc = 2;
-    Local<Value> argv[argc] = {args[0], args[1]};
-    Local<Function> cons = Local<Function>::New(isolate, constructor);
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-    args.GetReturnValue().Set(instance);
 }
 
 void TTY::Error(const FunctionCallbackInfo<Value> &args)
@@ -327,6 +305,10 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
             Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
             Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
         }
+    }
+    else if (r == 0) {
+        fprintf(stderr, "this should not happen\n");
+        abort();
     }
     else if ((uint32_t)r < length)
     {

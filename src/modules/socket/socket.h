@@ -11,10 +11,6 @@
 
 #include <dv8.h>
 
-// size of work buffer for reading. this should be user configurable and be same size as in buffer
-// TODO: need to figure out what is correct for this
-#define MAX_CONTEXTS 4096
-
 namespace dv8
 {
 
@@ -31,7 +27,6 @@ typedef struct
 {
   uv_write_t req; // libu write handle
   uv_buf_t buf;   // buffer reference
-  uint32_t fd;    // id of the context
 } write_req_t;
 
 // object for passing socket server structure to libuv
@@ -53,10 +48,22 @@ typedef struct
   uint8_t onEnd;
 } callbacks_t;
 typedef struct _context _context;
+typedef struct socket_plugin socket_plugin;
 
-// typedefs for http parser callbacks
+// typedefs for plugin  callbacks
+typedef void (*on_plugin_close)(void* obj);
+typedef uint32_t (*on_plugin_read_data)(uint32_t len, void* data);
 typedef int (*on_data)(_context *, const char *at, size_t len);
 typedef int (*cb)(_context *);
+
+// socket plugin struct
+struct socket_plugin
+{
+  void* data;
+  on_plugin_read_data onRead;
+  on_plugin_close onClose;
+  socket_plugin* next;
+};
 
 // context operations
 void context_init(uv_stream_t *handle, _context *ctx);
@@ -66,7 +73,6 @@ void context_free(uv_handle_t *handle);
 static void on_connection(uv_stream_t *server, int status);
 static void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
 static void after_write(uv_write_t *req, int status);
-static void after_write2(uv_write_t *req, int status);
 static void on_close(uv_handle_t *peer);
 static void after_shutdown(uv_shutdown_t *req, int status);
 static void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf);
@@ -100,7 +106,6 @@ typedef struct
 // socket context
 struct _context
 {
-  uint32_t fd;                // id of the context
   uint32_t readBufferLength;  // size of read buffer
   uint32_t writeBufferLength; // size of write buffer
   uint32_t index;             // position in buffer
@@ -115,14 +120,11 @@ struct _context
   socket_stats stats;
 };
 
-static std::queue<_context *> contexts; // queue for managing pool of contexts
-
 class Socket : public dv8::ObjectWrap
 {
 public:
   // initialisation
   static void Init(v8::Local<v8::Object> exports);
-  static void NewInstance(const v8::FunctionCallbackInfo<v8::Value> &args);
 
   // persistent pointers to JS callbacks
   v8::Persistent<v8::Function> _onConnect;
@@ -134,14 +136,20 @@ public:
   v8::Persistent<v8::Function> _onEnd;
 
   socket_type socktype = TCP; // 0 = tcp socket, 1 = Unix Domain Socket/Named Pipe
-  callbacks_t callbacks;      // pointers to JS callbacks
+  callbacks_t callbacks;
   uv_stream_t* _stream;
   _context* context;
-
-private:
+  dv8::socket::socket_plugin* first = 0;
+  dv8::socket::socket_plugin* last = 0;
+  bool isServer = true;
   Socket()
   {
   }
+
+protected:
+  void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
+private:
 
   ~Socket()
   {
@@ -157,11 +165,15 @@ private:
   static void Listen(const v8::FunctionCallbackInfo<v8::Value> &args);    // listen to port/path/handle
   static void Close(const v8::FunctionCallbackInfo<v8::Value> &args);     // close a socket
   static void Write(const v8::FunctionCallbackInfo<v8::Value> &args);     // write from out buffer to the socket
+  static void Splice(const v8::FunctionCallbackInfo<v8::Value> &args);     // write from out buffer to the socket
   static void Pause(const v8::FunctionCallbackInfo<v8::Value> &args);     // pause the socket
   static void Resume(const v8::FunctionCallbackInfo<v8::Value> &args);    // resume the socket
   static void Error(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the uv error string for an error code
   static void QueueSize(const v8::FunctionCallbackInfo<v8::Value> &args); // size in bytes of the write queue
   static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
+  static void UnRef(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
+  static void Open(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
+  static void PortNumber(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the port number
 
   // TCP only methods
   static void RemoteAddress(const v8::FunctionCallbackInfo<v8::Value> &args); // remote ip4 address as string
@@ -177,9 +189,6 @@ private:
   static void onClose(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket closes
   static void onEnd(const v8::FunctionCallbackInfo<v8::Value> &args);     // when a read socket gets EOF
   static void onDrain(const v8::FunctionCallbackInfo<v8::Value> &args);   // when socket write buffers have flushed
-
-  // persistent reference to JS Socket constructor
-  static v8::Persistent<v8::Function> constructor;
 };
 
 } // namespace socket

@@ -1,23 +1,19 @@
 #include "fs.h"
 
-namespace dv8
-{
-namespace fs
-{
-using v8::Local;
-using v8::Object;
+namespace dv8 {
+namespace fs {
+	using v8::Local;
+	using v8::Object;
 
-void InitAll(Local<Object> exports)
-{
-	Filesystem::Init(exports);
+	void InitAll(Local<Object> exports) {
+		FileSystem::Init(exports);
+		File::Init(exports);
+	}
 }
-} // namespace fs
-} // namespace dv8
+}
 
-extern "C"
-{
-	void *_register_fs()
-	{
-		return (void *)dv8::fs::InitAll;
+extern "C" {
+	void* _register_fs() {
+		return (void*)dv8::fs::InitAll;
 	}
 }

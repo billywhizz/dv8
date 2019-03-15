@@ -1,3 +1,42 @@
+## core
+the core engine which can bootstrap a js script with builtin globals
+- description of builtins/globals
+- description of v8 globals
+- examples
+- benchmarks
+
+## modules (optional)
+optional binary modules
+- description of each module
+- examples for each module
+- benchmarks
+
+## runtime (optional)
+default runtime environment with some lightweight JS wrappers around low level libraries
+- description of runtime 
+
+# Builtins
+
+## Buffer
+
+## Globals
+
+# Modules
+
+## httpParser
+## loop
+## openssl
+## os
+## process
+## socket
+## thread
+## timer
+## tty
+
+# Base
+
+
+
 # process module
 
 ## Process

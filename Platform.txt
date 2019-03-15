@@ -1,0 +1,129 @@
+allow sending messages from main to specific threadid
+allow broadcasting messages to all threads
+allow broadcasting from thread to other threads
+allow control of these options so they can be turned on/off (security!)
+
+SRV records with ports for each service
+
+no filesystem access out of the box
+if you need it, write a c++ module
+no exec
+limited setuid, setgid
+
+
+shutting down
+
+set a timer for x seconds
+unref the timer
+cleanly stop/close any known handles (e.g. client connections, timers, server socket)
+  on next request
+    notify client (HTTP Connection: close)
+    wait for write drain
+close all event loop handles (intelligently if possible)
+run garbage collection
+run micro tasks?
+if timer expires
+  explicit shutdown
+
+
+
+- spin up new isolates on newest hosts
+- idle isolates get terminated
+- idle hosts get terminated
+- could run on bare metal alpine linux - don't use containers at all? or only very lightweight containers just used to control resource access using standard tool, e.g. cgroups
+- boot bare metal over tftp with specific host image
+
+
+
+## container/isolate settings
+
+mainPath: './app.js',
+env: {
+    FOO: 'bar'
+},
+args: [1, 2, 3],
+limits: {
+    cpu: {}, // does not look like this is possible for threads. we can set affinity but not limit usage, can use cgroups to limit cpu per user/group
+    mem: {}, // use v8 settings - looks like this is possible in some way. OOM is an issue still for threads.
+    net: {} // should be possible to rate limite - tc/traffic shaping? code in c++?
+},
+taskId: 1111111,
+listen: ['127.0.0.1:3000'],
+pwd: '/apps/app1',
+cpu: 0,
+
+
+https://v8docs.nodesource.com/node-10.6/d8/dcd/classv8_1_1_resource_constraints.html
+
+https://groups.google.com/forum/#!topic/v8-users/vKn1hVs8KNQ
+v8::ResourceConstraints::set_max_old_space_size().
+AddNearHeapLimitCallback
+
+
+
+"No clean solution, but with hacks we've been able to solve the problem for our use case.
+
+I set the heap limit to 8x the limit I actually want. Then, after each call into the isolate, I check if the memory usage has gone over the intended limit. If so, I invoke garbage collection. If it's *still* over the limit after that, then I terminate the isolate at that point.
+
+Meanwhile, we also enforce a CPU time limit of 50ms. In practice, a script that allocates tons of memory tends to run out of CPU time before it can hit the 8x heap limit (especially as the GC slows things down when approaching the limit).
+
+This together seems to solve the case of scripts that accidentally allocate too much memory.
+
+A carefully-crafted malicious script can still cause an abort. In that case, the SIGABRT single handler blacklists the offending script and simply leaves the thread in limbo rather than exit the process. Some time later, if we need that RAM back, we can do a clean restart, in which we start a new process to handle new requests while letting the old process finish up anything in-flight and then exit.
+
+One thing I haven't had time to experiment with yet is whether we can longjmp() out of the signal handler and then delete the isolate, rather than leave it in limbo. Obviously this would be super-leaky, but perhaps we could reclaim most of the resources associated with the isolate. (In my first message in this thread I was contemplating whether I could compile with exceptions enabled in order to be able to do a proper stack unwind invoking destructors, which could perhaps make things a little bit less leaky, even though V8 is not exception-safe. But that won't actually work because libunwind can't unwind through JIT'd code.)"
+
+
+https://groups.google.com/forum/?nomobile=true#!topic/v8-users/qLs7-XT2Zvg
+
+
+
+size_t MyNearHeapLimitCallback(void* data, size_t current_heap_limit,
+                             size_t initial_heap_limit) {
+  v8::Isolate *isolate = (v8::Isolate *)data;
+  isolate->TerminateExecution();
+  return initial_heap_limit + 5 * 1024 * 1024;
+}
+
+
+int main(int argc, char* argv[]) {
+  v8::V8::InitializeICUDefaultLocation(argv[0]);
+  v8::V8::InitializeExternalStartupData(argv[0]);
+  std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
+  v8::V8::InitializePlatform(platform.get());
+  v8::V8::Initialize();
+  while(true) {
+      v8::Isolate::CreateParams create_params;
+      create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+      v8::ResourceConstraints constraints;
+      constraints.set_max_old_space_size(10);
+      create_params.constraints = constraints;
+      v8::Isolate* isolate = v8::Isolate::New(create_params);
+      isolate->AddNearHeapLimitCallback(MyNearHeapLimitCallback, isolate);
+      {
+          v8::Isolate::Scope isolate_scope(isolate);
+          v8::HandleScope handle_scope(isolate);
+          v8::Local<v8::Context> context = v8::Context::New(isolate);
+          v8::Context::Scope context_scope(context);
+          v8::Local<v8::String> source =
+              v8::String::NewFromUtf8(isolate, "a = []; for (;;) { a.push('hello'); }", 
+                                      v8::NewStringType::kNormal)
+              .ToLocalChecked();
+
+          v8::Local<v8::Script> script = v8::Script::Compile(context, source).ToLocalChecked();
+
+          v8::TryCatch try_catch(isolate);
+          v8::MaybeLocal<v8::Value> result;
+          result = script->Run(context);
+          if (try_catch.HasCaught() && try_catch.HasTerminated()) {
+              isolate->CancelTerminateExecution();
+          }
+      }
+      delete create_params.array_buffer_allocator;
+      isolate->Dispose();
+  }
+  v8::V8::Dispose();
+  v8::V8::ShutdownPlatform();
+  return 0;
+}
+

@@ -7,16 +7,18 @@
 namespace dv8
 {
 
-static void DecorateErrorStack(v8::Isolate *isolate, const v8::TryCatch &try_catch)
+typedef struct
 {
-    v8::Local<v8::Value> exception = try_catch.Exception();
-    if (!exception->IsObject())
-        return;
-    v8::Local<v8::Object> err_obj = exception.As<v8::Object>();
-    v8::Local<v8::Value> stack = err_obj->Get(v8::String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked());
-    v8::String::Utf8Value strStack(isolate, stack);
-    fprintf(stderr, "UncaughtException:\nStack:\n%s\n", *strStack);
-}
+	uint8_t hasError;
+    int linenum;
+    char* filename;
+    char* exception;
+    char* sourceline;
+    char* stack;
+    uint8_t* bytes;
+    size_t len;
+} js_error;
+
 class ObjectWrap
 {
   public:
@@ -59,7 +61,6 @@ class ObjectWrap
         return handle_;
     }
 
-  protected:
     inline void Wrap(v8::Local<v8::Object> handle)
     {
         assert(persistent().IsEmpty());
@@ -69,9 +70,15 @@ class ObjectWrap
         MakeWeak();
     }
 
+
+  protected:
     inline void MakeWeak(void)
     {
         persistent().SetWeak(this, WeakCallback, v8::WeakCallbackType::kParameter);
+    }
+
+    virtual void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+
     }
 
     virtual void Ref()
@@ -97,6 +104,7 @@ class ObjectWrap
     {
         ObjectWrap *wrap = data.GetParameter();
         assert(wrap->refs_ == 0);
+        wrap->Destroy(data);
         wrap->handle_.Reset();
         delete wrap;
     }

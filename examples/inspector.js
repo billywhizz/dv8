@@ -1,0 +1,11 @@
+let gid = 0
+//const timer = setInterval(() => print(new Date()), 1000)
+global.receive = message => print(JSON.stringify(JSON.parse(message), null, '  '))
+const sendMessage = (method, params) => global.send(JSON.stringify({ id: gid++, method, params }))
+sendMessage('Debugger.enable')
+sendMessage('Debugger.pause')
+sendMessage('Debugger.getScriptSource', { scriptId: '8' })
+sendMessage('Debugger.getStackTrace')
+sendMessage('Runtime.enable')
+sendMessage('Debugger.resume')
+sendMessage('Runtime.evaluate', { expression: 'version()' })

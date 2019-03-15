@@ -3,71 +3,87 @@
 namespace dv8
 {
 
-using dv8::builtins::Environment;
-using v8::HeapSpaceStatistics;
+void PromiseRejectCallback(PromiseRejectMessage message) {
+  Local<Promise> promise = message.GetPromise();
+  Isolate* isolate = promise->GetIsolate();
+  HandleScope handle_scope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  PromiseRejectEvent event = message.GetEvent();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  if (!env->onUnhandledRejection.IsEmpty() && event == v8::kPromiseRejectWithNoHandler) {
+    const unsigned int argc = 3;
+    Local<Object> globalInstance = context->Global();
+    Local<Value> value = message.GetValue();
+    if (value.IsEmpty()) value = Undefined(isolate);
+    Local<Value> argv[argc] = { promise, value, Integer::New(isolate, event) };
+    Local<Function> onUnhandledRejection = Local<Function>::New(isolate, env->onUnhandledRejection);
+    TryCatch try_catch(isolate);
+    onUnhandledRejection->Call(globalInstance, 3, argv);
+    if (try_catch.HasCaught()) {
+      dv8::ReportException(isolate, &try_catch);
+    }
+  }
+}
 
-using InitializerCallback = void (*)(Local<Object> exports);
-
-void on_handle_close(uv_handle_t *h)
-{
+void on_handle_close(uv_handle_t *h) {
   free(h);
 }
 
-void shutdown(uv_loop_t *loop)
-{
+void shutdown(uv_loop_t *loop) {
   uv_walk(loop, [](uv_handle_t *handle, void *arg) {
-    fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
+    // I have to use this function in main so it can be used in loop.so. hmmm....
+    const char* typeName = uv_handle_type_name(handle->type);
+    //fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
     uv_close(handle, on_handle_close);
-    //void* close_cb = reinterpret_cast<void*>(handle->close_cb);
-  },
-          NULL);
+  }, NULL);
 }
 
-void Shutdown(const FunctionCallbackInfo<Value> &args)
-{
+void Shutdown(const FunctionCallbackInfo<Value> &args) {
   shutdown(uv_default_loop());
 }
 
-void ReportException(Isolate *isolate, TryCatch *try_catch)
-{
+void ReportException(Isolate *isolate, TryCatch *try_catch) {
   HandleScope handle_scope(isolate);
-  fprintf(stderr, "exception\n");
-  String::Utf8Value exception(isolate, try_catch->Exception());
-  const char *exception_string = *exception;
+  Local<Context> context(isolate->GetCurrentContext());
+  Local<Object> globalInstance = context->Global();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Local<Value> er = try_catch->Exception();
   Local<Message> message = try_catch->Message();
-  if (message.IsEmpty())
-  {
-    fprintf(stderr, "%s\n", exception_string);
+  if (message.IsEmpty()) {
+    message = Exception::CreateMessage(isolate, er);
   }
-  else
-  {
-    String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
-    Local<Context> context(isolate->GetCurrentContext());
-    const char *filename_string = *filename;
-    int linenum = message->GetLineNumber(context).FromJust();
-    fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
-    String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
-    const char *sourceline_string = *sourceline;
-    fprintf(stderr, "%s\n", sourceline_string);
-    int start = message->GetStartColumn(context).FromJust();
-    for (int i = 0; i < start; i++)
-    {
-      fprintf(stderr, " ");
-    }
-    int end = message->GetEndColumn(context).FromJust();
-    for (int i = start; i < end; i++)
-    {
-      fprintf(stderr, "^");
-    }
-    fprintf(stderr, "\n");
-    Local<Value> stack_trace_string;
-    if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0)
-    {
-      String::Utf8Value stack_trace(isolate, stack_trace_string);
-      const char *stack_trace_string = *stack_trace;
-      fprintf(stderr, "%s\n", stack_trace_string);
-    }
+  String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
+  Local<Value> func = globalInstance->Get(String::NewFromUtf8(isolate, "onUncaughtException", NewStringType::kNormal).ToLocalChecked());
+  Local<Function> onUncaughtException = Local<Function>::Cast(func);
+  Local<Object> err_obj = er->ToObject(context).ToLocalChecked();
+  env->err.Reset(isolate, err_obj);
+  env->error->hasError = 1;
+  String::Utf8Value exception(isolate, er);
+  char *exception_string = *exception;
+  char *filename_string = *filename;
+  int linenum = message->GetLineNumber(context).FromJust();
+  env->error->linenum = linenum;
+  env->error->filename = (char*)calloc(strlen(filename_string), 1);
+  memcpy(env->error->filename, filename_string, strlen(filename_string));
+  err_obj->Set(String::NewFromUtf8(isolate, "fileName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, filename_string, v8::NewStringType::kNormal).ToLocalChecked());
+  env->error->exception = (char*)calloc(strlen(exception_string), 1);
+  memcpy(env->error->exception, exception_string, strlen(exception_string));
+  err_obj->Set(String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
+  String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
+  char *sourceline_string = *sourceline;
+  env->error->sourceline = (char*)calloc(strlen(sourceline_string), 1);
+  memcpy(env->error->sourceline, sourceline_string, strlen(sourceline_string));
+  err_obj->Set(String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
+  Local<Value> stack_trace_string;
+  if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0) {
+    String::Utf8Value stack_trace(isolate, stack_trace_string);
+    char *stack_trace_string = *stack_trace;
+    env->error->stack = (char*)calloc(strlen(stack_trace_string), 1);
+    err_obj->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, stack_trace_string, v8::NewStringType::kNormal).ToLocalChecked());
+    memcpy(env->error->stack, stack_trace_string, strlen(stack_trace_string));
   }
+  Local<Value> argv[1] = { err_obj };
+  onUncaughtException->Call(globalInstance, 1, argv);
 }
 
 bool ExecuteString(Isolate *isolate, Local<String> source, Local<Value> name, bool report_exceptions)
@@ -172,6 +188,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   if (success != 0)
   {
     fprintf(stderr, "uv_dlopen failed: %i\n", success);
+    fprintf(stderr, "%s\n", uv_dlerror(&lib));
     args.GetReturnValue().Set(exports);
     return;
   }
@@ -241,6 +258,19 @@ void OnExit(const FunctionCallbackInfo<Value> &args)
   }
 }
 
+void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  if (args[0]->IsFunction())
+  {
+    Local<Function> onUnhandledRejection = Local<Function>::Cast(args[0]);
+    env->onUnhandledRejection.Reset(isolate, onUnhandledRejection);
+  }
+}
+
 void Require(const FunctionCallbackInfo<Value> &args)
 {
   HandleScope handle_scope(args.GetIsolate());
@@ -279,7 +309,7 @@ void Require(const FunctionCallbackInfo<Value> &args)
   }
   else
   {
-    String::Utf8Value utf8string(args.GetIsolate(), source_text);
+    //String::Utf8Value utf8string(args.GetIsolate(), source_text);
     Maybe<bool> ok = module->InstantiateModule(context, OnModuleInstantiate);
     if (!ok.ToChecked())
     {
@@ -303,6 +333,7 @@ Local<Context> CreateContext(Isolate *isolate)
   global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
   global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
   global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
+  global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
   return Context::New(isolate, NULL, global);
 }
 
