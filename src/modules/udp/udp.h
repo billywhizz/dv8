@@ -35,6 +35,7 @@ class UDP : public dv8::ObjectWrap {
 		static void Start(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Stop(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void GetPeerName(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static void OnMessage(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void OnError(const v8::FunctionCallbackInfo<v8::Value>& args);

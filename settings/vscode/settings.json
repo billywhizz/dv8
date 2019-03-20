@@ -5,6 +5,7 @@
         "globals": ["PID", "TID", "gc", "BigInt", "BigInt64Array", "print", "BigUint64Array"],
         "parser": "babel-eslint"
     },
+    "editor.rulers": [80, 120],
     "standard.usePackageJson": false,
     "standard.enable": true,
     "javascript.validate.enable": false,

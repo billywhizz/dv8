@@ -1,1 +1,0 @@
-const json = require('./test.json')
