@@ -1,1 +1,0 @@
-docker run -it --rm -v $(pwd)/build:/build -v $(pwd)/out/lib:/out/lib -v $(pwd)/src:/src dv8-sdk ./pico-http-parser.sh $@

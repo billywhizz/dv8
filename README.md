@@ -353,8 +353,25 @@ dv8::Require()
 
 ### builtins
 
+Buffer
+
 ### modules
 
+dns - stable
+httpParser - stable
+os - stable
+process - stable
+socket - stable
+thread - stable
+timer - stable
+tty - stable
+udp - stable
+
+fs - experimental
+libz - experimental
+openssl - experimental
+picoHttpParser - experimental
+posix - experimental
 
 # Tests
 

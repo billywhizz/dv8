@@ -78,6 +78,7 @@ namespace udp {
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", UDP::Close);
 
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "getPeerName", UDP::GetPeerName);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setBroadcast", UDP::SetBroadcast);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onMessage", UDP::OnMessage);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", UDP::OnError);
@@ -136,6 +137,18 @@ namespace udp {
 		len = strlen(ip);
 		args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
 		return;
+	}
+
+	void UDP::SetBroadcast(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
+    const int on = args[1]->IntegerValue(context).ToChecked();
+		int r = uv_udp_set_broadcast(obj->handle, on);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void UDP::Send(const FunctionCallbackInfo<Value> &args)

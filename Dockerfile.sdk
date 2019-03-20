@@ -11,8 +11,6 @@ COPY src /src
 COPY build/platform.sh /build/platform.sh
 COPY build/module.sh /build/module.sh
 COPY build/http-parser.sh /build/http-parser.sh
-COPY build/pico-http-parser.sh /build/pico-http-parser.sh
-#COPY build/openssl.sh /build/openssl.sh
 RUN ./platform.sh && \
     ./module.sh os && \
     ./module.sh process && \
@@ -24,9 +22,5 @@ RUN ./platform.sh && \
     ./module.sh libz && \
     ./module.sh fs && \
     ./module.sh udp && \
-    ./module.sh dns && \
-    ./module.sh libz && \
-    ./http-parser.sh && \
-    ./pico-http-parser.sh
-#    ./openssl.sh
+    ./http-parser.sh
 CMD ["/bin/sh"]
