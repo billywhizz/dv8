@@ -277,6 +277,8 @@ void Require(const FunctionCallbackInfo<Value> &args)
   String::Utf8Value str(args.GetIsolate(), args[0]);
   const char *cstr = *str;
   Local<String> source_text;
+  // TODO: Fix this so require paths are always relative to the path of the 
+  // requiring file, not the cwd 
   if (!ReadFile(args.GetIsolate(), cstr).ToLocal(&source_text))
   {
     fprintf(stderr, "Error reading '%s'\n", cstr);

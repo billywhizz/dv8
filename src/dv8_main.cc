@@ -63,15 +63,16 @@ int main(int argc, char *argv[])
 
       // compile and run the base module
       v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
-      v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "./lib/base.js", v8::NewStringType::kNormal).ToLocalChecked(), 
-        v8::Integer::New(isolate, 0), 
-        v8::Integer::New(isolate, 0), 
-        v8::False(isolate), 
-        v8::Local<v8::Integer>(), 
-        v8::Local<v8::Value>(), 
-        v8::False(isolate), 
-        v8::False(isolate), 
-        v8::True(isolate));
+      // https://v8docs.nodesource.com/node-10.6/db/d84/classv8_1_1_script_origin.html
+      v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "./lib/base.js", v8::NewStringType::kNormal).ToLocalChecked(), // resource name
+        v8::Integer::New(isolate, 0), // line offset
+        v8::Integer::New(isolate, 0),  // column offset
+        v8::False(isolate), // is shared cross-origin
+        v8::Local<v8::Integer>(),  // script id
+        v8::Local<v8::Value>(), // source map url
+        v8::False(isolate), // is opaque
+        v8::False(isolate), // is wasm
+        v8::True(isolate)); // is module
       v8::Local<v8::Module> module;
       v8::ScriptCompiler::Source basescript(base.ToLocalChecked(), baseorigin);
       if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {

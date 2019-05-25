@@ -69,6 +69,8 @@ docker cp v8-build:/tmp/v8/src deps/v8/src
 docker run -d --rm --name uv-build uv-build sleep 10
 docker cp uv-build:/source/uv/include deps/uv/include
 docker cp uv-build:/source/uv/src deps/uv/src
+docker run -d --rm --name dv8-sdk dv8-sdk sleep 10
+docker cp dv8-sdk:/usr/include/openssl deps/openssl
 ```
 
 ## Debug a core dump
