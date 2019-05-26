@@ -1,0 +1,4 @@
+FROM scratch
+COPY out/bin/dv8 /dv8
+WORKDIR /app
+CMD ["/dv8"]

@@ -181,7 +181,176 @@ void LoadModule(const FunctionCallbackInfo<Value> &args)
   String::Utf8Value str(args.GetIsolate(), args[0]);
   const char *module_name = *str;
   char lib_name[128];
+  if (strcmp("loop", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::loop::EventLoop::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("socket", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::socket::Socket::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("timer", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::timer::Timer::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("thread", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::thread::Thread::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("process", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::process::Process::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("udp", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::udp::UDP::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("os", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::os::OS::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("tty", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::tty::TTY::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("os", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::os::OS::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("fs", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::fs::FileSystem::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("libz", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::libz::ZLib::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  if (strcmp("httpParser", module_name) == 0) {
+    fprintf(stderr, "module_name: %s\n", module_name);
+    Local<Object> exports;
+    bool ok = args[1]->ToObject(context).ToLocal(&exports);
+    if (!ok)
+    {
+      fprintf(stderr, "convert args to local failed\n");
+      args.GetReturnValue().Set(exports);
+      return;
+    }
+		dv8::httpParser::HTTPParser::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
   snprintf(lib_name, 128, "/usr/local/lib/%s.so", module_name);
+  fprintf(stderr, "lib: %s\n", lib_name);
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   Local<Object> exports;

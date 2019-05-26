@@ -11,6 +11,17 @@
 #include <buffer.h>
 #include <env.h>
 #include <string.h>
+#include <modules/loop/loop.h>
+#include <modules/socket/socket.h>
+#include <modules/timer/timer.h>
+#include <modules/thread/thread.h>
+#include <modules/process/process.h>
+#include <modules/udp/udp.h>
+#include <modules/tty/tty.h>
+#include <modules/os/os.h>
+#include <modules/fs/fs.h>
+#include <modules/libz/libz.h>
+#include <modules/httpParser/httpParser.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1

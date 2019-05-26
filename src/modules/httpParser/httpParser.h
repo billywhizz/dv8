@@ -1,9 +1,9 @@
-#ifndef DV8_HTTPParser_H
-#define DV8_HTTPParser_H
+#ifndef DV8_HTTPPARSER_H
+#define DV8_HTTPPARSER_H
 
-#include <dv8.h>
-#include <socket.h>
 #include "http_parser.h"
+#include <dv8.h>
+#include <modules/socket/socket.h>
 
 namespace dv8 {
 
@@ -20,9 +20,6 @@ using v8::Number;
 using v8::Object;
 using v8::String;
 using v8::Value;
-using dv8::builtins::Buffer;
-using dv8::socket::Socket;
-using dv8::socket::socket_plugin;
 
 #define STRING_OFFSET 16
 
@@ -73,7 +70,7 @@ class HTTPParser : public dv8::ObjectWrap {
 		char *buf;
 		_context* context;
 		callbacks_t callbacks;
-		dv8::socket::socket_plugin* plugin;
+		void* plugin;
 		v8::Persistent<v8::Function> _onHeaders;
 		v8::Persistent<v8::Function> _onBody;
 		v8::Persistent<v8::Function> _onRequest;
