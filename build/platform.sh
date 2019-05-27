@@ -8,9 +8,9 @@ export UV_DEPS=/deps/uv/out/Release
 export BUILTINS=/src/builtins
 
 if [[ "$CONFIG" == "release" ]]; then
-    export CCFLAGS="-DHTTP_PARSER_STRICT=0 -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -pthread -Wall -Wextra -Wno-cast-function-type -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
+    export CCFLAGS="-DHTTP_PARSER_STRICT=0 -DSTATIC_BUILD=1 -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -pthread -Wall -Wextra -Wno-cast-function-type -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 else
-    export CCFLAGS="-DHTTP_PARSER_STRICT=0 -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -pthread -Wall -Wextra -Wno-cast-function-type -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
+    export CCFLAGS="-DHTTP_PARSER_STRICT=0 -DSTATIC_BUILD=1 -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -pthread -Wall -Wextra -Wno-cast-function-type -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 fi
 export LDFLAGS="-pthread -static -rdynamic -m64 -Wl,--start-group ./dv8main.o ./dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -lrt -lm -lz -Wl,--end-group"
 

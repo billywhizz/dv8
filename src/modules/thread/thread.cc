@@ -45,8 +45,8 @@ void start_context(uv_work_t *req)
 		Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
 		global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
 		global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
-		global->Set(String::NewFromUtf8(isolate, "module", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
-		global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
+		global->Set(String::NewFromUtf8(isolate, "library", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
+		//global->Set(String::NewFromUtf8(isolate, "evaluate", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Evaluate));
 		global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
 		global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
 		global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
@@ -106,13 +106,7 @@ void start_context(uv_work_t *req)
 		module->Evaluate(context);
 		// Load main script
 		v8::MaybeLocal<v8::String> source;
-		if (th->isFile == 1) {
-			// if we are loading a file from disk
-			source = dv8::ReadFile(isolate, (char*)th->name);
-		} else {
-			// if we have been passed in a function
-			source = v8::String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal, static_cast<int>(th->size));
-		}
+		source = v8::String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal, static_cast<int>(th->size));
 		if (try_catch.HasCaught()) {
 			dv8::ReportException(isolate, &try_catch);
 			return;
@@ -257,77 +251,48 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	v8::HandleScope handleScope(isolate);
 	int argc = args.Length();
 	Thread *obj = ObjectWrap::Unwrap<Thread>(args.Holder());
-	if (args[0]->IsString()) {
-		String::Utf8Value str(args.GetIsolate(), args[0]);
-		Local<Function> onComplete = Local<Function>::Cast(args[1]);
-		String::Utf8Value source(isolate, onComplete->ToString(isolate));
-		obj->onComplete.Reset(isolate, onComplete);
-		obj->handle = (uv_work_t *)malloc(sizeof(uv_work_t));
-		thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
-		if (argc > 2) {
-			Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
-			size_t len = b->_length;
-			th->data = b->_data;
-			th->length = b->_length;
-		}
-		else {
-			th->length = 0;
-		}
-		th->object = (void *)obj;
-		th->error.hasError = 0;
-		const char *fname = *str;
-		char *lib_name = (char *)calloc(128, 1);
-		snprintf(lib_name, 128, "%s", *str);
-		th->name = lib_name;
-		th->isFile = 1;
-		obj->handle->data = (void *)th;
-		uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
-	} else {
-		Local<Function> threadFunc = Local<Function>::Cast(args[0]);
-		String::Utf8Value function_name(args.GetIsolate(), threadFunc->GetName());
-		Local<Function> onComplete = Local<Function>::Cast(args[1]);
-		Local<String> sourceString = threadFunc->ToString(isolate);
-		String::Utf8Value source(isolate, sourceString);
-		obj->onComplete.Reset(isolate, onComplete);
-		obj->handle = (uv_work_t *)malloc(sizeof(uv_work_t));
-		thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
-		if (argc > 2) {
-			Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
-			size_t len = b->_length;
-			th->data = b->_data;
-			th->length = b->_length;
-		}
-		else {
-			th->length = 0;
-		}
-		th->name = *function_name;
-		th->error.hasError = 0;
-		th->object = (void *)obj;
-		int len = strlen(*source);
-		int first = 0;
-		int last = 0;
-		int off = 0;
-		char* ss = *source;
-		while(len--) {
-			char* c = ss + off;
-			if (c[0] == '{') {
-				if (first == 0) first = off + 1;
-			} else if (c[0] == '}') {
-				last = off;
-			}
-			off++;
-		}
-		th->size = ((last - first));
-		th->source = (char*)calloc(th->size, 1);
-		char* start = *source;
-		start += first;
-		memcpy(th->source, (void*)start, th->size);
-		th->isFile = 0;
-		obj->handle->data = (void *)th;
-		uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	Local<Function> threadFunc = Local<Function>::Cast(args[0]);
+	String::Utf8Value function_name(args.GetIsolate(), threadFunc->GetName());
+	Local<Function> onComplete = Local<Function>::Cast(args[1]);
+	Local<String> sourceString = threadFunc->ToString(isolate);
+	String::Utf8Value source(isolate, sourceString);
+	obj->onComplete.Reset(isolate, onComplete);
+	obj->handle = (uv_work_t *)malloc(sizeof(uv_work_t));
+	thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
+	if (argc > 2) {
+		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
+		size_t len = b->_length;
+		th->data = b->_data;
+		th->length = b->_length;
 	}
+	else {
+		th->length = 0;
+	}
+	th->name = *function_name;
+	th->error.hasError = 0;
+	th->object = (void *)obj;
+	int len = strlen(*source);
+	int first = 0;
+	int last = 0;
+	int off = 0;
+	char* ss = *source;
+	while(len--) {
+		char* c = ss + off;
+		if (c[0] == '{') {
+			if (first == 0) first = off + 1;
+		} else if (c[0] == '}') {
+			last = off;
+		}
+		off++;
+	}
+	th->size = ((last - first));
+	th->source = (char*)calloc(th->size, 1);
+	char* start = *source;
+	start += first;
+	memcpy(th->source, (void*)start, th->size);
+	obj->handle->data = (void *)th;
+	uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
+	args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 
 } // namespace thread

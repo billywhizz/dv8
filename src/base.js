@@ -1,8 +1,9 @@
-const { Process } = module('process', {})
-const { Timer } = module('timer', {})
-const { Thread } = module('thread', {})
-const { EventLoop } = module('loop', {})
-const { Socket, UNIX } = module('socket', {})
+const { Process } = library('process', {})
+const { Timer } = library('timer', {})
+const { Thread } = library('thread', {})
+const { EventLoop } = library('loop', {})
+const { Socket, UNIX } = library('socket', {})
+const { File, O_RDONLY } = library('fs', {})
 
 class Parser {
   constructor (rb, wb) {
@@ -327,27 +328,9 @@ if (global.workerData) {
       sock.resume()
     })
     parser.onMessage = message => sock.onMessage(message)
+    // TODO: messages too big
     process.send = o => sock.write(parser.write(o))
     process.sendString = s => {
-/*
-      print(`process.sendString: ${s.length}`)
-      let len = s.length
-      let towrite = 0
-      if (len + 4 > wb.size) {
-        towrite = wb.size - 4
-        let off = 0
-        sock.write(parser.write(s.slice(off, towrite), 2))
-        len -= towrite
-        off += towrite
-        while (len) {
-          towrite = Math.min(len, wb.size)
-          sock.write(parser.write(s.slice(off, towrite), 2))
-          len -= towrite
-          off += towrite
-        }
-        return
-      }
-*/
       sock.write(parser.write(s, 2))
     }
     process.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
@@ -418,4 +401,28 @@ if (global.workerData) {
   process.threads = threads
 }
 
-module.exports = {}
+function readFile (path) {
+  const buf = Buffer.alloc(16384)
+  const file = new File()
+  const parts = []
+  file.setup(buf, buf)
+  file.fd = file.open(path, O_RDONLY)
+  file.size = 0
+  let len = file.read(16384, file.size)
+  while (len > 0) {
+    file.size += len
+    parts.push(buf.read(0, len))
+    len = file.read(16384, file.size)
+  }
+  file.close()
+  file.text = parts.join('')
+  return file
+}
+
+global.require = path => {
+  const module = { exports: {} }
+  const { text } = readFile(path)
+  const source = `(function (module) {\n${text}\n})(module)`
+  eval(source)
+  return module.exports
+}
