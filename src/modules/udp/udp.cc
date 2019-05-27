@@ -76,6 +76,9 @@ namespace udp {
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", UDP::Start);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stop", UDP::Stop);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", UDP::Close);
+
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "getPeerName", UDP::GetPeerName);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setBroadcast", UDP::SetBroadcast);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onMessage", UDP::OnMessage);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", UDP::OnError);
@@ -108,6 +111,44 @@ namespace udp {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void UDP::GetPeerName(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
+		struct sockaddr_storage address;
+		int addrlen = sizeof(address);
+		int r = uv_udp_getpeername(obj->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
+		if (r)
+		{
+			args.GetReturnValue().Set(Integer::New(isolate, r));
+			return;
+		}
+		const sockaddr *addr = reinterpret_cast<const sockaddr *>(&address);
+		char ip[INET_ADDRSTRLEN];
+		const sockaddr_in *a4;
+		a4 = reinterpret_cast<const sockaddr_in *>(addr);
+		int len = sizeof ip;
+		uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
+		len = strlen(ip);
+		args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
+		return;
+	}
+
+	void UDP::SetBroadcast(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
+    const int on = args[1]->IntegerValue(context).ToChecked();
+		int r = uv_udp_set_broadcast(obj->handle, on);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void UDP::Send(const FunctionCallbackInfo<Value> &args)

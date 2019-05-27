@@ -13,7 +13,6 @@ typedef struct
 	void *data;
 	void *object;
 	size_t length;
-	uint8_t isFile;
 	size_t size;
 	char* source;
 	char* name;
