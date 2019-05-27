@@ -1,6 +1,6 @@
-FROM alpine:3.8 as dv8-sdk
+FROM alpine:3.9 as dv8-sdk
 WORKDIR /build
-RUN apk add --no-cache g++ openssl-dev
+RUN apk add --update --no-cache g++ zlib-dev openssl-dev
 RUN mkdir -p /out/bin
 RUN mkdir -p /out/lib
 COPY --from=v8-build /tmp/v8/include /deps/v8/include
@@ -9,10 +9,12 @@ COPY --from=uv-build /source/uv/include /deps/uv/include
 COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/out/Release/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
+COPY build/platform-dynamic.sh /build/platform-dynamic.sh
 COPY build/module.sh /build/module.sh
 COPY build/http-parser.sh /build/http-parser.sh
 COPY build/openssl.sh /build/openssl.sh
 RUN ./platform.sh && \
+    ./platform-dynamic.sh && \
     ./module.sh os && \
     ./module.sh process && \
     ./module.sh socket && \
@@ -23,8 +25,5 @@ RUN ./platform.sh && \
     ./module.sh libz && \
     ./module.sh fs && \
     ./module.sh udp && \
-    ./module.sh dns && \
-    ./module.sh libz && \
-    ./http-parser.sh && \
-    ./openssl.sh
+    ./http-parser.sh
 CMD ["/bin/sh"]

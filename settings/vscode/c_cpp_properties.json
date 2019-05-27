@@ -9,6 +9,7 @@
                 "${workspaceFolder}/deps/v8/src",
                 "${workspaceFolder}/deps/v8",
                 "${workspaceFolder}/deps/openssl",
+                "${workspaceFolder}/deps/zlib",
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/src/builtins",
                 "${workspaceFolder}/src/modules/os",

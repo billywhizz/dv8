@@ -5,6 +5,10 @@ namespace dv8
 
 namespace httpParser
 {
+using dv8::builtins::Buffer;
+using dv8::socket::Socket;
+using dv8::socket::socket_plugin;
+
 int message_begin_cb(http_parser *parser) {
 	_context *context = (_context *)parser->data;
 	context->request->urllength = 0;
@@ -180,8 +184,9 @@ void on_plugin_close(void* obj) {
 	//fprintf(stderr, "parser.on_close\n");
 	socket_plugin* plugin = (socket_plugin*)obj;
 	HTTPParser* parser = (HTTPParser*)plugin->data;
-	if (parser->plugin->next) {
-		parser->plugin->next->onClose(parser->plugin->next);
+	dv8::socket::socket_plugin* parserPlugin = (dv8::socket::socket_plugin*)parser->plugin;
+	if (parserPlugin->next) {
+		parserPlugin->next->onClose(parserPlugin->next);
 	}
 }
 
@@ -193,8 +198,9 @@ uint32_t on_plugin_read_data(uint32_t nread, void* obj) {
 		uint8_t *lastByte = (uint8_t *)(parser->context->base + np);
 		parser->context->lastByte = *lastByte;
 	}
-	if (parser->plugin->next) {
-		uint32_t r = parser->plugin->next->onRead(nread, parser->plugin->next);
+	dv8::socket::socket_plugin* parserPlugin = (dv8::socket::socket_plugin*)parser->plugin;
+	if (parserPlugin->next) {
+		uint32_t r = parserPlugin->next->onRead(nread, parserPlugin->next);
 	}
 	return 0;
 }

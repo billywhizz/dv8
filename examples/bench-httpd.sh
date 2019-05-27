@@ -1,1 +1,0 @@
-wrk -c 128 -t 2 -d 30 -s ./pipeline.lua http://127.0.0.1:3000/plaintext -- 1024
