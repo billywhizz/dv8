@@ -1,6 +1,6 @@
 FROM alpine:3.9 as dv8
 RUN apk add --update --no-cache libstdc++
 WORKDIR /app
-COPY --from=dv8-sdk /out/bin/dv8 /usr/local/bin/dv8
+COPY --from=dv8-sdk /out/bin/dv8-dynamic /usr/local/bin/dv8
 COPY --from=dv8-sdk /out/lib/*.so /usr/local/lib/
 CMD [ "/usr/local/bin/dv8" ]

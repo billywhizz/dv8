@@ -1,6 +1,4 @@
 ## convert base.js into a byte array so can be built into runtime
-rm -f out/bin/dv8
-rm -f out/lib/*.so
 xxd -i src/base.js > src/builtins.h
 sed -i 's/unsigned char/static const char/g' src/builtins.h
 sed -i 's/unsigned int/static unsigned int/g' src/builtins.h

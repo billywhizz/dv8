@@ -9,10 +9,12 @@ COPY --from=uv-build /source/uv/include /deps/uv/include
 COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/out/Release/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
+COPY build/platform-dynamic.sh /build/platform-dynamic.sh
 COPY build/module.sh /build/module.sh
 COPY build/http-parser.sh /build/http-parser.sh
 COPY build/openssl.sh /build/openssl.sh
 RUN ./platform.sh && \
+    ./platform-dynamic.sh && \
     ./module.sh os && \
     ./module.sh process && \
     ./module.sh socket && \
