@@ -5,6 +5,24 @@ const { EventLoop } = library('loop', {})
 const { Socket, UNIX } = library('socket', {})
 const { File, O_RDONLY } = library('fs', {})
 
+function readFile (path) {
+  const buf = Buffer.alloc(16384)
+  const file = new File()
+  const parts = []
+  file.setup(buf, buf)
+  file.fd = file.open(path, O_RDONLY)
+  file.size = 0
+  let len = file.read(16384, file.size)
+  while (len > 0) {
+    file.size += len
+    parts.push(buf.read(0, len))
+    len = file.read(16384, file.size)
+  }
+  file.close()
+  file.text = parts.join('')
+  return file
+}
+
 class Parser {
   constructor (rb, wb) {
     this.position = 0
@@ -101,6 +119,15 @@ let next = 1
 const queue = []
 const threads = {}
 const heap = [
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
   new Float64Array(4),
   new Float64Array(4),
   new Float64Array(4),
@@ -305,6 +332,25 @@ global.onExit(() => {
   if (process.onExit) process.onExit()
 })
 
+global.require = path => {
+  const module = { exports: {} }
+  const { text } = readFile(path)
+  const source = `(function (module) {\n${text}\n})(module)`
+  eval(source)
+  return module.exports
+}
+
+global.runScript = path => {
+  const { text } = readFile(path)
+  const source = `(function (global) {\n${text}\n})(global)`
+  eval(source)
+}
+
+global.evalScript = text => {
+  const source = `(function (global) {\n${text}\n})(global)`
+  eval(source)
+}
+
 if (global.workerData) {
   global.workerData.bytes = global.workerData.alloc()
   const dv = new DataView(global.workerData.bytes)
@@ -342,6 +388,15 @@ if (global.workerData) {
     sock.open(process.fd)
     process.sock = sock
   }
+  let alive = true
+  const { workerSource } = global
+  delete global.workerSource
+  global.evalScript(workerSource)
+  do {
+    loop.run()
+    alive = loop.isAlive()
+  } while (alive)
+  loop.close()
 } else {
   process.spawn = (fun, onComplete, opts = { ipc: false }) => {
     const thread = new Thread()
@@ -399,30 +454,15 @@ if (global.workerData) {
   process.TID = 0
   process.args = global.args
   process.threads = threads
-}
-
-function readFile (path) {
-  const buf = Buffer.alloc(16384)
-  const file = new File()
-  const parts = []
-  file.setup(buf, buf)
-  file.fd = file.open(path, O_RDONLY)
-  file.size = 0
-  let len = file.read(16384, file.size)
-  while (len > 0) {
-    file.size += len
-    parts.push(buf.read(0, len))
-    len = file.read(16384, file.size)
+  if (process.args.length < 2) {
+    // repl?
+  } else {
+    let alive = true
+    global.runScript(process.args[1])
+    do {
+      loop.run()
+      alive = loop.isAlive()
+    } while (alive)
+    loop.close()
   }
-  file.close()
-  file.text = parts.join('')
-  return file
-}
-
-global.require = path => {
-  const module = { exports: {} }
-  const { text } = readFile(path)
-  const source = `(function (module) {\n${text}\n})(module)`
-  eval(source)
-  return module.exports
 }
