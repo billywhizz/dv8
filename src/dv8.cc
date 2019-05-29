@@ -88,31 +88,6 @@ void Version(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), v8::V8::GetVersion(), NewStringType::kNormal).ToLocalChecked());
 }
 
-MaybeLocal<String> ReadFile(Isolate *isolate, const char *name) {
-  FILE *file = fopen(name, "rb");
-  if (file == NULL) {
-    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Bad File", v8::NewStringType::kNormal).ToLocalChecked()));
-    return v8::MaybeLocal<v8::String>();
-  }
-  fseek(file, 0, SEEK_END);
-  size_t size = ftell(file);
-  rewind(file);
-  char *chars = new char[size + 1];
-  chars[size] = '\0';
-  for (size_t i = 0; i < size;) {
-    i += fread(&chars[i], 1, size - i, file);
-    if (ferror(file)) {
-      fclose(file);
-      isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Read Error", v8::NewStringType::kNormal).ToLocalChecked()));
-      return v8::MaybeLocal<v8::String>();
-    }
-  }
-  fclose(file);
-  v8::MaybeLocal<v8::String> result = v8::String::NewFromUtf8(isolate, chars, v8::NewStringType::kNormal, static_cast<int>(size));
-  delete[] chars;
-  return result;
-}
-
 void Print(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);

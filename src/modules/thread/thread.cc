@@ -31,14 +31,12 @@ void start_context(uv_work_t *req)
 	create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
 	v8::Isolate *isolate = v8::Isolate::New(create_params);
 	{
-		// initialize the isolate
 		isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
 		isolate->SetFatalErrorHandler(dv8::OnFatalError);
 		isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
 		v8::Isolate::Scope isolate_scope(isolate);
 		v8::HandleScope handle_scope(isolate);
 		isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
-		// set up global
 		Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
 		global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
 		global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
@@ -47,18 +45,15 @@ void start_context(uv_work_t *req)
 		global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
 		global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
 		global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
-		// set up context and environment
 		v8::Local<v8::Context> context = Context::New(isolate, NULL, global);
 		dv8::builtins::Environment *env = new dv8::builtins::Environment();
 		env->error = &th->error;
 		env->AssignToContext(context);
 		env->err.Reset();
-		// get context global instance and initialise it
 		v8::Local<v8::Object> globalInstance = context->Global();
 		v8::Context::Scope context_scope(context);
 		dv8::builtins::Buffer::Init(globalInstance);
 		globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
-		// if we were passed in a buffer, then set is as workerData on the thread global
 		if (th->length > 0) {
 			v8::Local<v8::Function> bufferObj = Local<Function>::Cast(globalInstance->Get(v8::String::NewFromUtf8(isolate, "Buffer", v8::NewStringType::kNormal).ToLocalChecked()));
 			Local<Function> cons = Local<Function>::New(isolate, bufferObj);
@@ -67,11 +62,9 @@ void start_context(uv_work_t *req)
 			obj->Wrap(instance);
 			globalInstance->Set(String::NewFromUtf8(isolate, "workerData", v8::NewStringType::kNormal).ToLocalChecked(), instance);
 		}
-		// create a new event loop for the thread and assign it to the environment
 		uv_loop_t *loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 		env->loop = loop;
 		uv_loop_init(loop);
-		// compile and run the base module
 		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
 		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, th->name, v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
@@ -118,7 +111,6 @@ void on_context_complete(uv_work_t *req, int status)
 	}
 	js_error* jsError = &th->error;
 	if (jsError->hasError == 1) {
-		//v8::ValueDeserializer* _deserializer = new v8::ValueDeserializer(isolate, jsError->bytes, jsError->len);
 		Local<Object> o = Object::New(isolate);
 		o->Set(String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
 		if (jsError->filename) {
@@ -134,10 +126,9 @@ void on_context_complete(uv_work_t *req, int status)
 			free(jsError->sourceline);
 		}
 		if (jsError->stack) {
-			//o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
-			//free(jsError->stack);
+			o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
+			free(jsError->stack);
 		}
-		//MaybeLocal<Value> ret = _deserializer->ReadValue(context);
 		Local<Value> argv[2] = { o, Integer::New(isolate, status) };
 		v8::TryCatch try_catch(isolate);
 		foo->Call(isolate->GetCurrentContext()->Global(), 2, argv);

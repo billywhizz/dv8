@@ -4,6 +4,46 @@ const { Thread } = library('thread', {})
 const { EventLoop } = library('loop', {})
 const { Socket, UNIX } = library('socket', {})
 const { File, O_RDONLY } = library('fs', {})
+const { UV_TTY_MODE_NORMAL, TTY } = library('tty', {})
+
+function repl () {
+  const BUFFER_SIZE = 64 * 1024
+  const MAX_BUFFER = 4 * BUFFER_SIZE
+  const stdin = new TTY(0)
+  const buf = Buffer.alloc(BUFFER_SIZE)
+  function parse (statement) {
+    return Function(`"use strict"; return (${statement})`)() // eslint-disable-line no-new-func
+  }
+  stdin.setup(buf, UV_TTY_MODE_NORMAL)
+  stdin.onRead(len => {
+    const source = buf.read(0, len)
+    try {
+      const result = parse(source)
+      let payload = `${JSON.stringify(result, null, 2)}\n`
+      if (!result) payload = '(null)\n'
+      if (!payload) payload = '(null)\n'
+      if (payload === undefined) payload = '(undefined)\n'
+      const r = stdout.write(buf.write(payload, 0))
+      if (r < 0) return stdout.close()
+    } catch (err) {
+      print(err.message)
+    }
+    const r = stdout.write(buf.write('> ', 0))
+    if (r < 0) return stdout.close()
+    if (r < len && stdout.queueSize() >= MAX_BUFFER) stdin.pause()
+  })
+  stdin.onEnd(() => stdin.close())
+  stdin.onClose(() => stdout.close())
+  const stdout = new TTY(1)
+  stdout.setup(buf, UV_TTY_MODE_NORMAL)
+  stdout.onDrain(() => stdin.resume())
+  stdout.onError((e, message) => print(`stdout.error:\n${e.toString()}\n${message}`))
+  if (stdout.write(buf.write('> ', 0)) < 0) {
+    stdout.close()
+  } else {
+    stdin.resume()
+  }
+}
 
 function readFile (path) {
   const buf = Buffer.alloc(16384)
@@ -335,20 +375,26 @@ global.onExit(() => {
 global.require = path => {
   const module = { exports: {} }
   const { text } = readFile(path)
-  const source = `(function (module) {\n${text}\n})(module)`
-  eval(source)
+  Function('module', `"use strict";\n${text}`)(module) // eslint-disable-line no-new-func
   return module.exports
 }
 
 global.runScript = path => {
   const { text } = readFile(path)
-  const source = `(function (global) {\n${text}\n})(global)`
-  eval(source)
+  Function('global', `"use strict";\n${text}`)(global) // eslint-disable-line no-new-func
 }
 
 global.evalScript = text => {
-  const source = `(function (global) {\n${text}\n})(global)`
-  eval(source)
+  Function('global', `"use strict";\n${text}`)(global) // eslint-disable-line no-new-func
+}
+
+function runLoop () {
+  let alive = true
+  do {
+    loop.run()
+    alive = loop.isAlive()
+  } while (alive)
+  loop.close()
 }
 
 if (global.workerData) {
@@ -388,15 +434,9 @@ if (global.workerData) {
     sock.open(process.fd)
     process.sock = sock
   }
-  let alive = true
   const { workerSource } = global
   delete global.workerSource
   global.evalScript(workerSource)
-  do {
-    loop.run()
-    alive = loop.isAlive()
-  } while (alive)
-  loop.close()
 } else {
   process.spawn = (fun, onComplete, opts = { ipc: false }) => {
     const thread = new Thread()
@@ -455,14 +495,10 @@ if (global.workerData) {
   process.args = global.args
   process.threads = threads
   if (process.args.length < 2) {
-    // repl?
+    repl()
   } else {
-    let alive = true
     global.runScript(process.args[1])
-    do {
-      loop.run()
-      alive = loop.isAlive()
-    } while (alive)
-    loop.close()
   }
 }
+
+runLoop()

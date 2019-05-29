@@ -202,7 +202,6 @@ typedef void *(*register_plugin)();
 
 void PromiseRejectCallback(PromiseRejectMessage message);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
-MaybeLocal<String> ReadFile(Isolate *isolate, const char *name);
 Local<Context> CreateContext(Isolate *isolate);
 // Global Functions
 void Print(const FunctionCallbackInfo<Value> &args);
