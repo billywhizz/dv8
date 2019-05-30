@@ -3,6 +3,10 @@
 namespace dv8 {
 
 namespace openssl {
+using dv8::builtins::Environment;
+using dv8::builtins::Buffer;
+using dv8::socket::Socket;
+using dv8::socket::socket_plugin;
 
 	void Hmac::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
@@ -25,7 +29,7 @@ namespace openssl {
 		v8::HandleScope handleScope(isolate);
 		ObjectWrap *wrap = data.GetParameter();
 		Hmac* obj = static_cast<Hmac *>(wrap);
-		HMAC_CTX_cleanup(obj->context);
+		HMAC_CTX_free(obj->context);
 		free(obj->in);
 		free(obj->out);
 		free(obj->context);
@@ -37,7 +41,7 @@ namespace openssl {
 		if (args.IsConstructCall()) {
 			Hmac* obj = new Hmac();
 			obj->Wrap(args.This());
-			obj->context = (HMAC_CTX *)calloc(1, sizeof(HMAC_CTX));
+			obj->context = HMAC_CTX_new();
 			obj->in = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
 			obj->out = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
 			args.GetReturnValue().Set(args.This());
@@ -50,7 +54,7 @@ namespace openssl {
 		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
 		String::Utf8Value hash_type(isolate, args[0]);
 		const EVP_MD* md = EVP_get_digestbyname(*hash_type);
-		HMAC_CTX_init(obj->context);
+		HMAC_CTX_reset(obj->context);
 		String::Utf8Value key(isolate, args[1]);
 		HMAC_Init_ex(obj->context, *key, strlen(*key), md, nullptr);
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
@@ -95,7 +99,7 @@ namespace openssl {
 		Isolate *isolate = args.GetIsolate();
 		Hmac *obj = ObjectWrap::Unwrap<Hmac>(args.Holder());
 		v8::HandleScope handleScope(isolate);
-		HMAC_CTX_cleanup(obj->context);
+		HMAC_CTX_free(obj->context);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -130,7 +134,7 @@ namespace openssl {
 		v8::HandleScope handleScope(isolate);
 		ObjectWrap *wrap = data.GetParameter();
 		Hash* obj = static_cast<Hash *>(wrap);
-		EVP_MD_CTX_cleanup(obj->context);
+		EVP_MD_CTX_free(obj->context);
 		free(obj->in);
 		free(obj->out);
 		free(obj->context);
@@ -143,7 +147,7 @@ namespace openssl {
 		if (args.IsConstructCall()) {
 			Hash* obj = new Hash();
 			obj->Wrap(args.This());
-			obj->context = (EVP_MD_CTX *)calloc(1, sizeof(EVP_MD_CTX));
+			obj->context = EVP_MD_CTX_new();
 			obj->in = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
 			obj->out = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
 			args.GetReturnValue().Set(args.This());
@@ -188,7 +192,7 @@ namespace openssl {
 		Isolate *isolate = args.GetIsolate();
 		Hash *obj = ObjectWrap::Unwrap<Hash>(args.Holder());
 		v8::HandleScope handleScope(isolate);
-		EVP_MD_CTX_cleanup(obj->context);
+		EVP_MD_CTX_free(obj->context);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -444,8 +448,9 @@ namespace openssl {
 					Local<Function> onRead = Local<Function>::New(isolate, secure->_onRead);
 					onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
 				}
-				if (secure->plugin->next) {
-					uint32_t r = secure->plugin->next->onRead(n, secure->plugin->next);
+				socket_plugin* plugin = (socket_plugin*)secure->plugin;
+				if (plugin->next) {
+					uint32_t r = plugin->next->onRead(n, plugin->next);
 				}
 			}
 		}
@@ -455,7 +460,7 @@ namespace openssl {
 		//fprintf(stderr, "openssl.on_close\n");
 		socket_plugin* plugin = (socket_plugin*)obj;
 		SecureSocket* secure = (SecureSocket*)plugin->data;
-		Socket* sock = secure->socket;
+		Socket* sock = (Socket*)secure->socket;
 		dv8::socket::_context* context = sock->context;
 		char* in = context->in.base;
 		char* out = context->out.base;
@@ -467,8 +472,8 @@ namespace openssl {
 			cycleIn(secure, (uv_stream_t *)context->handle, in, inlen);
 			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
 		}
-		if (secure->plugin->next) {
-			secure->plugin->next->onClose(secure->plugin->next);
+		if (plugin->next) {
+			plugin->next->onClose(plugin->next);
 		}
 		SSL_free(secure->ssl);
 	}
@@ -476,7 +481,7 @@ namespace openssl {
 	uint32_t on_plugin_read_data(uint32_t nread, void* obj) {
 		socket_plugin* plugin = (socket_plugin*)obj;
 		SecureSocket* secure = (SecureSocket*)plugin->data;
-		Socket* sock = secure->socket;
+		Socket* sock = (Socket*)secure->socket;
 		dv8::socket::_context* context = sock->context;
 		char* in = context->in.base;
 		char* out = context->out.base;
@@ -497,11 +502,12 @@ namespace openssl {
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
 		SecureSocket *secure = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
+		Socket* sock = (Socket*)secure->socket;
 		v8::HandleScope handleScope(isolate);
 		int argc = args.Length();
 		uint32_t off = 0;
 		uint32_t len = args[0]->Uint32Value(context).ToChecked();
-		dv8::socket::_context* ctx = secure->socket->context;
+		dv8::socket::_context* ctx = sock->context;
 		char* out = ctx->out.base;
 		if (argc > 1) {
 			off = args[1]->Int32Value(context).ToChecked();
@@ -600,7 +606,7 @@ namespace openssl {
 	int start_ssl(SecureSocket* secure) {
 		Isolate *isolate = Isolate::GetCurrent();
 		v8::HandleScope handleScope(isolate);
-		Socket* sock = secure->socket;
+		Socket* sock = (Socket*)secure->socket;
 		dv8::socket::_context* context = sock->context;
 		char* in = context->in.base;
 		char* out = context->out.base;

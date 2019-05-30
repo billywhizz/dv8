@@ -483,10 +483,7 @@ if (global.workerData) {
     view.setUint32(envJSON.length + 9, argsJSON.length)
     thread.buffer.write(argsJSON, envJSON.length + 13)
     threads[thread.id] = thread
-    // TODO: do we need nextTick here? for the ipc socket ?
-    nextTick(() => {
-      thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
-    })
+    thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
     return thread
   }
   process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
@@ -497,7 +494,7 @@ if (global.workerData) {
   if (process.args.length < 2) {
     repl()
   } else {
-    global.runScript(process.args[1])
+    global.runScript(process.args[process.args.length - 1])
   }
 }
 

@@ -111,6 +111,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
+  static std::atomic<uint64_t> inits{0};
   const char *module_name = *str;
   char lib_name[128];
   Local<Object> exports;
@@ -163,6 +164,23 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     return;
   } else if (strcmp("libz", module_name) == 0) {
 		dv8::libz::ZLib::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("openssl", module_name) == 0) {
+		inits++;
+		int loads = inits.load();
+		dv8::openssl::Hash::Init(exports);
+		dv8::openssl::Hmac::Init(exports);
+		dv8::openssl::SecureContext::Init(exports);
+		dv8::openssl::SecureSocket::Init(exports);
+		if (loads == 1) {
+			SSL_library_init();
+			BIO* bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
+			SSL_load_error_strings();
+			ERR_load_BIO_strings();
+			OpenSSL_add_all_algorithms();
+			ERR_load_crypto_strings();
+		}
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("httpParser", module_name) == 0) {

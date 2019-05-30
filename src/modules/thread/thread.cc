@@ -126,8 +126,8 @@ void on_context_complete(uv_work_t *req, int status)
 			free(jsError->sourceline);
 		}
 		if (jsError->stack) {
-			o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
-			free(jsError->stack);
+			//o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
+			//free(jsError->stack);
 		}
 		Local<Value> argv[2] = { o, Integer::New(isolate, status) };
 		v8::TryCatch try_catch(isolate);

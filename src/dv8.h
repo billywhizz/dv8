@@ -11,6 +11,7 @@
 #include <buffer.h>
 #include <env.h>
 #include <string.h>
+#include <atomic>
 
 #ifdef STATIC_BUILD
 #include <modules/loop/loop.h>
@@ -24,6 +25,7 @@
 #include <modules/fs/fs.h>
 #include <modules/libz/libz.h>
 #include <modules/httpParser/httpParser.h>
+#include <modules/openssl/openssl.h>
 #endif
 
 #define MICROS_PER_SEC 1e6
