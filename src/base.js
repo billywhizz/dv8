@@ -483,7 +483,9 @@ if (global.workerData) {
     view.setUint32(envJSON.length + 9, argsJSON.length)
     thread.buffer.write(argsJSON, envJSON.length + 13)
     threads[thread.id] = thread
-    thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+    process.nextTick(() => {
+      thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+    })
     return thread
   }
   process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
