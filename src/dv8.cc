@@ -31,7 +31,7 @@ void on_handle_close(uv_handle_t *h) {
 void shutdown(uv_loop_t *loop) {
   uv_walk(loop, [](uv_handle_t *handle, void *arg) {
     const char* typeName = uv_handle_type_name(handle->type);
-    fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
+    //fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
     uv_close(handle, on_handle_close);
   }, NULL);
 }
@@ -248,6 +248,35 @@ void OnExit(const FunctionCallbackInfo<Value> &args) {
   }
 }
 
+void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  size_t rss;
+  int err = uv_resident_set_memory(&rss);
+  if (err) {
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
+  }
+  HeapStatistics v8_heap_stats;
+  isolate->GetHeapStatistics(&v8_heap_stats);
+  Local<Float64Array> array = args[0].As<Float64Array>();
+  Local<ArrayBuffer> ab = array->Buffer();
+  double *fields = static_cast<double *>(ab->GetContents().Data());
+  fields[0] = rss;
+  fields[1] = v8_heap_stats.total_heap_size();
+  fields[2] = v8_heap_stats.used_heap_size();
+  fields[3] = v8_heap_stats.external_memory();
+  fields[4] = v8_heap_stats.does_zap_garbage();
+  fields[5] = v8_heap_stats.heap_size_limit();
+  fields[6] = v8_heap_stats.malloced_memory();
+  fields[7] = v8_heap_stats.number_of_detached_contexts();
+  fields[8] = v8_heap_stats.number_of_native_contexts();
+  fields[9] = v8_heap_stats.peak_malloced_memory();
+  fields[10] = v8_heap_stats.total_available_size();
+  fields[11] = v8_heap_stats.total_heap_size_executable();
+  fields[12] = v8_heap_stats.total_physical_size();
+  fields[13] = isolate->AdjustAmountOfExternalAllocatedMemory(0);
+}
+
 void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
@@ -263,6 +292,7 @@ Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
   global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
   global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
+  global->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
   global->Set(String::NewFromUtf8(isolate, "library", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
   global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));

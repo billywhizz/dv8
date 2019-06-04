@@ -213,6 +213,7 @@ MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> spe
 void shutdown(uv_loop_t *loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void CollectGarbage(const FunctionCallbackInfo<Value> &args);
+void MemoryUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void OnExit(const FunctionCallbackInfo<Value> &args);
 void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args);
