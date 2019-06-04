@@ -53,8 +53,10 @@ docker build -t v8-build -f Dockerfile.v8 .
 docker build -t uv-build -f Dockerfile.uv .
 ## build sdk and runtime
 docker build -t dv8-sdk -f Dockerfile.sdk .
-## build runtime only docker image
+## build dynamic runtime only docker image
 docker build -t dv8 -f Dockerfile.runtime .
+## build static runtime only docker image
+docker build -t dv8-static -f Dockerfile.scratch .
 ## build debugger (lldb)
 docker build -t dv8-debug -f Dockerfile.debug .
 ```

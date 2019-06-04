@@ -12,7 +12,7 @@ if [[ "$CONFIG" == "release" ]]; then
 else
     export CCFLAGS="-DHTTP_PARSER_STRICT=0 -DSTATIC_BUILD=1 -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -pthread -Wall -Wextra -Wno-cast-function-type -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 fi
-export LDFLAGS="-pthread -static -rdynamic -m64 -Wl,--start-group ./dv8main.o ./dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -lrt -lm -lz -Wl,--end-group"
+export LDFLAGS="-pthread -static -rdynamic -m64 -Wl,--start-group ./dv8main.o ./dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a /usr/lib/libssl.a /usr/lib/libcrypto.a -ldl -lrt -lm -lz -Wl,--end-group"
 
 # compile the builtins
 g++ $CCFLAGS -c -o buffer.o /src/builtins/buffer.cc
@@ -53,11 +53,14 @@ g++ $CCFLAGS -I/src/modules/libz -c -o libz.o /src/modules/libz/libz.cc
 g++ $CCFLAGS -I/src/modules/socket -I/src/modules/httpParser -c -o httpParser-binding.o /src/modules/httpParser/binding.cc
 g++ $CCFLAGS -I/src/modules/socket -I/src/modules/httpParser -c -o httpParser.o /src/modules/httpParser/httpParser.cc
 
+g++ $CCFLAGS -I/src/modules/socket -I/src/modules/openssl -c -o openssl-binding.o /src/modules/openssl/binding.cc
+g++ $CCFLAGS -I/src/modules/socket -I/src/modules/openssl -c -o openssl.o /src/modules/openssl/openssl.cc
+
 # compile the dv8 core
 g++ $CCFLAGS -c -o dv8.o /src/dv8.cc
 # create the lib
 rm -f dv8.a
-ar crsT dv8.a buffer.o env.o dv8.o loop.o loop-binding.o process.o process-binding.o timer.o timer-binding.o thread.o thread-binding.o socket.o socket-binding.o udp.o udp-binding.o tty.o tty-binding.o os.o os-binding.o fs.o fs-binding.o libz.o libz-binding.o httpParser.o httpParser-binding.o http_parser.o
+ar crsT dv8.a buffer.o env.o dv8.o loop.o loop-binding.o process.o process-binding.o timer.o timer-binding.o thread.o thread-binding.o socket.o socket-binding.o udp.o udp-binding.o tty.o tty-binding.o os.o os-binding.o fs.o fs-binding.o libz.o libz-binding.o httpParser.o httpParser-binding.o http_parser.o openssl-binding.o openssl.o
 # compile the main executable
 g++ $CCFLAGS -c -o dv8main.o /src/dv8_main.cc
 # link main executable

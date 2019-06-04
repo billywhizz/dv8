@@ -33,6 +33,7 @@ void Process::Init(Local<Object> exports) {
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cpuUsage", Process::CPUUsage);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hrtime", Process::HRTime);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "sleep", Process::Sleep);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cwd", Process::Cwd);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "usleep", Process::USleep);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
   // spawn, kill, getTitle, setTitle, rss, uptime, rusage, ppid, interfaces, loadavg, exepath, cwd, chdir, homedir, tmpdir, passwd, memory, handles, hostname, getPriority, setPriority 
@@ -92,6 +93,21 @@ void Process::Sleep(const FunctionCallbackInfo<Value> &args) {
   Local<Context> context = isolate->GetCurrentContext();
   int seconds = args[0]->IntegerValue(context).ToChecked();
   sleep(seconds);
+}
+
+void Process::Cwd(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  char* cwd = (char*)calloc(1, PATH_MAX);
+  size_t size;
+  int r = uv_cwd(cwd, &size);
+  if (r == UV_ENOBUFS) {
+    free(cwd);
+    cwd = (char*)calloc(1, size);
+    r = uv_cwd(cwd, &size);
+  }
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, cwd, NewStringType::kNormal).ToLocalChecked());
+  free(cwd);
 }
 
 void Process::USleep(const FunctionCallbackInfo<Value> &args) {

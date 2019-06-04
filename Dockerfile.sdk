@@ -25,5 +25,6 @@ RUN ./platform.sh && \
     ./module.sh libz && \
     ./module.sh fs && \
     ./module.sh udp && \
-    ./http-parser.sh
+    ./http-parser.sh && \
+    ./openssl.sh
 CMD ["/bin/sh"]

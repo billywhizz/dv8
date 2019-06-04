@@ -31,7 +31,7 @@ void on_handle_close(uv_handle_t *h) {
 void shutdown(uv_loop_t *loop) {
   uv_walk(loop, [](uv_handle_t *handle, void *arg) {
     const char* typeName = uv_handle_type_name(handle->type);
-    fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
+    //fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
     uv_close(handle, on_handle_close);
   }, NULL);
 }
@@ -88,31 +88,6 @@ void Version(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), v8::V8::GetVersion(), NewStringType::kNormal).ToLocalChecked());
 }
 
-MaybeLocal<String> ReadFile(Isolate *isolate, const char *name) {
-  FILE *file = fopen(name, "rb");
-  if (file == NULL) {
-    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Bad File", v8::NewStringType::kNormal).ToLocalChecked()));
-    return v8::MaybeLocal<v8::String>();
-  }
-  fseek(file, 0, SEEK_END);
-  size_t size = ftell(file);
-  rewind(file);
-  char *chars = new char[size + 1];
-  chars[size] = '\0';
-  for (size_t i = 0; i < size;) {
-    i += fread(&chars[i], 1, size - i, file);
-    if (ferror(file)) {
-      fclose(file);
-      isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "Read Error", v8::NewStringType::kNormal).ToLocalChecked()));
-      return v8::MaybeLocal<v8::String>();
-    }
-  }
-  fclose(file);
-  v8::MaybeLocal<v8::String> result = v8::String::NewFromUtf8(isolate, chars, v8::NewStringType::kNormal, static_cast<int>(size));
-  delete[] chars;
-  return result;
-}
-
 void Print(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
@@ -136,6 +111,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
+  static std::atomic<uint64_t> inits{0};
   const char *module_name = *str;
   char lib_name[128];
   Local<Object> exports;
@@ -188,6 +164,23 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     return;
   } else if (strcmp("libz", module_name) == 0) {
 		dv8::libz::ZLib::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("openssl", module_name) == 0) {
+		inits++;
+		int loads = inits.load();
+		dv8::openssl::Hash::Init(exports);
+		dv8::openssl::Hmac::Init(exports);
+		dv8::openssl::SecureContext::Init(exports);
+		dv8::openssl::SecureSocket::Init(exports);
+		if (loads == 1) {
+			SSL_library_init();
+			BIO* bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
+			SSL_load_error_strings();
+			ERR_load_BIO_strings();
+			OpenSSL_add_all_algorithms();
+			ERR_load_crypto_strings();
+		}
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("httpParser", module_name) == 0) {
@@ -255,6 +248,35 @@ void OnExit(const FunctionCallbackInfo<Value> &args) {
   }
 }
 
+void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  size_t rss;
+  int err = uv_resident_set_memory(&rss);
+  if (err) {
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
+  }
+  HeapStatistics v8_heap_stats;
+  isolate->GetHeapStatistics(&v8_heap_stats);
+  Local<Float64Array> array = args[0].As<Float64Array>();
+  Local<ArrayBuffer> ab = array->Buffer();
+  double *fields = static_cast<double *>(ab->GetContents().Data());
+  fields[0] = rss;
+  fields[1] = v8_heap_stats.total_heap_size();
+  fields[2] = v8_heap_stats.used_heap_size();
+  fields[3] = v8_heap_stats.external_memory();
+  fields[4] = v8_heap_stats.does_zap_garbage();
+  fields[5] = v8_heap_stats.heap_size_limit();
+  fields[6] = v8_heap_stats.malloced_memory();
+  fields[7] = v8_heap_stats.number_of_detached_contexts();
+  fields[8] = v8_heap_stats.number_of_native_contexts();
+  fields[9] = v8_heap_stats.peak_malloced_memory();
+  fields[10] = v8_heap_stats.total_available_size();
+  fields[11] = v8_heap_stats.total_heap_size_executable();
+  fields[12] = v8_heap_stats.total_physical_size();
+  fields[13] = isolate->AdjustAmountOfExternalAllocatedMemory(0);
+}
+
 void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
@@ -270,6 +292,7 @@ Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
   global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
   global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
+  global->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
   global->Set(String::NewFromUtf8(isolate, "library", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
   global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));

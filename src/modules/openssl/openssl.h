@@ -2,7 +2,7 @@
 #define DV8_OpenSSL_H
 
 #include <dv8.h>
-#include <socket.h>
+#include <modules/socket/socket.h>
 #include <openssl/err.h>
 #include <openssl/dh.h>
 #include <openssl/ssl.h>
@@ -27,10 +27,6 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 using v8::Array;
-using dv8::builtins::Environment;
-using dv8::builtins::Buffer;
-using dv8::socket::Socket;
-using dv8::socket::socket_plugin;
 
 typedef struct
 {
@@ -137,12 +133,12 @@ class SecureSocket : public dv8::ObjectWrap {
     v8::Persistent<v8::Function> _onHost;
     v8::Persistent<v8::Function> _onSecure;
 		SecureContext* context;
-		dv8::socket::Socket* socket;
+		void* socket;
 		SSL* ssl;
 		BIO *output_bio;
 		BIO *input_bio;
     callbacks_t callbacks;
-		dv8::socket::socket_plugin* plugin;
+		void* plugin;
 
 	private:
 
