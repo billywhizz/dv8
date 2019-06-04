@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
     v8::TryCatch try_catch(isolate);
     v8::MaybeLocal<v8::String> base;
-    char* base_name;
+    const char* base_name;
     if (argc == 3 && strcmp("-e", argv[1]) == 0) {
       base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
       base_name = "base.js";

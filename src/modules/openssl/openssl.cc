@@ -307,7 +307,7 @@ using dv8::socket::socket_plugin;
 			sockType = args[0]->Int32Value(context).ToChecked();
 		}
 		if (sockType == SERVER_SOCKET) {
-			const SSL_METHOD* meth = TLSv1_2_server_method();
+			const SSL_METHOD* meth = TLS_server_method();
 			int r = 0;
 			SSL_CTX* ctx = SSL_CTX_new(meth);
 			if (!ctx) {
@@ -352,7 +352,7 @@ using dv8::socket::socket_plugin;
 			args.GetReturnValue().Set(Integer::New(isolate, 0));
 			return;
 		}
-		const SSL_METHOD* meth = TLSv1_2_client_method();
+		const SSL_METHOD* meth = TLS_client_method();
 		int r = 0;
 		SSL_CTX* ctx = SSL_CTX_new(meth);
 		if (!ctx) {
