@@ -318,8 +318,10 @@ using dv8::socket::socket_plugin;
 			SSL_CTX_set_app_data(ctx, obj);
 			String::Utf8Value certPath(args.GetIsolate(), args[1]);
 			String::Utf8Value keyPath(args.GetIsolate(), args[2]);
+			String::Utf8Value chainPath(args.GetIsolate(), args[3]);
 			const char *key = *keyPath;
 			const char *crtf = *certPath;
+			const char *chainf = *chainPath;
 			long options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_CIPHER_SERVER_PREFERENCE | SSL_OP_NO_COMPRESSION | SSL_OP_SINGLE_DH_USE;
 			long mode = SSL_MODE_RELEASE_BUFFERS | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER | SSL_MODE_AUTO_RETRY | SSL_MODE_ENABLE_PARTIAL_WRITE;
 			SSL_CTX_set_options(ctx, options);
@@ -335,6 +337,11 @@ using dv8::socket::socket_plugin;
 			//SSL_CTX_set_tlsext_status_arg(ctx, nullptr);
 			//SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
 			r = SSL_CTX_use_certificate_file(ctx, crtf, SSL_FILETYPE_PEM);
+			if (r != 1) {
+				args.GetReturnValue().Set(Integer::New(isolate, 4));
+				return;
+			}
+			r = SSL_CTX_use_certificate_chain_file(ctx, chainf);
 			if (r != 1) {
 				args.GetReturnValue().Set(Integer::New(isolate, 4));
 				return;

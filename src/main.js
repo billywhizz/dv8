@@ -390,11 +390,10 @@ global.evalScript = text => {
 }
 
 function runLoop () {
-  let alive = true
+  loop.run()
   do {
     loop.run()
-    alive = loop.isAlive()
-  } while (alive)
+  } while (loop.isAlive())
   loop.close()
 }
 
@@ -437,7 +436,7 @@ if (global.workerData) {
   }
   const { workerSource } = global
   delete global.workerSource
-  global.evalScript(workerSource)
+  global.evalScript(workerSource.slice(workerSource.indexOf('{') + 1, workerSource.lastIndexOf('}')))
 } else {
   process.spawn = (fun, onComplete, opts = { ipc: false }) => {
     const thread = new Thread()
@@ -485,7 +484,10 @@ if (global.workerData) {
     thread.buffer.write(argsJSON, envJSON.length + 13)
     threads[thread.id] = thread
     process.nextTick(() => {
-      thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+      thread.start(fun, (err, status) => {
+        delete threads[thread.id]
+        onComplete({ err, thread, status })
+      }, thread.buffer)
     })
     return thread
   }

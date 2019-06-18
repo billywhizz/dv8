@@ -212,24 +212,9 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	th->error.hasError = 0;
 	th->object = (void *)obj;
 	int len = strlen(*source);
-	int first = 0;
-	int last = 0;
-	int off = 0;
-	char* ss = *source;
-	while(len--) {
-		char* c = ss + off;
-		if (c[0] == '{') {
-			if (first == 0) first = off + 1;
-		} else if (c[0] == '}') {
-			last = off;
-		}
-		off++;
-	}
-	th->size = ((last - first));
+	th->size = len;
 	th->source = (char*)calloc(th->size, 1);
-	char* start = *source;
-	start += first;
-	memcpy(th->source, (void*)start, th->size);
+	strncpy(th->source, *source, len + 1);
 	obj->handle->data = (void *)th;
 	uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
 	args.GetReturnValue().Set(Integer::New(isolate, 0));
