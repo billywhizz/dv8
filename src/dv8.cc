@@ -187,6 +187,10 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
 		dv8::httpParser::HTTPParser::Init(exports);
     args.GetReturnValue().Set(exports);
     return;
+  } else if (strcmp("picoHttpParser", module_name) == 0) {
+		dv8::picoHttpParser::PicoHTTPParser::Init(exports);
+    args.GetReturnValue().Set(exports);
+    return;
   }
 #endif
   snprintf(lib_name, 128, "/usr/local/lib/%s.so", module_name);

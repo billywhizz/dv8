@@ -25,6 +25,7 @@
 #include <modules/fs/fs.h>
 #include <modules/libz/libz.h>
 #include <modules/httpParser/httpParser.h>
+#include <modules/picoHttpParser/picoHttpParser.h>
 #include <modules/openssl/openssl.h>
 #endif
 
