@@ -257,14 +257,26 @@ void on_connection(uv_stream_t *server, int status)
   {
     stream = (uv_stream_t *)malloc(sizeof(uv_tcp_t));
     status = uv_tcp_init(env->loop, (uv_tcp_t *)stream);
+    if (status != 0) {
+      fprintf(stderr, "uv_tcp_init: %i, %s\n", status, uv_strerror(status));
+    }
     status = uv_tcp_simultaneous_accepts((uv_tcp_t *)stream, 1);
+    if (status != 0) {
+      fprintf(stderr, "uv_tcp_simultaneous_accepts: %i, %s\n", status, uv_strerror(status));
+    }
   }
   else
   {
     stream = (uv_stream_t *)malloc(sizeof(uv_pipe_t));
     status = uv_pipe_init(env->loop, (uv_pipe_t *)stream, 0);
+    if (status != 0) {
+      fprintf(stderr, "uv_pipe_init: %i, %s\n", status, uv_strerror(status));
+    }
   }
   status = uv_accept(server, stream);
+  if (status != 0) {
+      fprintf(stderr, "uv_accept: %i, %s\n", status, uv_strerror(status));
+  }
   if (s->callbacks.onConnect == 1) {
       Local<Value> argv[0] = {};
       Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
@@ -279,6 +291,9 @@ void on_connection(uv_stream_t *server, int status)
       _context *ctx = context_init(stream, s);
   }
   status = uv_read_start(stream, alloc_chunk, after_read);
+  if (status != 0) {
+      fprintf(stderr, "uv_read_start: %i, %s\n", status, uv_strerror(status));
+  }
   assert(status == 0);
 }
 
