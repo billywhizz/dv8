@@ -1,6 +1,8 @@
 #!/bin/sh
 echo building dv8 platform
 CONFIG=${1:-release}
+BUILDTYPE=${2:-static}
+echo "building $BUILDTYPE dv8 platform ($CONFIG)"
 export V8_INCLUDE=/deps/v8/include
 export UV_INCLUDE=/deps/uv/include
 export V8_DEPS=/deps/v8/out.gn/x64.release/obj

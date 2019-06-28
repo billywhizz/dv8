@@ -113,6 +113,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   String::Utf8Value str(args.GetIsolate(), args[0]);
   static std::atomic<uint64_t> inits{0};
   const char *module_name = *str;
+  const char *module_path = "/usr/local/lib/";
   char lib_name[128];
   Local<Object> exports;
   bool ok = args[1]->ToObject(context).ToLocal(&exports);
@@ -193,7 +194,13 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     return;
   }
 #endif
-  snprintf(lib_name, 128, "/usr/local/lib/%s.so", module_name);
+  if (args.Length() > 2) {
+    String::Utf8Value str(args.GetIsolate(), args[2]);
+    module_path = *str;
+    snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
+  } else {
+    snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
+  }
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   if (success != 0) {
