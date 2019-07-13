@@ -7,6 +7,20 @@ namespace dv8 {
 
 namespace loop {
 
+using v8::Context;
+using v8::Function;
+using v8::FunctionCallbackInfo;
+using v8::FunctionTemplate;
+using v8::Isolate;
+using v8::Local;
+using v8::Number;
+using v8::Integer;
+using v8::Object;
+using v8::Persistent;
+using v8::String;
+using v8::Value;
+using v8::Array;
+
 typedef struct
 {
   uint8_t onIdle;
@@ -24,6 +38,8 @@ typedef struct
 static void on_idle(uv_idle_t* handle);
 static void on_check(uv_check_t* handle);
 static void on_prepare(uv_prepare_t* handle);
+
+void InitAll(Local<Object> exports);
 
 class EventLoop : public dv8::ObjectWrap {
 	public:
@@ -65,4 +81,5 @@ class EventLoop : public dv8::ObjectWrap {
 
 }
 }
+
 #endif

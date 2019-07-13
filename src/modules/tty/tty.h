@@ -8,6 +8,20 @@ namespace dv8
 
 namespace tty
 {
+using v8::Array;
+using v8::Context;
+using v8::Function;
+using v8::FunctionCallbackInfo;
+using v8::FunctionTemplate;
+using v8::Integer;
+using v8::Isolate;
+using v8::Local;
+using v8::Number;
+using v8::Object;
+using v8::Persistent;
+using v8::String;
+using v8::Value;
+
 
 static void on_close(uv_handle_t *handle);
 static void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
@@ -48,6 +62,8 @@ typedef struct
   uint8_t onDrain;
   uint8_t onEnd;
 } callbacks_t;
+
+void InitAll(Local<Object> exports);
 
 class TTY : public dv8::ObjectWrap
 {
@@ -97,4 +113,5 @@ private:
 
 } // namespace tty
 } // namespace dv8
+
 #endif

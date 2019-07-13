@@ -8,6 +8,19 @@
 namespace dv8 {
 
 namespace libz {
+using v8::Context;
+using v8::Function;
+using v8::FunctionCallbackInfo;
+using v8::FunctionTemplate;
+using v8::Isolate;
+using v8::Local;
+using v8::Number;
+using v8::Integer;
+using v8::Object;
+using v8::Persistent;
+using v8::String;
+using v8::Value;
+using v8::Array;
 
 #define Z_MIN_CHUNK 64
 #define Z_MAX_CHUNK std::numeric_limits<double>::infinity()
@@ -32,6 +45,8 @@ enum dv8_zlib_mode {
   INFLATERAW,
   UNZIP
 };
+
+void InitAll(Local<Object> exports);
 
 class ZLib : public dv8::ObjectWrap {
 	public:

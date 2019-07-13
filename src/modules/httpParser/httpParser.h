@@ -15,11 +15,12 @@ using v8::FunctionCallbackInfo;
 using v8::FunctionTemplate;
 using v8::Integer;
 using v8::Isolate;
-using v8::Local;
 using v8::Number;
-using v8::Object;
 using v8::String;
 using v8::Value;
+using v8::Local;
+using v8::Object;
+
 
 #define STRING_OFFSET 16
 
@@ -63,6 +64,8 @@ typedef struct
   uint8_t onError;
   uint8_t onBody;
 } callbacks_t;
+
+void InitAll(Local<Object> exports);
 
 class HTTPParser : public dv8::ObjectWrap {
 	public:
@@ -111,4 +114,5 @@ class HTTPParser : public dv8::ObjectWrap {
 
 }
 }
+
 #endif

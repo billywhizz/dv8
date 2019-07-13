@@ -9,6 +9,7 @@
 #include <openssl/conf.h>
 #include <openssl/engine.h>
 #include <openssl/hmac.h>
+#include <atomic>
 
 namespace dv8 {
 
@@ -49,6 +50,8 @@ static void on_plugin_close(void* obj);
 extern int VerifyCallback(int preverify_ok, X509_STORE_CTX* ctx);
 static int TLSExtStatusCallback(SSL* s, void* arg);
 static int SelectSNIContextCallback(SSL* s, int* ad, void* arg);
+
+void InitAll(v8::Local<v8::Object> exports);
 
 class Hmac : public dv8::ObjectWrap {
 	public:
@@ -166,4 +169,5 @@ static int start_ssl(SecureSocket* secure);
 
 }
 }
+
 #endif

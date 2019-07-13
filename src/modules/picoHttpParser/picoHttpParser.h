@@ -41,6 +41,7 @@ typedef struct
   uint8_t onBody;
 } callbacks_t;
 
+void InitAll(Local<Object> exports);
 
 class PicoHTTPParser : public dv8::ObjectWrap {
 	public:
@@ -67,4 +68,5 @@ class PicoHTTPParser : public dv8::ObjectWrap {
 
 }
 }
+
 #endif

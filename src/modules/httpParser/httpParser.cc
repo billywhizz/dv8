@@ -9,6 +9,10 @@ using dv8::builtins::Buffer;
 using dv8::socket::Socket;
 using dv8::socket::socket_plugin;
 
+void InitAll(Local<Object> exports) {
+	HTTPParser::Init(exports);
+}
+
 int message_begin_cb(http_parser *parser) {
 	_context *context = (_context *)parser->data;
 	context->request->urllength = 0;

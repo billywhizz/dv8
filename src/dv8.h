@@ -11,7 +11,6 @@
 #include <buffer.h>
 #include <env.h>
 #include <string.h>
-#include <atomic>
 
 #ifdef STATIC_BUILD
 #include <modules/loop/loop.h>

@@ -8,6 +8,10 @@ using dv8::builtins::Buffer;
 using dv8::socket::Socket;
 using dv8::socket::socket_plugin;
 
+	void InitAll(Local<Object> exports) {
+		PicoHTTPParser::Init(exports);
+	}
+
 	void PicoHTTPParser::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
