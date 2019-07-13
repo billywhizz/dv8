@@ -111,8 +111,8 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
-  static std::atomic<uint64_t> inits{0};
   const char *module_name = *str;
+  const char *module_path = "/usr/local/lib/";
   char lib_name[128];
   Local<Object> exports;
   bool ok = args[1]->ToObject(context).ToLocal(&exports);
@@ -122,74 +122,70 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   }
 #ifdef STATIC_BUILD
   if (strcmp("loop", module_name) == 0) {
-		dv8::loop::EventLoop::Init(exports);
+		dv8::loop::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("socket", module_name) == 0) {
-		dv8::socket::Socket::Init(exports);
+		dv8::socket::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("timer", module_name) == 0) {
-		dv8::timer::Timer::Init(exports);
+		dv8::timer::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("thread", module_name) == 0) {
-		dv8::thread::Thread::Init(exports);
+		dv8::thread::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("process", module_name) == 0) {
-		dv8::process::Process::Init(exports);
+		dv8::process::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("udp", module_name) == 0) {
-		dv8::udp::UDP::Init(exports);
+		dv8::udp::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("os", module_name) == 0) {
-		dv8::os::OS::Init(exports);
+		dv8::os::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("tty", module_name) == 0) {
-		dv8::tty::TTY::Init(exports);
+		dv8::tty::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("os", module_name) == 0) {
-		dv8::os::OS::Init(exports);
+		dv8::os::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("fs", module_name) == 0) {
-		dv8::fs::FileSystem::Init(exports);
-		dv8::fs::File::Init(exports);
+		dv8::fs::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("libz", module_name) == 0) {
-		dv8::libz::ZLib::Init(exports);
+		dv8::libz::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("openssl", module_name) == 0) {
-		inits++;
-		int loads = inits.load();
-		dv8::openssl::Hash::Init(exports);
-		dv8::openssl::Hmac::Init(exports);
-		dv8::openssl::SecureContext::Init(exports);
-		dv8::openssl::SecureSocket::Init(exports);
-		if (loads == 1) {
-			SSL_library_init();
-			BIO* bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
-			SSL_load_error_strings();
-			ERR_load_BIO_strings();
-			OpenSSL_add_all_algorithms();
-			ERR_load_crypto_strings();
-		}
+		dv8::openssl::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("httpParser", module_name) == 0) {
-		dv8::httpParser::HTTPParser::Init(exports);
+		dv8::httpParser::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("picoHttpParser", module_name) == 0) {
+		dv8::picoHttpParser::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   }
 #endif
-  snprintf(lib_name, 128, "/usr/local/lib/%s.so", module_name);
+  if (args.Length() > 2) {
+    String::Utf8Value str(args.GetIsolate(), args[2]);
+    module_path = *str;
+    snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
+  } else {
+    snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
+  }
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   if (success != 0) {
@@ -221,7 +217,11 @@ MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> spe
 
 void CollectGarbage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
-  isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+  //isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+  bool stop = false;
+  while(!stop) {
+    stop = isolate->IdleNotificationDeadline(1);  
+  }
 }
 
 void EnvVars(const FunctionCallbackInfo<Value> &args) {

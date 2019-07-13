@@ -8,6 +8,22 @@ namespace dv8
 
 namespace thread
 {
+
+using v8::Array;
+using v8::ArrayBufferCreationMode;
+using v8::Context;
+using v8::Function;
+using v8::FunctionCallbackInfo;
+using v8::FunctionTemplate;
+using v8::Integer;
+using v8::Isolate;
+using v8::Local;
+using v8::Number;
+using v8::Object;
+using v8::Persistent;
+using v8::String;
+using v8::Value;
+
 typedef struct
 {
 	void *data;
@@ -18,6 +34,8 @@ typedef struct
 	char* name;
 	js_error error;
 } thread_handle;
+
+void InitAll(Local<Object> exports);
 
 class Thread : public dv8::ObjectWrap
 {

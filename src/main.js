@@ -1,3 +1,8 @@
+const ENV = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+if (ENV.DV8_MODULES) {
+  const _library = global.library
+  global.library = (name, exports) => _library(name, exports, ENV.DV8_MODULES)
+}
 const { Process } = library('process', {})
 const { Timer } = library('timer', {})
 const { Thread } = library('thread', {})
@@ -390,11 +395,10 @@ global.evalScript = text => {
 }
 
 function runLoop () {
-  let alive = true
+  loop.run()
   do {
     loop.run()
-    alive = loop.isAlive()
-  } while (alive)
+  } while (loop.isAlive())
   loop.close()
 }
 
@@ -437,7 +441,7 @@ if (global.workerData) {
   }
   const { workerSource } = global
   delete global.workerSource
-  global.evalScript(workerSource)
+  global.evalScript(workerSource.slice(workerSource.indexOf('{') + 1, workerSource.lastIndexOf('}')))
 } else {
   process.spawn = (fun, onComplete, opts = { ipc: false }) => {
     const thread = new Thread()
@@ -485,11 +489,14 @@ if (global.workerData) {
     thread.buffer.write(argsJSON, envJSON.length + 13)
     threads[thread.id] = thread
     process.nextTick(() => {
-      thread.start(fun, (err, status) => onComplete({ err, thread, status }), thread.buffer)
+      thread.start(fun, (err, status) => {
+        delete threads[thread.id]
+        onComplete({ err, thread, status })
+      }, thread.buffer)
     })
     return thread
   }
-  process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+  process.env = ENV
   process.PID = _process.pid()
   process.TID = 0
   process.args = global.args
