@@ -1,13 +1,26 @@
-const { Process } = library('process', {})
-const time = new BigInt64Array(1)
-const process = new Process()
-process.hrtime(time)
-const source = global.args[2]
-Function('global', `"use strict";\n${source}`)(global) // eslint-disable-line no-new-func
+if (!global.workerSource) {
+  const ENV = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+  if (ENV.DV8_MODULES) {
+    const _library = global.library
+    global.library = (name, exports) => _library(name, exports, ENV.DV8_MODULES)
+  }
+}
 const { EventLoop } = library('loop', {})
 const loop = new EventLoop()
-process.hrtime(time)
-do {
+let source
+if (global.workerSource) {
+  const { workerSource } = global
+  delete global.workerSource
+  source = workerSource.slice(workerSource.indexOf('{') + 1, workerSource.lastIndexOf('}'))
+} else {
+  source = global.args[2]
+}
+function runLoop () {
   loop.run()
-} while (loop.isAlive())
-loop.close()
+  do {
+    loop.run()
+  } while (loop.isAlive())
+  loop.close()
+}
+Function('global', `"use strict";\n${source}`)(global) // eslint-disable-line no-new-func
+runLoop()

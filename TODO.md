@@ -1,3 +1,17 @@
+## lines
+480 lines of javascript
+900 lines of cpp
+
+dv8.h 229
+dv8.cc 291
+dv8_main.cc 83
+bultins/buffer.cc 91
+builtins/buffer.h 38
+builtins/common.h 96
+builtins/env.cc 7
+builtins/env.h 30
+
+
 ## platform
 thread ips on domain socket with tls using shared cert passed by master to thread
 at startup, master generates a cert

@@ -117,7 +117,7 @@ RUN cd /tmp/v8 \
       v8_deprecation_warnings=false \
       v8_enable_gdbjit=false \
       v8_imminent_deprecation_warnings=false \
-      v8_untrusted_code_mitigations=false \
+      v8_untrusted_code_mitigations=false \ # https://v8.dev/docs/untrusted-code-mitigations
       disable_glibcxx_debug=false
 
 RUN cd /tmp/v8 \

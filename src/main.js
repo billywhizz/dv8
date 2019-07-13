@@ -1,3 +1,8 @@
+const ENV = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+if (ENV.DV8_MODULES) {
+  const _library = global.library
+  global.library = (name, exports) => _library(name, exports, ENV.DV8_MODULES)
+}
 const { Process } = library('process', {})
 const { Timer } = library('timer', {})
 const { Thread } = library('thread', {})
@@ -491,7 +496,7 @@ if (global.workerData) {
     })
     return thread
   }
-  process.env = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+  process.env = ENV
   process.PID = _process.pid()
   process.TID = 0
   process.args = global.args

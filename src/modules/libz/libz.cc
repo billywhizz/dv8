@@ -3,21 +3,12 @@
 namespace dv8 {
 
 namespace libz {
-	using v8::Context;
-	using v8::Function;
-	using v8::FunctionCallbackInfo;
-	using v8::FunctionTemplate;
-	using v8::Isolate;
-	using v8::Local;
-	using v8::Number;
-	using v8::Integer;
-	using v8::Object;
-	using v8::Persistent;
-	using v8::String;
-	using v8::Value;
-	using v8::Array;
-	using dv8::builtins::Environment;
-	using dv8::builtins::Buffer;
+using dv8::builtins::Environment;
+using dv8::builtins::Buffer;
+
+	void InitAll(Local<Object> exports) {
+		ZLib::Init(exports);
+	}
 
   static void* AllocForZlib(void* data, uInt items, uInt size) {
     ZLib* ctx = static_cast<ZLib*>(data);

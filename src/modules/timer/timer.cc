@@ -6,19 +6,11 @@ namespace dv8
 namespace timer
 {
 using dv8::builtins::Environment;
-using v8::Array;
-using v8::Context;
-using v8::Function;
-using v8::FunctionCallbackInfo;
-using v8::FunctionTemplate;
-using v8::Integer;
-using v8::Isolate;
-using v8::Local;
-using v8::Number;
-using v8::Object;
-using v8::Persistent;
-using v8::String;
-using v8::Value;
+
+void InitAll(Local<Object> exports)
+{
+  Timer::Init(exports);
+}
 
 void Timer::Init(Local<Object> exports)
 {
@@ -120,9 +112,9 @@ void Timer::OnTimeout(uv_timer_t *handle)
     v8::HandleScope handleScope(isolate);
     const unsigned int argc = 0;
     Local<Value> argv[argc] = {};
-    Local<Function> foo = Local<Function>::New(isolate, t->onTimeout);
+    Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
     v8::TryCatch try_catch(isolate);
-    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    cb->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
     }

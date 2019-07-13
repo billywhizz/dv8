@@ -4,23 +4,11 @@ namespace dv8 {
 
 namespace process {
 using dv8::builtins::Environment;
-using v8::Array;
-using v8::BigUint64Array;
-using v8::Context;
-using v8::Float64Array;
-using v8::Function;
-using v8::FunctionCallbackInfo;
-using v8::FunctionTemplate;
-using v8::HeapSpaceStatistics;
-using v8::HeapStatistics;
-using v8::Integer;
-using v8::Isolate;
-using v8::Local;
-using v8::Number;
-using v8::Object;
-using v8::Persistent;
-using v8::String;
-using v8::Value;
+
+void InitAll(Local<Object> exports)
+{
+  Process::Init(exports);
+}
 
 void Process::Init(Local<Object> exports) {
   Isolate *isolate = exports->GetIsolate();

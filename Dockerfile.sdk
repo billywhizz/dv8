@@ -1,6 +1,6 @@
 FROM alpine:3.9 as dv8-sdk
 WORKDIR /build
-RUN apk add --update --no-cache g++ zlib-dev openssl-dev
+RUN apk add --update --no-cache g++ zlib-dev openssl-dev ccache
 RUN mkdir -p /out/bin
 RUN mkdir -p /out/lib
 COPY --from=v8-build /tmp/v8/include /deps/v8/include

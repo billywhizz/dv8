@@ -8,20 +8,11 @@ namespace thread
 {
 using dv8::builtins::Buffer;
 using dv8::builtins::Environment;
-using v8::Array;
-using v8::ArrayBufferCreationMode;
-using v8::Context;
-using v8::Function;
-using v8::FunctionCallbackInfo;
-using v8::FunctionTemplate;
-using v8::Integer;
-using v8::Isolate;
-using v8::Local;
-using v8::Number;
-using v8::Object;
-using v8::Persistent;
-using v8::String;
-using v8::Value;
+
+void InitAll(Local<Object> exports)
+{
+	Thread::Init(exports);
+}
 
 void start_context(uv_work_t *req)
 {
@@ -89,7 +80,9 @@ void start_context(uv_work_t *req)
 			dv8::ReportException(isolate, &try_catch);
 			return;
 		}
-		globalInstance->Set(String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
+		if (th->size > 0) {
+			globalInstance->Set(String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
+		}
 		module->Evaluate(context);
 	}
 	isolate->Dispose();
@@ -112,6 +105,7 @@ void on_context_complete(uv_work_t *req, int status)
 		errObj = Local<Object>::New(isolate, env->err);
 	}
 	js_error* jsError = &th->error;
+	free(th);
 	if (jsError->hasError == 1) {
 		Local<Object> o = Object::New(isolate);
 		o->Set(String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
@@ -216,8 +210,8 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	th->source = (char*)calloc(th->size, 1);
 	strncpy(th->source, *source, len + 1);
 	obj->handle->data = (void *)th;
-	uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
-	args.GetReturnValue().Set(Integer::New(isolate, 0));
+	int r = uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
+	args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
 } // namespace thread

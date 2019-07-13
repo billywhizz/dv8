@@ -9,6 +9,10 @@ using dv8::builtins::Buffer;
 using dv8::socket::Socket;
 using dv8::socket::socket_plugin;
 
+void InitAll(Local<Object> exports) {
+	HTTPParser::Init(exports);
+}
+
 int message_begin_cb(http_parser *parser) {
 	_context *context = (_context *)parser->data;
 	context->request->urllength = 0;
@@ -181,7 +185,6 @@ void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args) {
 }
 
 void on_plugin_close(void* obj) {
-	//fprintf(stderr, "parser.on_close\n");
 	socket_plugin* plugin = (socket_plugin*)obj;
 	HTTPParser* parser = (HTTPParser*)plugin->data;
 	dv8::socket::socket_plugin* parserPlugin = (dv8::socket::socket_plugin*)parser->plugin;
