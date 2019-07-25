@@ -14,19 +14,20 @@ void InitAll(Local<Object> exports)
 	Thread::Init(exports);
 }
 
-void start_context(uv_work_t *req)
+void start_context(void *data)
 {
-	thread_handle *th = (thread_handle *)req->data;
+	thread_handle *th = (thread_handle *)data;
 
 	v8::Isolate::CreateParams create_params;
 	create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
 	v8::Isolate *isolate = v8::Isolate::New(create_params);
 	{
+		//v8::Locker lock(isolate);
+		v8::Isolate::Scope isolate_scope(isolate);
+		v8::HandleScope handle_scope(isolate);
 		isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
 		isolate->SetFatalErrorHandler(dv8::OnFatalError);
 		isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
-		v8::Isolate::Scope isolate_scope(isolate);
-		v8::HandleScope handle_scope(isolate);
 		isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
 		Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
 		global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
@@ -58,7 +59,7 @@ void start_context(uv_work_t *req)
 		env->loop = loop;
 		uv_loop_init(loop);
 
-		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len));
+		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
 		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, th->name, v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
 			v8::Integer::New(isolate, 0), 
@@ -87,11 +88,19 @@ void start_context(uv_work_t *req)
 	}
 	isolate->Dispose();
 	delete create_params.array_buffer_allocator;
+	uv_async_send(th->async);
 }
 
-void on_context_complete(uv_work_t *req, int status)
+void on_thread_close(uv_handle_t *handle)
 {
-	thread_handle *th = (thread_handle *)req->data;
+		//free(handle);
+}
+
+void on_context_complete(uv_async_t *async)
+{
+	thread_handle *th = (thread_handle *)async->data;
+	uv_handle_t* handle = (uv_handle_t*)async;
+	uv_close(handle, on_thread_close);
 	Thread *t = (Thread *)th->object;
 	Isolate *isolate = Isolate::GetCurrent();
 	v8::HandleScope handleScope(isolate);
@@ -122,19 +131,19 @@ void on_context_complete(uv_work_t *req, int status)
 			free(jsError->sourceline);
 		}
 		if (jsError->stack) {
-			//o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
-			//free(jsError->stack);
+			o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
+			free(jsError->stack);
 		}
-		Local<Value> argv[2] = { o, Integer::New(isolate, status) };
+		Local<Value> argv[1] = { o };
 		v8::TryCatch try_catch(isolate);
-		foo->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+		foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
 		if (try_catch.HasCaught()) {
 			dv8::ReportException(isolate, &try_catch);
 		}
 	} else {
-		Local<Value> argv[2] = { v8::Null(isolate), Integer::New(isolate, status) };
+		Local<Value> argv[1] = { v8::Null(isolate) };
 		v8::TryCatch try_catch(isolate);
-		foo->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+		foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
 		if (try_catch.HasCaught()) {
 			dv8::ReportException(isolate, &try_catch);
 		}
@@ -186,13 +195,13 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	int argc = args.Length();
 	Thread *obj = ObjectWrap::Unwrap<Thread>(args.Holder());
 	Local<Function> threadFunc = Local<Function>::Cast(args[0]);
-	String::Utf8Value function_name(args.GetIsolate(), threadFunc->GetName());
+	String::Utf8Value function_name(isolate, threadFunc->GetName());
 	Local<Function> onComplete = Local<Function>::Cast(args[1]);
 	Local<String> sourceString = threadFunc->ToString(isolate);
 	String::Utf8Value source(isolate, sourceString);
 	obj->onComplete.Reset(isolate, onComplete);
-	obj->handle = (uv_work_t *)malloc(sizeof(uv_work_t));
 	thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
+	obj->handle = th;
 	if (argc > 2) {
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
 		size_t len = b->_length;
@@ -208,11 +217,20 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	int len = strlen(*source);
 	th->size = len;
 	th->source = (char*)calloc(th->size, 1);
+	th->async = (uv_async_t*)calloc(1, sizeof(uv_async_t));
+	th->async->data = th;
+	uv_async_init(env->loop, th->async, on_context_complete);
 	strncpy(th->source, *source, len + 1);
-	obj->handle->data = (void *)th;
-	int r = uv_queue_work(env->loop, obj->handle, start_context, on_context_complete);
+	int r = uv_thread_create(&th->tid, start_context, (void*)th);
+	//int r = pthread_create(&th->tid, NULL, start_context, (void*)th);
 	args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
 } // namespace thread
 } // namespace dv8
+
+extern "C" {
+	void* _register_thread() {
+		return (void*)dv8::thread::InitAll;
+	}
+}

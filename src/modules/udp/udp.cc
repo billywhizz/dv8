@@ -271,3 +271,9 @@ namespace udp {
 
 }
 }	
+
+extern "C" {
+	void* _register_udp() {
+		return (void*)dv8::udp::InitAll;
+	}
+}

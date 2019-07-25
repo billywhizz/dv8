@@ -502,3 +502,9 @@ void TTY::onError(const v8::FunctionCallbackInfo<v8::Value> &args)
 
 } // namespace tty
 } // namespace dv8
+
+extern "C" {
+	void* _register_tty() {
+		return (void*)dv8::tty::InitAll;
+	}
+}

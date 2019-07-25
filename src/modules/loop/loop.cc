@@ -294,3 +294,9 @@ using dv8::builtins::Buffer;
 	
 }
 }	
+
+extern "C" {
+	void* _register_loop() {
+		return (void*)dv8::loop::InitAll;
+	}
+}

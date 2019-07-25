@@ -1182,3 +1182,9 @@ void Socket::Bind(const FunctionCallbackInfo<Value> &args)
 }
 } // namespace socket
 } // namespace dv8
+
+extern "C" {
+	void* _register_socket() {
+		return (void*)dv8::socket::InitAll;
+	}
+}

@@ -252,4 +252,10 @@ using dv8::builtins::Buffer;
 
 
 }
-}	
+}
+
+extern "C" {
+	void* _register_fs() {
+		return (void*)dv8::fs::InitAll;
+	}
+}

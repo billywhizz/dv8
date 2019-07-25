@@ -120,7 +120,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     args.GetReturnValue().Set(Null(isolate));
     return;
   }
-#ifdef STATIC_BUILD
+  #ifdef STATIC_BUILD
   if (strcmp("loop", module_name) == 0) {
 		dv8::loop::InitAll(exports);
     args.GetReturnValue().Set(exports);
@@ -137,48 +137,40 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
 		dv8::thread::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
+  } else if (strcmp("fs", module_name) == 0) {
+		dv8::fs::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
   } else if (strcmp("process", module_name) == 0) {
 		dv8::process::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("os", module_name) == 0) {
+		dv8::os::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("udp", module_name) == 0) {
 		dv8::udp::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
-  } else if (strcmp("os", module_name) == 0) {
-		dv8::os::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("tty", module_name) == 0) {
-		dv8::tty::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("os", module_name) == 0) {
-		dv8::os::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("fs", module_name) == 0) {
-		dv8::fs::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
   } else if (strcmp("libz", module_name) == 0) {
 		dv8::libz::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("openssl", module_name) == 0) {
-		dv8::openssl::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("httpParser", module_name) == 0) {
 		dv8::httpParser::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
-  } else if (strcmp("picoHttpParser", module_name) == 0) {
-		dv8::picoHttpParser::InitAll(exports);
+  } else if (strcmp("openssl", module_name) == 0) {
+		dv8::openssl::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("tty", module_name) == 0) {
+		dv8::tty::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
   }
-#endif
+  #endif
   if (args.Length() > 2) {
     String::Utf8Value str(args.GetIsolate(), args[2]);
     module_path = *str;

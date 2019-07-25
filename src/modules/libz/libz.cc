@@ -224,3 +224,9 @@ using dv8::builtins::Buffer;
 	
 }
 }	
+
+extern "C" {
+	void* _register_libz() {
+		return (void*)dv8::libz::InitAll;
+	}
+}

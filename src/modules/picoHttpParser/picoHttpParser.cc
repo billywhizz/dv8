@@ -136,3 +136,9 @@ using dv8::socket::socket_plugin;
 	
 }
 }	
+
+extern "C" {
+	void* _register_picoHttpParser() {
+		return (void*)dv8::picoHttpParser::InitAll;
+	}
+}

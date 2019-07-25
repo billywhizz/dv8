@@ -5,16 +5,10 @@ uint64_t start;
 
 int main(int argc, char *argv[]) {
   start = uv_hrtime();
-  //fprintf(stderr, "start: %lu\n", start);
   std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
   v8::V8::InitializePlatform(platform.get());
   v8::V8::Initialize();
   v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
-  //const char *flags = "--optimize-for-size --use-strict --max-old-space-size=8 --no-expose-wasm --predictable --single-threaded --single-threaded-gc";
-  //int flaglen = strlen(flags);
-  //v8::V8::SetFlagsFromString(flags, flaglen);
-  // Disable stdio buffering, it interacts poorly with printf()
-  // calls elsewhere in the program (e.g., any logging from V8.)
   setvbuf(stdout, nullptr, _IONBF, 0);
   setvbuf(stderr, nullptr, _IONBF, 0);
 
@@ -48,7 +42,7 @@ int main(int argc, char *argv[]) {
 
     v8::TryCatch try_catch(isolate);
     v8::MaybeLocal<v8::String> base;
-    const char* base_name;
+     const char* base_name;
     if (argc == 3 && strcmp("-e", argv[1]) == 0) {
       base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
       base_name = "base.js";
@@ -56,7 +50,7 @@ int main(int argc, char *argv[]) {
       base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len));
       base_name = "main.js";
     }
-    // https://v8docs.nodesource.com/node-10.6/db/d84/classv8_1_1_script_origin.html
+   // https://v8docs.nodesource.com/node-10.6/db/d84/classv8_1_1_script_origin.html
     v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, base_name, v8::NewStringType::kNormal).ToLocalChecked(), // resource name
       v8::Integer::New(isolate, 0), // line offset
       v8::Integer::New(isolate, 0),  // column offset
@@ -78,8 +72,6 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     uint64_t now = uv_hrtime();
-    //fprintf(stderr, "bootstrap: %lu\n", now - start);
-    //fprintf(stderr, "           %lu\n", now);
     module->Evaluate(context);
 
     v8::platform::PumpMessageLoop(platform.get(), isolate);

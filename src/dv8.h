@@ -14,17 +14,16 @@
 
 #ifdef STATIC_BUILD
 #include <modules/loop/loop.h>
-#include <modules/socket/socket.h>
 #include <modules/timer/timer.h>
 #include <modules/thread/thread.h>
 #include <modules/process/process.h>
-#include <modules/udp/udp.h>
 #include <modules/tty/tty.h>
 #include <modules/os/os.h>
 #include <modules/fs/fs.h>
+#include <modules/socket/socket.h>
+#include <modules/udp/udp.h>
 #include <modules/libz/libz.h>
 #include <modules/httpParser/httpParser.h>
-#include <modules/picoHttpParser/picoHttpParser.h>
 #include <modules/openssl/openssl.h>
 #endif
 
@@ -114,7 +113,10 @@ class InspectorFrontend final : public V8Inspector::Channel {
     if (callback->IsFunction()) {
       v8::TryCatch try_catch(isolate_);
       Local<Value> args[] = {message};
-      Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 1, args);
+      Local<Value> ret = Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 1, args).ToLocalChecked();
+      if (ret->IsNull()) {
+
+      }
     }
   }
 
@@ -145,7 +147,10 @@ class InspectorClient : public V8InspectorClient {
     if (callback->IsFunction()) {
       v8::TryCatch try_catch(isolate_);
       Local<Value> args[] = {};
-      Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args);
+      Local<Value> ret = Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args).ToLocalChecked();
+      if (ret->IsNull()) {
+
+      }
     }
   }
 
@@ -156,7 +161,10 @@ class InspectorClient : public V8InspectorClient {
     if (callback->IsFunction()) {
       v8::TryCatch try_catch(isolate_);
       Local<Value> args[] = {};
-      Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args);
+      Local<Value> ret = Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args).ToLocalChecked();
+      if (ret->IsNull()) {
+
+      }
     }
   }
 

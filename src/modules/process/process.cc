@@ -23,6 +23,7 @@ void Process::Init(Local<Object> exports) {
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "sleep", Process::Sleep);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cwd", Process::Cwd);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "usleep", Process::USleep);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "nanosleep", Process::NanoSleep);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
   // spawn, kill, getTitle, setTitle, rss, uptime, rusage, ppid, interfaces, loadavg, exepath, cwd, chdir, homedir, tmpdir, passwd, memory, handles, hostname, getPriority, setPriority 
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
@@ -106,6 +107,18 @@ void Process::USleep(const FunctionCallbackInfo<Value> &args) {
   usleep(microseconds);
 }
 
+void Process::NanoSleep(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  int seconds = args[0]->IntegerValue(context).ToChecked();
+  int nanoseconds = args[1]->IntegerValue(context).ToChecked();
+  struct timespec sleepfor;
+  sleepfor.tv_sec = seconds;
+  sleepfor.tv_nsec = nanoseconds;
+  nanosleep(&sleepfor, NULL);
+}
+
 void Process::MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
@@ -160,3 +173,9 @@ void Process::HRTime(const FunctionCallbackInfo<Value> &args) {
 
 } // namespace process
 } // namespace dv8
+
+extern "C" {
+	void* _register_process() {
+		return (void*)dv8::process::InitAll;
+	}
+}

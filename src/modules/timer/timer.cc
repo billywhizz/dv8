@@ -112,8 +112,8 @@ void Timer::OnTimeout(uv_timer_t *handle)
     v8::HandleScope handleScope(isolate);
     const unsigned int argc = 0;
     Local<Value> argv[argc] = {};
-    Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
     v8::TryCatch try_catch(isolate);
+    Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
     cb->Call(isolate->GetCurrentContext()->Global(), 0, argv);
     if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
@@ -122,3 +122,9 @@ void Timer::OnTimeout(uv_timer_t *handle)
 
 } // namespace timer
 } // namespace dv8
+
+extern "C" {
+	void* _register_timer() {
+		return (void*)dv8::timer::InitAll;
+	}
+}

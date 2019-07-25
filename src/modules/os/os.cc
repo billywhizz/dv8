@@ -83,3 +83,9 @@ void OS::on_signal(uv_signal_t *handle, int signum)
 
 } // namespace os
 } // namespace dv8
+
+extern "C" {
+	void* _register_os() {
+		return (void*)dv8::os::InitAll;
+	}
+}

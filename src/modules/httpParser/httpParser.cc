@@ -324,3 +324,9 @@ void HTTPParser::onError(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 } // namespace httpParser
 } // namespace dv8
+
+extern "C" {
+	void* _register_httpParser() {
+		return (void*)dv8::httpParser::InitAll;
+	}
+}

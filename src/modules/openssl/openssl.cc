@@ -739,3 +739,9 @@ using dv8::socket::socket_plugin;
 
 }
 }	
+
+extern "C" {
+	void* _register_openssl() {
+		return (void*)dv8::openssl::InitAll;
+	}
+}
