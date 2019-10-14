@@ -1,12 +1,12 @@
-FROM alpine:3.9 as dv8-sdk
+FROM debian:stretch-slim as dv8-sdk
 WORKDIR /build
-RUN apk add --update --no-cache g++ zlib-dev openssl-dev ccache
+RUN apt update && apt upgrade -y && apt install -y g++ make libssl-dev ccache zlib1g-dev
 RUN mkdir -p /out/bin
 RUN mkdir -p /out/lib
-COPY --from=v8-build /tmp/v8/include /deps/v8/include
-COPY --from=v8-build /tmp/v8/out.gn/x64.release/obj/libv8_monolith.a /deps/v8/out.gn/x64.release/obj/libv8_monolith.a
+COPY --from=v8-build /build/v8/include /deps/v8/include
+COPY --from=v8-build /build/v8/out.gn/x64.release/obj/libv8_monolith.a /deps/v8/libv8_monolith.a
 COPY --from=uv-build /source/uv/include /deps/uv/include
-COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/out/Release/libuv.a
+COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
 COPY build/platform-dynamic.sh /build/platform-dynamic.sh

@@ -4,8 +4,8 @@ CONFIG=${2:-release}
 echo building module $MODULE_NAME
 export V8_INCLUDE=/deps/v8/include
 export UV_INCLUDE=/deps/uv/include
-export V8_DEPS=/deps/v8/out.gn/x64.release/obj
-export UV_DEPS=/deps/uv/out/Release
+export V8_DEPS=/deps/v8
+export UV_DEPS=/deps/uv
 export BUILTINS=/src/builtins
 export MODULE_DIR=/src/modules/$MODULE_NAME
 export SOCKET_DIR=/src/modules/socket

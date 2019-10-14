@@ -3,8 +3,8 @@ CONFIG=${1:-release}
 echo "building dynamic dv8 platform ($CONFIG)"
 export V8_INCLUDE=/deps/v8/include
 export UV_INCLUDE=/deps/uv/include
-export V8_DEPS=/deps/v8/out.gn/x64.release/obj
-export UV_DEPS=/deps/uv/out/Release
+export V8_DEPS=/deps/v8
+export UV_DEPS=/deps/uv
 export BUILTINS=/src/builtins
 
 if [[ "$CONFIG" == "release" ]]; then
