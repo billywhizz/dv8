@@ -9,6 +9,7 @@ build/dv8
 *.ods
 build/count
 *.gz
+*.a
 scratch
 deploy.sh
 out
