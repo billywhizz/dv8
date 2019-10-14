@@ -3,28 +3,28 @@ WORKDIR /build
 RUN apt update && apt upgrade -y && apt install -y g++ make libssl-dev ccache zlib1g-dev
 RUN mkdir -p /out/bin
 RUN mkdir -p /out/lib
-COPY --from=v8-build /build/v8/include /deps/v8/include
-COPY --from=v8-build /build/v8/out.gn/x64.release/obj/libv8_monolith.a /deps/v8/libv8_monolith.a
-COPY --from=uv-build /source/uv/include /deps/uv/include
-COPY --from=uv-build /source/uv/out/Release/libuv.a /deps/uv/libuv.a
+COPY deps/v8/include /deps/v8/include
+COPY deps/v8/libv8_monolith.a /deps/v8/libv8_monolith.a
+COPY deps/uv/include /deps/uv/include
+COPY deps/uv/libuv.a /deps/uv/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
 COPY build/platform-dynamic.sh /build/platform-dynamic.sh
 COPY build/module.sh /build/module.sh
 COPY build/http-parser.sh /build/http-parser.sh
 COPY build/openssl.sh /build/openssl.sh
-RUN ./platform.sh && \
-    ./platform-dynamic.sh && \
-    ./module.sh os && \
-    ./module.sh process && \
-    ./module.sh socket && \
-    ./module.sh thread && \
-    ./module.sh timer && \
-    ./module.sh tty && \
-    ./module.sh loop && \
-    ./module.sh libz && \
-    ./module.sh fs && \
-    ./module.sh udp && \
-    ./http-parser.sh && \
-    ./openssl.sh
+#RUN ./platform.sh && \
+#    ./platform-dynamic.sh && \
+#    ./module.sh os && \
+#    ./module.sh process && \
+#    ./module.sh socket && \
+#    ./module.sh thread && \
+#    ./module.sh timer && \
+#    ./module.sh tty && \
+#    ./module.sh loop && \
+#    ./module.sh libz && \
+#    ./module.sh fs && \
+#    ./module.sh udp && \
+#    ./http-parser.sh && \
+#    ./openssl.sh
 CMD ["/bin/sh"]
