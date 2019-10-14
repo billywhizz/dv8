@@ -1,7 +1,7 @@
 ## Build libuv
-FROM alpine:3.9 as uv-build
+FROM debian:stretch-slim as uv-build
 WORKDIR /source
-RUN apk add --update --no-cache --virtual .build-deps make g++ python gcc git
+RUN apt update && apt upgrade -y && apt install -y git curl python lsb-release sudo g++ wget make
 RUN wget "https://github.com/libuv/libuv/archive/v1.30.1.tar.gz" \
     && tar -zxvf v1.30.1.tar.gz \
     && mv libuv-1.30.1 uv
