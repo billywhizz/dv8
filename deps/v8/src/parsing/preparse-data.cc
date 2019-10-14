@@ -8,12 +8,13 @@
 
 #include "src/ast/scopes.h"
 #include "src/ast/variables.h"
-#include "src/handles.h"
-#include "src/objects-inl.h"
+#include "src/handles/handles.h"
+#include "src/objects/objects-inl.h"
 #include "src/objects/shared-function-info.h"
 #include "src/parsing/parser.h"
 #include "src/parsing/preparse-data-impl.h"
 #include "src/parsing/preparser.h"
+#include "src/zone/zone-list-inl.h"  // crbug.com/v8/8816
 
 namespace v8 {
 namespace internal {
@@ -29,8 +30,10 @@ class VariableContextAllocatedField
     : public BitField8<bool, VariableMaybeAssignedField::kNext, 1> {};
 
 class HasDataField : public BitField<bool, 0, 1> {};
+class LengthEqualsParametersField
+    : public BitField<bool, HasDataField::kNext, 1> {};
 class NumberOfParametersField
-    : public BitField<uint16_t, HasDataField::kNext, 16> {};
+    : public BitField<uint16_t, LengthEqualsParametersField::kNext, 16> {};
 
 class LanguageField : public BitField8<LanguageMode, 0, 1> {};
 class UsesSuperField : public BitField8<bool, LanguageField::kNext, 1> {};
@@ -90,6 +93,7 @@ PreparseDataBuilder::PreparseDataBuilder(Zone* zone,
       byte_data_(),
       children_buffer_(children_buffer),
       function_scope_(nullptr),
+      function_length_(-1),
       num_inner_functions_(0),
       num_inner_with_data_(0),
       bailed_out_(false),
@@ -219,16 +223,18 @@ void PreparseDataBuilder::ByteData::WriteQuarter(uint8_t data) {
 }
 
 void PreparseDataBuilder::DataGatheringScope::SetSkippableFunction(
-    DeclarationScope* function_scope, int num_inner_functions) {
+    DeclarationScope* function_scope, int function_length,
+    int num_inner_functions) {
   DCHECK_NULL(builder_->function_scope_);
   builder_->function_scope_ = function_scope;
   DCHECK_EQ(builder_->num_inner_functions_, 0);
+  builder_->function_length_ = function_length;
   builder_->num_inner_functions_ = num_inner_functions;
   builder_->parent_->has_data_ = true;
 }
 
 bool PreparseDataBuilder::HasInnerFunctions() const {
-  return !children_.is_empty();
+  return !children_.empty();
 }
 
 bool PreparseDataBuilder::HasData() const { return !bailed_out_ && has_data_; }
@@ -280,10 +286,16 @@ bool PreparseDataBuilder::SaveDataForSkippableFunction(
   byte_data_.WriteVarint32(function_scope->end_position());
 
   bool has_data = builder->HasData();
+  bool length_equals_parameters =
+      function_scope->num_parameters() == builder->function_length_;
   uint32_t has_data_and_num_parameters =
       HasDataField::encode(has_data) |
+      LengthEqualsParametersField::encode(length_equals_parameters) |
       NumberOfParametersField::encode(function_scope->num_parameters());
   byte_data_.WriteVarint32(has_data_and_num_parameters);
+  if (!length_equals_parameters) {
+    byte_data_.WriteVarint32(builder->function_length_);
+  }
   byte_data_.WriteVarint32(builder->num_inner_functions_);
 
   uint8_t language_and_super =
@@ -408,7 +420,7 @@ Handle<PreparseData> PreparseDataBuilder::ByteData::CopyToHeap(
   int data_length = zone_byte_data_.length();
   Handle<PreparseData> data =
       isolate->factory()->NewPreparseData(data_length, children_length);
-  data->copy_in(0, zone_byte_data_.start(), data_length);
+  data->copy_in(0, zone_byte_data_.begin(), data_length);
   return data;
 }
 
@@ -456,7 +468,7 @@ class BuilderProducedPreparseData final : public ProducedPreparseData {
 
   ZonePreparseData* Serialize(Zone* zone) final {
     return builder_->Serialize(zone);
-  };
+  }
 
  private:
   PreparseDataBuilder* builder_;
@@ -475,7 +487,7 @@ class OnHeapProducedPreparseData final : public ProducedPreparseData {
   ZonePreparseData* Serialize(Zone* zone) final {
     // Not required.
     UNREACHABLE();
-  };
+  }
 
  private:
   Handle<PreparseData> data_;
@@ -489,7 +501,7 @@ class ZoneProducedPreparseData final : public ProducedPreparseData {
     return data_->Serialize(isolate);
   }
 
-  ZonePreparseData* Serialize(Zone* zone) final { return data_; };
+  ZonePreparseData* Serialize(Zone* zone) final { return data_; }
 
  private:
   ZonePreparseData* data_;
@@ -514,7 +526,7 @@ template <class Data>
 ProducedPreparseData*
 BaseConsumedPreparseData<Data>::GetDataForSkippableFunction(
     Zone* zone, int start_position, int* end_position, int* num_parameters,
-    int* num_inner_functions, bool* uses_super_property,
+    int* function_length, int* num_inner_functions, bool* uses_super_property,
     LanguageMode* language_mode) {
   // The skippable function *must* be the next function in the data. Use the
   // start position as a sanity check.
@@ -530,6 +542,13 @@ BaseConsumedPreparseData<Data>::GetDataForSkippableFunction(
   bool has_data = HasDataField::decode(has_data_and_num_parameters);
   *num_parameters =
       NumberOfParametersField::decode(has_data_and_num_parameters);
+  bool length_equals_parameters =
+      LengthEqualsParametersField::decode(has_data_and_num_parameters);
+  if (length_equals_parameters) {
+    *function_length = *num_parameters;
+  } else {
+    *function_length = scope_data_->ReadVarint32();
+  }
   *num_inner_functions = scope_data_->ReadVarint32();
 
   uint8_t language_and_super = scope_data_->ReadQuarter();
@@ -626,7 +645,7 @@ void BaseConsumedPreparseData<Data>::RestoreDataForVariable(Variable* var) {
 #endif
   uint8_t variable_data = scope_data_->ReadQuarter();
   if (VariableMaybeAssignedField::decode(variable_data)) {
-    var->set_maybe_assigned();
+    var->SetMaybeAssigned();
   }
   if (VariableContextAllocatedField::decode(variable_data)) {
     var->set_is_used();

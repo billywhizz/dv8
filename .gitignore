@@ -5,7 +5,6 @@ app/count
 app/*.sh
 *.o
 *.so
-*.a
 build/dv8
 *.ods
 build/count

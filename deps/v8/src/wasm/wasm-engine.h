@@ -8,7 +8,7 @@
 #include <memory>
 #include <unordered_set>
 
-#include "src/cancelable-task.h"
+#include "src/tasks/cancelable-task.h"
 #include "src/wasm/wasm-code-manager.h"
 #include "src/wasm/wasm-memory.h"
 #include "src/wasm/wasm-tier.h"
@@ -62,7 +62,7 @@ class V8_EXPORT_PRIVATE WasmEngine {
   MaybeHandle<AsmWasmData> SyncCompileTranslatedAsmJs(
       Isolate* isolate, ErrorThrower* thrower, const ModuleWireBytes& bytes,
       Vector<const byte> asm_js_offset_table_bytes,
-      Handle<HeapNumber> uses_bitset);
+      Handle<HeapNumber> uses_bitset, LanguageMode language_mode);
   Handle<WasmModuleObject> FinalizeTranslatedAsmJs(
       Isolate* isolate, Handle<AsmWasmData> asm_wasm_data,
       Handle<Script> script);
@@ -88,7 +88,8 @@ class V8_EXPORT_PRIVATE WasmEngine {
   // be shared across threads, i.e. could be concurrently modified.
   void AsyncCompile(Isolate* isolate, const WasmFeatures& enabled,
                     std::shared_ptr<CompilationResultResolver> resolver,
-                    const ModuleWireBytes& bytes, bool is_shared);
+                    const ModuleWireBytes& bytes, bool is_shared,
+                    const char* api_method_name_for_errors);
 
   // Begin an asynchronous instantiation of the given WASM module.
   void AsyncInstantiate(Isolate* isolate,
@@ -98,6 +99,7 @@ class V8_EXPORT_PRIVATE WasmEngine {
 
   std::shared_ptr<StreamingDecoder> StartStreamingCompilation(
       Isolate* isolate, const WasmFeatures& enabled, Handle<Context> context,
+      const char* api_method_name,
       std::shared_ptr<CompilationResultResolver> resolver);
 
   // Compiles the function with the given index at a specific compilation tier.
@@ -138,6 +140,11 @@ class V8_EXPORT_PRIVATE WasmEngine {
   // Isolate is currently running.
   bool HasRunningCompileJob(Isolate* isolate);
 
+  // Deletes all AsyncCompileJobs that belong to the given context. All
+  // compilation is aborted, no more callbacks will be triggered. This is used
+  // when a context is disposed, e.g. because of browser navigation.
+  void DeleteCompileJobsOnContext(Handle<Context> context);
+
   // Deletes all AsyncCompileJobs that belong to the given Isolate. All
   // compilation is aborted, no more callbacks will be triggered. This is used
   // for tearing down an isolate, or to clean it up to be reused.
@@ -158,18 +165,50 @@ class V8_EXPORT_PRIVATE WasmEngine {
   // background threads.
   void LogCode(WasmCode*);
 
+  // Enable code logging for the given Isolate. Initially, code logging is
+  // enabled if {WasmCode::ShouldBeLogged(Isolate*)} returns true during
+  // {AddIsolate}.
+  void EnableCodeLogging(Isolate*);
+
+  // This is called from the foreground thread of the Isolate to log all
+  // outstanding code objects (added via {LogCode}).
+  void LogOutstandingCodesForIsolate(Isolate*);
+
   // Create a new NativeModule. The caller is responsible for its
   // lifetime. The native module will be given some memory for code,
   // which will be page size aligned. The size of the initial memory
   // is determined with a heuristic based on the total size of wasm
   // code. The native module may later request more memory.
   // TODO(titzer): isolate is only required here for CompilationState.
-  std::unique_ptr<NativeModule> NewNativeModule(
+  std::shared_ptr<NativeModule> NewNativeModule(
       Isolate* isolate, const WasmFeatures& enabled_features,
       size_t code_size_estimate, bool can_request_more,
       std::shared_ptr<const WasmModule> module);
 
   void FreeNativeModule(NativeModule*);
+
+  // Sample the code size of the given {NativeModule} in all isolates that have
+  // access to it. Call this after top-tier compilation finished.
+  // This will spawn foreground tasks that do *not* keep the NativeModule alive.
+  void SampleTopTierCodeSizeInAllIsolates(const std::shared_ptr<NativeModule>&);
+
+  // Called by each Isolate to report its live code for a GC cycle. First
+  // version reports an externally determined set of live code (might be empty),
+  // second version gets live code from the execution stack of that isolate.
+  void ReportLiveCodeForGC(Isolate*, Vector<WasmCode*>);
+  void ReportLiveCodeFromStackForGC(Isolate*);
+
+  // Add potentially dead code. The occurrence in the set of potentially dead
+  // code counts as a reference, and is decremented on the next GC.
+  // Returns {true} if the code was added to the set of potentially dead code,
+  // {false} if an entry already exists. The ref count is *unchanged* in any
+  // case.
+  V8_WARN_UNUSED_RESULT bool AddPotentiallyDeadCode(WasmCode*);
+
+  // Free dead code.
+  using DeadCodeMap = std::unordered_map<NativeModule*, std::vector<WasmCode*>>;
+  void FreeDeadCode(const DeadCodeMap&);
+  void FreeDeadCodeLocked(const DeadCodeMap&);
 
   // Call on process start and exit.
   static void InitializeOncePerProcess();
@@ -180,13 +219,26 @@ class V8_EXPORT_PRIVATE WasmEngine {
   static std::shared_ptr<WasmEngine> GetWasmEngine();
 
  private:
+  struct CurrentGCInfo;
   struct IsolateInfo;
+  struct NativeModuleInfo;
 
   AsyncCompileJob* CreateAsyncCompileJob(
       Isolate* isolate, const WasmFeatures& enabled,
       std::unique_ptr<byte[]> bytes_copy, size_t length,
-      Handle<Context> context,
+      Handle<Context> context, const char* api_method_name,
       std::shared_ptr<CompilationResultResolver> resolver);
+
+  void TriggerGC(int8_t gc_sequence_index);
+
+  // Remove an isolate from the outstanding isolates of the current GC. Returns
+  // true if the isolate was still outstanding, false otherwise. Hold {mutex_}
+  // when calling this method.
+  bool RemoveIsolateFromCurrentGC(Isolate*);
+
+  // Finish a GC if there are no more outstanding isolates. Hold {mutex_} when
+  // calling this method.
+  void PotentiallyFinishCurrentGC();
 
   WasmMemoryTracker memory_tracker_;
   WasmCodeManager code_manager_;
@@ -214,10 +266,17 @@ class V8_EXPORT_PRIVATE WasmEngine {
   // Set of isolates which use this WasmEngine.
   std::unordered_map<Isolate*, std::unique_ptr<IsolateInfo>> isolates_;
 
-  // Maps each NativeModule to the set of Isolates that have access to that
-  // NativeModule. The isolate sets currently only grow, they never shrink.
-  std::unordered_map<NativeModule*, std::unordered_set<Isolate*>>
-      isolates_per_native_module_;
+  // Set of native modules managed by this engine.
+  std::unordered_map<NativeModule*, std::unique_ptr<NativeModuleInfo>>
+      native_modules_;
+
+  // Size of code that became dead since the last GC. If this exceeds a certain
+  // threshold, a new GC is triggered.
+  size_t new_potentially_dead_code_size_ = 0;
+
+  // If an engine-wide GC is currently running, this pointer stores information
+  // about that.
+  std::unique_ptr<CurrentGCInfo> current_gc_info_;
 
   // End of fields protected by {mutex_}.
   //////////////////////////////////////////////////////////////////////////////

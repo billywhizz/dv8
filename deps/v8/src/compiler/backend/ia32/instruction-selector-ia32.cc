@@ -272,14 +272,9 @@ void InstructionSelector::VisitStackSlot(Node* node) {
        sequence()->AddImmediate(Constant(slot)), 0, nullptr);
 }
 
-void InstructionSelector::VisitDebugAbort(Node* node) {
+void InstructionSelector::VisitAbortCSAAssert(Node* node) {
   IA32OperandGenerator g(this);
-  Emit(kArchDebugAbort, g.NoOutput(), g.UseFixed(node->InputAt(0), edx));
-}
-
-void InstructionSelector::VisitSpeculationFence(Node* node) {
-  IA32OperandGenerator g(this);
-  Emit(kLFence, g.NoOutput());
+  Emit(kArchAbortCSAAssert, g.NoOutput(), g.UseFixed(node->InputAt(0), edx));
 }
 
 void InstructionSelector::VisitLoad(Node* node) {
@@ -309,10 +304,12 @@ void InstructionSelector::VisitLoad(Node* node) {
     case MachineRepresentation::kSimd128:
       opcode = kIA32Movdqu;
       break;
-    case MachineRepresentation::kWord64:  // Fall through.
+    case MachineRepresentation::kCompressedSigned:   // Fall through.
+    case MachineRepresentation::kCompressedPointer:  // Fall through.
+    case MachineRepresentation::kCompressed:         // Fall through.
+    case MachineRepresentation::kWord64:             // Fall through.
     case MachineRepresentation::kNone:
       UNREACHABLE();
-      return;
   }
 
   IA32OperandGenerator g(this);
@@ -354,21 +351,8 @@ void InstructionSelector::VisitStore(Node* node) {
         g.UseUniqueRegister(base),
         g.GetEffectiveIndexOperand(index, &addressing_mode),
         g.UseUniqueRegister(value)};
-    RecordWriteMode record_write_mode = RecordWriteMode::kValueIsAny;
-    switch (write_barrier_kind) {
-      case kNoWriteBarrier:
-        UNREACHABLE();
-        break;
-      case kMapWriteBarrier:
-        record_write_mode = RecordWriteMode::kValueIsMap;
-        break;
-      case kPointerWriteBarrier:
-        record_write_mode = RecordWriteMode::kValueIsPointer;
-        break;
-      case kFullWriteBarrier:
-        record_write_mode = RecordWriteMode::kValueIsAny;
-        break;
-    }
+    RecordWriteMode record_write_mode =
+        WriteBarrierKindToRecordWriteMode(write_barrier_kind);
     InstructionOperand temps[] = {g.TempRegister(), g.TempRegister()};
     size_t const temp_count = arraysize(temps);
     InstructionCode code = kArchStoreWithWriteBarrier;
@@ -400,7 +384,10 @@ void InstructionSelector::VisitStore(Node* node) {
       case MachineRepresentation::kSimd128:
         opcode = kIA32Movdqu;
         break;
-      case MachineRepresentation::kWord64:  // Fall through.
+      case MachineRepresentation::kCompressedSigned:   // Fall through.
+      case MachineRepresentation::kCompressedPointer:  // Fall through.
+      case MachineRepresentation::kCompressed:         // Fall through.
+      case MachineRepresentation::kWord64:             // Fall through.
       case MachineRepresentation::kNone:
         UNREACHABLE();
         return;
@@ -1606,6 +1593,11 @@ void InstructionSelector::VisitFloat64SilenceNaN(Node* node) {
        g.UseRegister(node->InputAt(0)));
 }
 
+void InstructionSelector::VisitMemoryBarrier(Node* node) {
+  IA32OperandGenerator g(this);
+  Emit(kIA32MFence, g.NoOutput());
+}
+
 void InstructionSelector::VisitWord32AtomicLoad(Node* node) {
   LoadRepresentation load_rep = LoadRepresentationOf(node->op());
   DCHECK(load_rep.representation() == MachineRepresentation::kWord8 ||
@@ -1631,7 +1623,6 @@ void InstructionSelector::VisitWord32AtomicStore(Node* node) {
       break;
     default:
       UNREACHABLE();
-      break;
   }
   VisitAtomicExchange(this, node, opcode, rep);
 }
@@ -2441,8 +2432,7 @@ MachineOperatorBuilder::Flags
 InstructionSelector::SupportedMachineOperatorFlags() {
   MachineOperatorBuilder::Flags flags =
       MachineOperatorBuilder::kWord32ShiftIsSafe |
-      MachineOperatorBuilder::kWord32Ctz |
-      MachineOperatorBuilder::kSpeculationFence;
+      MachineOperatorBuilder::kWord32Ctz;
   if (CpuFeatures::IsSupported(POPCNT)) {
     flags |= MachineOperatorBuilder::kWord32Popcnt;
   }
