@@ -59,7 +59,8 @@ void after_write(uv_write_t *req, int status)
   {
     Local<Value> argv[2] = {Integer::New(isolate, wr->buf.len), Integer::New(isolate, status)};
     Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-    onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+    Local<Context> ctx = isolate->GetCurrentContext();
+    onWrite->Call(ctx, ctx->Global(), 2, argv);
   }
   if (status < 0)
   {
@@ -71,7 +72,8 @@ void after_write(uv_write_t *req, int status)
     {
       Local<Value> argv[1] = {Number::New(isolate, status)};
       Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
-      Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      Local<Context> ctx = isolate->GetCurrentContext();
+      Callback->Call(ctx, ctx->Global(), 1, argv);
     }
     return;
   }
@@ -89,7 +91,8 @@ void after_write(uv_write_t *req, int status)
       {
         Local<Value> argv[0] = {};
         Local<Function> Callback = Local<Function>::New(isolate, socket->_onDrain);
-        Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+        Local<Context> ctx = isolate->GetCurrentContext();
+        Callback->Call(ctx, ctx->Global(), 0, argv);
       }
       ctx->stats.out.drain++;
       ctx->blocked = false;
@@ -117,7 +120,8 @@ void on_close(uv_handle_t *peer)
   {
     Local<Value> argv[0] = {};
     Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
-    onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    Local<Context> context = isolate->GetCurrentContext();
+    onClose->Call(context, context->Global(), 0, argv);
   }
   context_free(peer);
   if (s->first) {
@@ -135,7 +139,8 @@ void on_close2(uv_handle_t *peer)
   {
     Local<Value> argv[0] = {};
     Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
-    onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    Local<Context> ctx = isolate->GetCurrentContext();
+    onClose->Call(ctx, ctx->Global(), 0, argv);
   }
   free(peer);
 }
@@ -174,7 +179,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       Local<Value> argv[1] = {Number::New(isolate, nread)};
       Local<Function> onRead = Local<Function>::New(isolate, s->_onRead);
-      onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      Local<Context> context = isolate->GetCurrentContext();
+      onRead->Call(context, context->Global(), 1, argv);
     }
   }
   else if (nread == UV_EOF) {
@@ -182,7 +188,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       Local<Value> argv[0] = {};
       Local<Function> onEnd = Local<Function>::New(isolate, s->_onEnd);
-      onEnd->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+      Local<Context> context = isolate->GetCurrentContext();
+      onEnd->Call(context, context->Global(), 0, argv);
     }
     ctx->stats.in.end++;
     if (uv_is_closing((uv_handle_t *)handle) == 0) {
@@ -195,7 +202,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
       Local<Function> onError = Local<Function>::New(isolate, s->_onError);
-      onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      Local<Context> context = isolate->GetCurrentContext();
+      onError->Call(context, context->Global(), 2, argv);
     }
     ctx->stats.in.end++;
     ctx->stats.error++;
@@ -273,7 +281,7 @@ void on_connection(uv_stream_t *server, int status)
       Local<Value> argv[0] = {};
       Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
       v8::TryCatch try_catch(isolate);
-      Local<Value> result = foo->Call(context->Global(), 0, argv);
+      Local<Value> result = foo->Call(context, context->Global(), 0, argv).ToLocalChecked();
       if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
       }
@@ -487,7 +495,8 @@ int onNewConnection(_context *ctx)
     Local<Value> argv[0] = {};
     Local<Function> foo = Local<Function>::New(isolate, obj->_onConnect);
     v8::TryCatch try_catch(isolate);
-    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    Local<Context> context = isolate->GetCurrentContext();
+    foo->Call(context, context->Global(), 0, argv);
     if (try_catch.HasCaught()) {
       dv8::ReportException(isolate, &try_catch);
     }
@@ -612,7 +621,8 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
       {
         Local<Value> argv[1] = {Number::New(isolate, r)};
         Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
-        Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+        Local<Context> context = isolate->GetCurrentContext();
+        Callback->Call(context, context->Global(), 1, argv);
       }
     }
     else if ((uint32_t)r < len)
@@ -632,7 +642,8 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
       {
         Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
         Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+        Local<Context> context = isolate->GetCurrentContext();
+        onWrite->Call(context, context->Global(), 2, argv);
       }
       if (status != 0)
       {
@@ -645,7 +656,8 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
       {
         Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
         Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+        Local<Context> context = isolate->GetCurrentContext();
+        onWrite->Call(context, context->Global(), 2, argv);
       }
     }
   } else {

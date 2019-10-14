@@ -59,7 +59,7 @@ void start_context(void *data)
 		env->loop = loop;
 		uv_loop_init(loop);
 
-		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
+		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len));
 		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, th->name, v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
 			v8::Integer::New(isolate, 0), 
@@ -104,8 +104,8 @@ void on_context_complete(uv_async_t *async)
 	Thread *t = (Thread *)th->object;
 	Isolate *isolate = Isolate::GetCurrent();
 	v8::HandleScope handleScope(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+	Local<Context> context = isolate->GetCurrentContext();
+	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
 	Local<Function> foo = Local<Function>::New(isolate, t->onComplete);
 	Local<Value> errObj;
 	if (env->err.IsEmpty()) {
@@ -136,14 +136,14 @@ void on_context_complete(uv_async_t *async)
 		}
 		Local<Value> argv[1] = { o };
 		v8::TryCatch try_catch(isolate);
-		foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+		foo->Call(context, context->Global(), 1, argv);
 		if (try_catch.HasCaught()) {
 			dv8::ReportException(isolate, &try_catch);
 		}
 	} else {
 		Local<Value> argv[1] = { v8::Null(isolate) };
 		v8::TryCatch try_catch(isolate);
-		foo->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+		foo->Call(context, context->Global(), 1, argv);
 		if (try_catch.HasCaught()) {
 			dv8::ReportException(isolate, &try_catch);
 		}

@@ -73,7 +73,8 @@ using dv8::socket::socket_plugin;
 				if (parser->callbacks.onHeaders == 1) {
 					Local<Value> argv[0] = {};
 					Local<Function> onHeaders = Local<Function>::New(isolate, parser->_onHeaders);
-					onHeaders->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+					Local<Context> context = isolate->GetCurrentContext();
+					onHeaders->Call(context, context->Global(), 0, argv);
 				}
 			}
 			off += 16 - nlen;

@@ -1,18 +1,19 @@
-#!/bin/sh
+#!/bin/bash
 CONFIG=${1:-release}
 echo "building static dv8 platform ($CONFIG)"
 export V8_INCLUDE=/deps/v8/include
 export UV_INCLUDE=/deps/uv/include
-export V8_DEPS=/deps/v8/out.gn/x64.release/obj
-export UV_DEPS=/deps/uv/out/Release
+export V8_DEPS=/deps/v8
+export UV_DEPS=/deps/uv
 export BUILTINS=/src/builtins
+export SSL_PREFIX=/usr/lib/x86_64-linux-gnu
 
 if [[ "$CONFIG" == "release" ]]; then
     export CCFLAGS="-DHTTP_PARSER_STRICT=0 -DSTATIC_BUILD=1 -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -msse4 -pthread -Wall -Wextra -Wno-cast-function-type -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 else
     export CCFLAGS="-DHTTP_PARSER_STRICT=0 -DSTATIC_BUILD=1 -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -msse4 -pthread -Wall -Wextra -Wno-cast-function-type -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 fi
-export LDFLAGS="-pthread -static -m64 -Wl,--start-group ./dv8main.o ./dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a  /usr/lib/libssl.a /usr/lib/libcrypto.a -lz -Wl,--end-group"
+export LDFLAGS="-pthread -static -m64 -Wl,--start-group ./dv8main.o ./dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a $SSL_PREFIX/libssl.a $SSL_PREFIX/libcrypto.a -lz -ldl -Wl,--end-group"
 export CC="ccache g++"
 # compile the builtins
 $CC $CCFLAGS -c -o buffer.o /src/builtins/buffer.cc

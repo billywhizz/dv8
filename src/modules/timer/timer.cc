@@ -114,7 +114,8 @@ void Timer::OnTimeout(uv_timer_t *handle)
     Local<Value> argv[argc] = {};
     v8::TryCatch try_catch(isolate);
     Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
-    cb->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+	Local<Context> ctx = isolate->GetCurrentContext();
+    cb->Call(ctx, ctx->Global(), 0, argv);
     if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
     }

@@ -72,7 +72,7 @@ void OS::on_signal(uv_signal_t *handle, int signum)
   OS *os = (OS *)handle->data;
   Local<Value> argv[1] = {Number::New(isolate, signum)};
   Local<Function> Callback = Local<Function>::New(isolate, os->_onSignal);
-  Local<Value> ret = Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+  Local<Value> ret = Callback->Call(context, context->Global(), 1, argv).ToLocalChecked();
   uint32_t close = ret->Uint32Value(context).ToChecked();
   if (close == 1)
   {

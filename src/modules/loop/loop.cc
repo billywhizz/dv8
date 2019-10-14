@@ -203,7 +203,8 @@ using dv8::builtins::Buffer;
 				Local<Value> argv[0] = {};
 				Local<Function> Callback = Local<Function>::New(isolate, obj->onIdle);
 				v8::TryCatch try_catch(isolate);
-				Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+				Local<Context> context = isolate->GetCurrentContext();
+				Callback->Call(context, context->Global(), 0, argv);
 				if (try_catch.HasCaught()) {
 					dv8::ReportException(isolate, &try_catch);
 				}
@@ -217,7 +218,8 @@ using dv8::builtins::Buffer;
         if (obj->callbacks.onPrepare == 1) {
             Local<Value> argv[0] = {};
             Local<Function> Callback = Local<Function>::New(isolate, obj->onPrepare);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+						Local<Context> context = isolate->GetCurrentContext();
+            Callback->Call(context, context->Global(), 0, argv);
         }
 	}
 
@@ -228,7 +230,8 @@ using dv8::builtins::Buffer;
         if (obj->callbacks.onCheck == 1) {
             Local<Value> argv[0] = {};
             Local<Function> Callback = Local<Function>::New(isolate, obj->onCheck);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+						Local<Context> context = isolate->GetCurrentContext();
+            Callback->Call(context, context->Global(), 0, argv);
         }
 	}
 

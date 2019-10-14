@@ -16,7 +16,8 @@ namespace udp {
 		UDP *obj = (UDP *)req->handle->data;
 		Local<Value> argv[1] = { Number::New(isolate, status) };
 		Local<Function> onSend = Local<Function>::New(isolate, obj->onSend);
-		onSend->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+		Local<Context> ctx = isolate->GetCurrentContext();
+		onSend->Call(ctx, ctx->Global(), 1, argv);
 		free(req);
 	}
 
@@ -33,7 +34,8 @@ namespace udp {
 			len = strlen(ip);
       Local<Value> argv[3] = { Number::New(isolate, nread), String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len), Number::New(isolate, ntohs(a4->sin_port)) };
       Local<Function> onMessage = Local<Function>::New(isolate, obj->onMessage);
-      onMessage->Call(isolate->GetCurrentContext()->Global(), 3, argv);
+			Local<Context> ctx = isolate->GetCurrentContext();
+      onMessage->Call(ctx, ctx->Global(), 3, argv);
 		}
 	}
 
@@ -43,7 +45,8 @@ namespace udp {
 		UDP *obj = (UDP *)handle->data;
 		Local<Value> argv[0] = {};
 		Local<Function> onMessage = Local<Function>::New(isolate, obj->onClose);
-		onMessage->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+		Local<Context> ctx = isolate->GetCurrentContext();
+		onMessage->Call(ctx, ctx->Global(), 0, argv);
 		free(handle);
 	}
 

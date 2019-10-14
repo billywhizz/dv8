@@ -74,7 +74,8 @@ int body_cb(http_parser *parser, const char *buf, size_t len) {
 			memcpy(work, buf, len);
 			Local<Value> argv[1] = {Integer::New(isolate, len)};
 			Local<Function> onBody = Local<Function>::New(isolate, obj->_onBody);
-			onBody->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+			Local<Context> ctx = isolate->GetCurrentContext();
+			onBody->Call(ctx, ctx->Global(), 1, argv);
 		}
 	}
 	return 0;
@@ -103,7 +104,8 @@ int headers_complete_cb(http_parser *parser) {
 	if (obj->callbacks.onHeaders == 1) {
 		Local<Value> argv[0] = {};
 		Local<Function> onHeaders = Local<Function>::New(isolate, obj->_onHeaders);
-		onHeaders->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+		Local<Context> ctx = isolate->GetCurrentContext();
+		onHeaders->Call(ctx, ctx->Global(), 0, argv);
 	}
 	return 0;
 }
@@ -113,14 +115,15 @@ int message_complete_cb(http_parser *parser) {
 	v8::HandleScope handleScope(isolate);
 	_context *context = (_context *)parser->data;
 	HTTPParser *obj = (HTTPParser *)context->data;
+	Local<Context> ctx = isolate->GetCurrentContext();
 	if (context->parser_mode == 0 && obj->callbacks.onRequest == 1) {
 		Local<Value> argv[0] = {};
 		Local<Function> onRequest = Local<Function>::New(isolate, obj->_onRequest);
-		onRequest->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+		onRequest->Call(ctx, ctx->Global(), 0, argv);
 	} else if (context->parser_mode == 1 && obj->callbacks.onResponse == 1) {
 		Local<Value> argv[0] = {};
 		Local<Function> onResponse = Local<Function>::New(isolate, obj->_onResponse);
-		onResponse->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+		onResponse->Call(ctx, ctx->Global(), 0, argv);
 	}
 	return 0;
 }
@@ -266,7 +269,7 @@ void HTTPParser::Execute(const FunctionCallbackInfo<Value> &args)
 		} else {
 			Local<Value> argv[2] = {Number::New(isolate, obj->context->parser->http_errno), String::NewFromUtf8(isolate, http_errno_description((http_errno)obj->context->parser->http_errno), v8::String::kNormalString)};
 			Local<Function> onError = Local<Function>::New(isolate, obj->_onError);
-			onError->Call(context->Global(), 2, argv);
+			onError->Call(context, context->Global(), 2, argv);
 		}
 	}
 	args.GetReturnValue().Set(Integer::New(isolate, 0));

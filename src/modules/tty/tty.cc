@@ -24,7 +24,8 @@ void on_close(uv_handle_t *handle)
     if (t->callbacks.onClose == 1) {
         Local<Value> argv[0] = {};
         Local<Function> Callback = Local<Function>::New(isolate, t->_onClose);
-        Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+        Local<Context> ctx = isolate->GetCurrentContext();
+        Callback->Call(ctx, ctx->Global(), 0, argv);
     }
     free(handle);
 }
@@ -39,7 +40,8 @@ void after_write(uv_write_t *req, int status)
     {
         Local<Value> argv[2] = {Integer::New(isolate, wr->buf.len), Integer::New(isolate, status)};
         Local<Function> onWrite = Local<Function>::New(isolate, t->_onWrite);
-        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+        Local<Context> ctx = isolate->GetCurrentContext();
+        onWrite->Call(ctx, ctx->Global(), 2, argv);
     }
     if (status < 0)
     {
@@ -50,7 +52,8 @@ void after_write(uv_write_t *req, int status)
         if (t->callbacks.onError) {
             Local<Value> argv[2] = {Number::New(isolate, status), String::NewFromUtf8(isolate, uv_strerror(status), v8::String::kNormalString)};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            Callback->Call(ctx, ctx->Global(), 2, argv);
         }
         return;
     }
@@ -68,7 +71,8 @@ void after_write(uv_write_t *req, int status)
             if (t->callbacks.onDrain == 1) {
                 Local<Value> argv[0] = {};
                 Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
-                Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+                Local<Context> ctx = isolate->GetCurrentContext();
+                Callback->Call(ctx, ctx->Global(), 0, argv);
             }
             t->stats.out.drain++;
             t->blocked = false;
@@ -102,7 +106,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         if (t->callbacks.onRead == 1) {
             Local<Value> argv[1] = {Number::New(isolate, nread)};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onRead);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            Callback->Call(ctx, ctx->Global(), 1, argv);
         }
         t->stats.in.read += (uint64_t)nread;
         t->stats.in.data++;
@@ -112,7 +117,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         if (t->callbacks.onEnd == 1) {
             Local<Value> argv[] = {};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onEnd);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            Callback->Call(ctx, ctx->Global(), 0, argv);
         }
         t->stats.in.end++;
         //uv_close((uv_handle_t*)handle, on_close);
@@ -123,7 +129,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         if (t->callbacks.onError == 1) {
             Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            Callback->Call(ctx, ctx->Global(), 2, argv);
         }
         t->stats.error++;
         uv_close((uv_handle_t*)handle, on_close);
@@ -295,7 +302,8 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
         if (t->callbacks.onError == 1) {
             Local<Value> argv[2] = {Number::New(isolate, r), String::NewFromUtf8(isolate, uv_strerror(r), v8::String::kNormalString)};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
-            Callback->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            Callback->Call(ctx, ctx->Global(), 2, argv);
         }
     }
     else if (r == 0) {
@@ -319,7 +327,8 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
         if (t->callbacks.onWrite == 1) {
             Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
             Local<Function> onWrite = Local<Function>::New(isolate, t->_onWrite);
-            onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            onWrite->Call(ctx, ctx->Global(), 2, argv);
         }
         if (status != 0)
         {
@@ -334,7 +343,8 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
         if (t->callbacks.onWrite == 1) {
             Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
             Local<Function> onWrite = Local<Function>::New(isolate, t->_onWrite);
-            onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            onWrite->Call(ctx, ctx->Global(), 2, argv);
         }
     }
     args.GetReturnValue().Set(Integer::New(isolate, r));

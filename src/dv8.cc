@@ -17,7 +17,7 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
     Local<Value> argv[argc] = { promise, value, Integer::New(isolate, event) };
     Local<Function> onUnhandledRejection = Local<Function>::New(isolate, env->onUnhandledRejection);
     TryCatch try_catch(isolate);
-    onUnhandledRejection->Call(globalInstance, 3, argv);
+    onUnhandledRejection->Call(context, globalInstance, 3, argv);
     if (try_catch.HasCaught()) {
       dv8::ReportException(isolate, &try_catch);
     }
@@ -81,7 +81,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
     memcpy(env->error->stack, stack_trace_string, strlen(stack_trace_string));
   }
   Local<Value> argv[1] = { err_obj };
-  onUncaughtException->Call(globalInstance, 1, argv);
+  onUncaughtException->Call(context, globalInstance, 1, argv);
 }
 
 void Version(const FunctionCallbackInfo<Value> &args) {
