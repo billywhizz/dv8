@@ -15,7 +15,7 @@ using dv8::builtins::Buffer;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "EventLoop"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "EventLoop").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stop", EventLoop::Stop);

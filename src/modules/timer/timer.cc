@@ -17,7 +17,7 @@ void Timer::Init(Local<Object> exports)
     Isolate *isolate = exports->GetIsolate();
     Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-    tpl->SetClassName(String::NewFromUtf8(isolate, "Timer"));
+    tpl->SetClassName(String::NewFromUtf8(isolate, "Timer").ToLocalChecked());
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", Timer::Start);

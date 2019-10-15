@@ -33,7 +33,7 @@ void Buffer::Init(Local<Object> exports)
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-  tpl->SetClassName(String::NewFromUtf8(isolate, "Buffer"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "Buffer").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "alloc", Buffer::Alloc);
@@ -126,7 +126,7 @@ void Buffer::Read(const FunctionCallbackInfo<Value> &args)
   int32_t len = args[1]->Int32Value(context).ToChecked();
   Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
   const char *data = b->_data + off;
-  args.GetReturnValue().Set(String::NewFromUtf8(isolate, data, v8::String::kNormalString, len));
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, data, v8::NewStringType::kNormal, len).ToLocalChecked());
 }
 
 void Buffer::Write(const FunctionCallbackInfo<Value> &args)

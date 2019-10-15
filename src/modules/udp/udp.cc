@@ -32,7 +32,7 @@ namespace udp {
 			const sockaddr_in *a4 = reinterpret_cast<const sockaddr_in *>(addr);
 			uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
 			len = strlen(ip);
-      Local<Value> argv[3] = { Number::New(isolate, nread), String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len), Number::New(isolate, ntohs(a4->sin_port)) };
+      Local<Value> argv[3] = { Number::New(isolate, nread), String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked(), Number::New(isolate, ntohs(a4->sin_port)) };
       Local<Function> onMessage = Local<Function>::New(isolate, obj->onMessage);
 			Local<Context> ctx = isolate->GetCurrentContext();
       onMessage->Call(ctx, ctx->Global(), 3, argv);
@@ -60,7 +60,7 @@ namespace udp {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "UDP"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "UDP").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", UDP::Open);
@@ -129,7 +129,7 @@ namespace udp {
 		int len = sizeof ip;
 		uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
 		len = strlen(ip);
-		args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
+		args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked());
 		return;
 	}
 

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 MODULE_NAME=openssl
 CONFIG=${2:-release}
 echo building module $MODULE_NAME

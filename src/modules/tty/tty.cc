@@ -50,7 +50,7 @@ void after_write(uv_write_t *req, int status)
         free(wr);
         t->stats.out.free++;
         if (t->callbacks.onError) {
-            Local<Value> argv[2] = {Number::New(isolate, status), String::NewFromUtf8(isolate, uv_strerror(status), v8::String::kNormalString)};
+            Local<Value> argv[2] = {Number::New(isolate, status), String::NewFromUtf8(isolate, uv_strerror(status), v8::NewStringType::kNormal).ToLocalChecked()};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
             Local<Context> ctx = isolate->GetCurrentContext();
             Callback->Call(ctx, ctx->Global(), 2, argv);
@@ -127,7 +127,7 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
         // we got a system error
         //TODO: change to onerror? same as socket?
         if (t->callbacks.onError == 1) {
-            Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
+            Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::NewStringType::kNormal).ToLocalChecked()};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
             Local<Context> ctx = isolate->GetCurrentContext();
             Callback->Call(ctx, ctx->Global(), 2, argv);
@@ -156,7 +156,7 @@ void TTY::Init(Local<Object> exports)
     Isolate *isolate = exports->GetIsolate();
     Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-    tpl->SetClassName(String::NewFromUtf8(isolate, "TTY"));
+    tpl->SetClassName(String::NewFromUtf8(isolate, "TTY").ToLocalChecked());
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", TTY::Close);
@@ -300,7 +300,7 @@ void TTY::Write(const FunctionCallbackInfo<Value> &args)
     {
         t->stats.error++;
         if (t->callbacks.onError == 1) {
-            Local<Value> argv[2] = {Number::New(isolate, r), String::NewFromUtf8(isolate, uv_strerror(r), v8::String::kNormalString)};
+            Local<Value> argv[2] = {Number::New(isolate, r), String::NewFromUtf8(isolate, uv_strerror(r), v8::NewStringType::kNormal).ToLocalChecked()};
             Local<Function> Callback = Local<Function>::New(isolate, t->_onError);
             Local<Context> ctx = isolate->GetCurrentContext();
             Callback->Call(ctx, ctx->Global(), 2, argv);

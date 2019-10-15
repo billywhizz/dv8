@@ -246,12 +246,13 @@ inline void DV8_SET_PROTOTYPE_METHOD(v8::Isolate *isolate, v8::Local<v8::Functio
 inline void DV8_SET_EXPORT(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate> recv, const char *name, v8::Local<v8::Object> exports) {
   v8::Local<v8::String> class_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
   Local<Context> context = isolate->GetCurrentContext();
-  exports->Set(class_name, recv->GetFunction(context).ToLocalChecked());
+  exports->Set(context, class_name, recv->GetFunction(context).ToLocalChecked());
 }
 
 inline void DV8_SET_EXPORT_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> obj, const char *name, v8::Local<v8::Object> exports) {
   v8::Local<v8::String> constant_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
-  exports->Set(constant_name, obj);
+  Local<Context> context = isolate->GetCurrentContext();
+  exports->Set(context, constant_name, obj);
 }
 
 inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate) {

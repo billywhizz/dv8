@@ -46,14 +46,14 @@ void start_context(void *data)
 		v8::Local<v8::Object> globalInstance = context->Global();
 		v8::Context::Scope context_scope(context);
 		dv8::builtins::Buffer::Init(globalInstance);
-		globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
+		globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
 		if (th->length > 0) {
-			v8::Local<v8::Function> bufferObj = Local<Function>::Cast(globalInstance->Get(v8::String::NewFromUtf8(isolate, "Buffer", v8::NewStringType::kNormal).ToLocalChecked()));
+			v8::Local<v8::Function> bufferObj = Local<Function>::Cast(globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "Buffer", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked());
 			Local<Function> cons = Local<Function>::New(isolate, bufferObj);
 			Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
 			Buffer *obj = new Buffer((char*)th->data, th->length);
 			obj->Wrap(instance);
-			globalInstance->Set(String::NewFromUtf8(isolate, "workerData", v8::NewStringType::kNormal).ToLocalChecked(), instance);
+			globalInstance->Set(context, String::NewFromUtf8(isolate, "workerData", v8::NewStringType::kNormal).ToLocalChecked(), instance);
 		}
 		uv_loop_t *loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 		env->loop = loop;
@@ -82,7 +82,7 @@ void start_context(void *data)
 			return;
 		}
 		if (th->size > 0) {
-			globalInstance->Set(String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
+			globalInstance->Set(context, String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
 		}
 		module->Evaluate(context);
 	}
@@ -117,21 +117,21 @@ void on_context_complete(uv_async_t *async)
 	free(th);
 	if (jsError->hasError == 1) {
 		Local<Object> o = Object::New(isolate);
-		o->Set(String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
+		o->Set(context, String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
 		if (jsError->filename) {
-			o->Set(String::NewFromUtf8(isolate, "filename", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->filename, v8::NewStringType::kNormal).ToLocalChecked());
+			o->Set(context, String::NewFromUtf8(isolate, "filename", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->filename, v8::NewStringType::kNormal).ToLocalChecked());
 			free(jsError->filename);
 		}
 		if (jsError->exception) {
-			o->Set(String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->exception, v8::NewStringType::kNormal).ToLocalChecked());
+			o->Set(context, String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->exception, v8::NewStringType::kNormal).ToLocalChecked());
 			free(jsError->exception);
 		}
 		if (jsError->sourceline) {
-			o->Set(String::NewFromUtf8(isolate, "sourceline", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->sourceline, v8::NewStringType::kNormal).ToLocalChecked());
+			o->Set(context, String::NewFromUtf8(isolate, "sourceline", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->sourceline, v8::NewStringType::kNormal).ToLocalChecked());
 			free(jsError->sourceline);
 		}
 		if (jsError->stack) {
-			o->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
+			o->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
 			free(jsError->stack);
 		}
 		Local<Value> argv[1] = { o };
@@ -155,7 +155,7 @@ void Thread::Init(Local<Object> exports)
 	Isolate *isolate = exports->GetIsolate();
 	Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-	tpl->SetClassName(String::NewFromUtf8(isolate, "Thread"));
+	tpl->SetClassName(String::NewFromUtf8(isolate, "Thread").ToLocalChecked());
 	tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", Thread::Start);
@@ -197,7 +197,7 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	Local<Function> threadFunc = Local<Function>::Cast(args[0]);
 	String::Utf8Value function_name(isolate, threadFunc->GetName());
 	Local<Function> onComplete = Local<Function>::Cast(args[1]);
-	Local<String> sourceString = threadFunc->ToString(isolate);
+	Local<String> sourceString = threadFunc->ToString(context).ToLocalChecked();
 	String::Utf8Value source(isolate, sourceString);
 	obj->onComplete.Reset(isolate, onComplete);
 	thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));

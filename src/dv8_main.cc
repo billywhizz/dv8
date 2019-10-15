@@ -32,11 +32,11 @@ int main(int argc, char *argv[]) {
     env->error->hasError = 0;
     v8::Local<v8::Array> arguments = v8::Array::New(isolate);
     for (int i = 0; i < argc; i++) {
-      arguments->Set(i, v8::String::NewFromUtf8(isolate, argv[i], v8::String::kNormalString, strlen(argv[i])));
+      arguments->Set(context, i, v8::String::NewFromUtf8(isolate, argv[i], v8::NewStringType::kNormal, strlen(argv[i])).ToLocalChecked());
     }
     v8::Local<v8::Object> globalInstance = context->Global();
-    globalInstance->Set(v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
-    globalInstance->Set(v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
+    globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
+    globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
     dv8::builtins::Buffer::Init(globalInstance);
     dv8::InspectorClient inspector_client(context, true);
 

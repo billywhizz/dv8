@@ -200,7 +200,7 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   else if (nread < 0) {
     if (s->callbacks.onError == 1)
     {
-      Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
+      Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::NewStringType::kNormal).ToLocalChecked()};
       Local<Function> onError = Local<Function>::New(isolate, s->_onError);
       Local<Context> context = isolate->GetCurrentContext();
       onError->Call(context, context->Global(), 2, argv);
@@ -302,7 +302,7 @@ void Socket::Init(Local<Object> exports)
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-  tpl->SetClassName(String::NewFromUtf8(isolate, "Socket"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "Socket").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listen", Listen);
@@ -445,7 +445,7 @@ void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
   int len = sizeof ip;
   uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
   len = strlen(ip);
-  args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked());
   return;
 }
 
@@ -527,7 +527,7 @@ void Socket::SetKeepAlive(const FunctionCallbackInfo<Value> &args)
   Local<Context> context = isolate->GetCurrentContext();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
-  int enable = static_cast<int>(args[0]->BooleanValue(context).ToChecked());
+  int enable = static_cast<int>(args[0]->BooleanValue(isolate));
   unsigned int delay = args[1]->Uint32Value(context).ToChecked();
   int r = uv_tcp_keepalive((uv_tcp_t *)ctx->handle, enable, delay);
   args.GetReturnValue().Set(Integer::New(isolate, r));
@@ -544,10 +544,9 @@ void Socket::UnRef(const FunctionCallbackInfo<Value> &args)
 void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
-  Local<Context> context = isolate->GetCurrentContext();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
-  int enable = static_cast<int>(args[0]->BooleanValue(context).ToChecked());
+  int enable = static_cast<int>(args[0]->BooleanValue(isolate));
   int r = uv_tcp_nodelay((uv_tcp_t *)ctx->handle, enable);
   args.GetReturnValue().Set(Integer::New(isolate, r));
 }

@@ -17,7 +17,7 @@ void OS::Init(Local<Object> exports)
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-  tpl->SetClassName(String::NewFromUtf8(isolate, "OS"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "OS").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onSignal", OS::OnSignal);

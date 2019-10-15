@@ -29,14 +29,14 @@ using dv8::builtins::Buffer;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "ZLib"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "ZLib").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", ZLib::Setup);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", ZLib::Write);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "end", ZLib::End);
 
-    DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, ZLIB_VERSION), "ZLIB_VERSION", exports);
+    DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, ZLIB_VERSION).ToLocalChecked(), "ZLIB_VERSION", exports);
 		// mode
     DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, NONE), "ZLIB_MODE_NONE", exports);
     DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, DEFLATE), "ZLIB_MODE_DEFLATE", exports);

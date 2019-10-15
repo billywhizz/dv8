@@ -131,7 +131,7 @@ int message_complete_cb(http_parser *parser) {
 void HTTPParser::Init(Local<Object> exports) {
 	Isolate *isolate = exports->GetIsolate();
 	Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-	tpl->SetClassName(String::NewFromUtf8(isolate, "HTTPParser"));
+	tpl->SetClassName(String::NewFromUtf8(isolate, "HTTPParser").ToLocalChecked());
 	tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", HTTPParser::Setup);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", HTTPParser::Reset);
@@ -267,7 +267,7 @@ void HTTPParser::Execute(const FunctionCallbackInfo<Value> &args)
 			uint8_t *lastByte = (uint8_t *)(obj->context->base + np);
 			obj->context->lastByte = *lastByte;
 		} else {
-			Local<Value> argv[2] = {Number::New(isolate, obj->context->parser->http_errno), String::NewFromUtf8(isolate, http_errno_description((http_errno)obj->context->parser->http_errno), v8::String::kNormalString)};
+			Local<Value> argv[2] = {Number::New(isolate, obj->context->parser->http_errno), String::NewFromUtf8(isolate, http_errno_description((http_errno)obj->context->parser->http_errno), v8::NewStringType::kNormal).ToLocalChecked()};
 			Local<Function> onError = Local<Function>::New(isolate, obj->_onError);
 			onError->Call(context, context->Global(), 2, argv);
 		}

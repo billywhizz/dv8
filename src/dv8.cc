@@ -51,7 +51,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
     message = Exception::CreateMessage(isolate, er);
   }
   String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
-  Local<Value> func = globalInstance->Get(String::NewFromUtf8(isolate, "onUncaughtException", NewStringType::kNormal).ToLocalChecked());
+  Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onUncaughtException", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
   Local<Function> onUncaughtException = Local<Function>::Cast(func);
   Local<Object> err_obj = er->ToObject(context).ToLocalChecked();
   env->err.Reset(isolate, err_obj);
@@ -63,21 +63,21 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
   env->error->linenum = linenum;
   env->error->filename = (char*)calloc(strlen(filename_string), 1);
   memcpy(env->error->filename, filename_string, strlen(filename_string));
-  err_obj->Set(String::NewFromUtf8(isolate, "fileName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, filename_string, v8::NewStringType::kNormal).ToLocalChecked());
+  err_obj->Set(context, String::NewFromUtf8(isolate, "fileName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, filename_string, v8::NewStringType::kNormal).ToLocalChecked());
   env->error->exception = (char*)calloc(strlen(exception_string), 1);
   memcpy(env->error->exception, exception_string, strlen(exception_string));
-  err_obj->Set(String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
+  err_obj->Set(context, String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
   String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
   char *sourceline_string = *sourceline;
   env->error->sourceline = (char*)calloc(strlen(sourceline_string), 1);
   memcpy(env->error->sourceline, sourceline_string, strlen(sourceline_string));
-  err_obj->Set(String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
+  err_obj->Set(context, String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
   Local<Value> stack_trace_string;
   if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0) {
     String::Utf8Value stack_trace(isolate, stack_trace_string);
     char *stack_trace_string = *stack_trace;
     env->error->stack = (char*)calloc(strlen(stack_trace_string), 1);
-    err_obj->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, stack_trace_string, v8::NewStringType::kNormal).ToLocalChecked());
+    err_obj->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, stack_trace_string, v8::NewStringType::kNormal).ToLocalChecked());
     memcpy(env->error->stack, stack_trace_string, strlen(stack_trace_string));
   }
   Local<Value> argv[1] = { err_obj };
@@ -219,12 +219,13 @@ void CollectGarbage(const FunctionCallbackInfo<Value> &args) {
 void EnvVars(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
   int size = 0;
   while (environ[size]) size++;
   Local<v8::Array> envarr = v8::Array::New(isolate);
   for (int i = 0; i < size; ++i) {
     const char *var = environ[i];
-    envarr->Set(i, String::NewFromUtf8(isolate, var, v8::String::kNormalString, strlen(var)));
+    envarr->Set(context, i, String::NewFromUtf8(isolate, var, v8::NewStringType::kNormal, strlen(var)).ToLocalChecked());
   }
   args.GetReturnValue().Set(envarr);
 }
@@ -246,7 +247,7 @@ void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   size_t rss;
   int err = uv_resident_set_memory(&rss);
   if (err) {
-    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::NewStringType::kNormal).ToLocalChecked());
   }
   HeapStatistics v8_heap_stats;
   isolate->GetHeapStatistics(&v8_heap_stats);

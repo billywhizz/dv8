@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 MODULE_NAME=httpParser
 CONFIG=${2:-release}
 echo building module $MODULE_NAME

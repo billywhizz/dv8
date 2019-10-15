@@ -13,7 +13,7 @@ void InitAll(Local<Object> exports)
 void Process::Init(Local<Object> exports) {
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-  tpl->SetClassName(String::NewFromUtf8(isolate, "Process"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "Process").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pid", Process::PID);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "memoryUsage", Process::MemoryUsage);
@@ -66,7 +66,7 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
     fields[1] = s.space_available_size();
     fields[2] = s.space_size();
     fields[3] = s.space_used_size();
-    o->Set(String::NewFromUtf8(isolate, s.space_name(), v8::NewStringType::kNormal).ToLocalChecked(), array);
+    o->Set(context, String::NewFromUtf8(isolate, s.space_name(), v8::NewStringType::kNormal).ToLocalChecked(), array);
   }
   args.GetReturnValue().Set(o);
 }
@@ -125,7 +125,7 @@ void Process::MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   size_t rss;
   int err = uv_resident_set_memory(&rss);
   if (err) {
-    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::NewStringType::kNormal).ToLocalChecked());
   }
   HeapStatistics v8_heap_stats;
   isolate->GetHeapStatistics(&v8_heap_stats);
@@ -154,7 +154,7 @@ void Process::CPUUsage(const FunctionCallbackInfo<Value> &args) {
   uv_rusage_t rusage;
   int err = uv_getrusage(&rusage);
   if (err) {
-    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::NewStringType::kNormal).ToLocalChecked());
   }
   Local<Float64Array> array = args[0].As<Float64Array>();
   Local<ArrayBuffer> ab = array->Buffer();

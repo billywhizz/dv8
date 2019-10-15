@@ -15,7 +15,7 @@ using dv8::builtins::Buffer;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "File"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "File").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		// Sync Methods
@@ -136,7 +136,7 @@ using dv8::builtins::Buffer;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "FileSystem"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "FileSystem").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		// Sync Methods
