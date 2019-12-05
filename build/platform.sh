@@ -33,12 +33,13 @@ $CC $CCFLAGS -I/src/modules/fs -c -o fs.o /src/modules/fs/fs.cc
 $CC $CCFLAGS -I/src/modules/libz -c -o libz.o /src/modules/libz/libz.cc
 $CC $CCFLAGS -I/src/modules/socket -I/src/modules/openssl -c -o openssl.o /src/modules/openssl/openssl.cc
 $CC $CCFLAGS -I/src/modules/socket -I/src/modules/httpParser -c -o httpParser.o /src/modules/httpParser/httpParser.cc
+$CC $CCFLAGS -march=native -mtune=native -flto -fuse-linker-plugin -I/src/modules/socket -I/src/modules/picoHttpParser -c -o picoHttpParser.o /src/modules/picoHttpParser/picoHttpParser.cc
 
 # compile the dv8 core
 $CC $CCFLAGS -c -o dv8.o /src/dv8.cc
 # create the lib
 rm -f dv8.a
-ar crsT dv8.a buffer.o env.o dv8.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o libz.o udp.o httpParser.o http_parser.o openssl.o
+gcc-ar crsT dv8.a buffer.o env.o dv8.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o libz.o udp.o httpParser.o picoHttpParser.o http_parser.o openssl.o
 # compile the main executable
 $CC $CCFLAGS -c -o dv8main.o /src/dv8_main.cc
 # link main executable

@@ -16,7 +16,7 @@ using dv8::socket::socket_plugin;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "PicoHTTPParser"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "PicoHTTPParser").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", PicoHTTPParser::Reset);

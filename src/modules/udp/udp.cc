@@ -25,8 +25,8 @@ namespace udp {
 		Isolate *isolate = Isolate::GetCurrent();
 		v8::HandleScope handleScope(isolate);
 		UDP *obj = (UDP *)handle->data;
-		v8::TryCatch try_catch(isolate);
 		if (nread > 0) {
+			v8::TryCatch try_catch(isolate);
 			char ip[INET_ADDRSTRLEN];
 			int len = sizeof ip;
 			const sockaddr_in *a4 = reinterpret_cast<const sockaddr_in *>(addr);
@@ -36,6 +36,9 @@ namespace udp {
       Local<Function> onMessage = Local<Function>::New(isolate, obj->onMessage);
 			Local<Context> ctx = isolate->GetCurrentContext();
       onMessage->Call(ctx, ctx->Global(), 3, argv);
+			if (try_catch.HasCaught()) {
+				dv8::ReportException(isolate, &try_catch);
+			}
 		}
 	}
 

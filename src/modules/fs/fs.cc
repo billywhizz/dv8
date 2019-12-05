@@ -157,6 +157,96 @@ using dv8::builtins::Buffer;
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_TRUNC), "O_TRUNC", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_EXCL), "O_EXCL", exports);
 
+/*
+
+https://linux.die.net/man/2/open
+
+flags
+
+access modes
+O_RDONLY
+O_WRONLY
+O_RDWR
+
+file creation flags
+O_CLOEXEC
+O_CREAT
+O_DIRECTORY
+O_EXCL
+O_NOCTTY
+O_NOFOLLOW
+O_TRUNC
+O_TTY_INIT
+
+file status flags
+
+O_APPEND
+O_ASYNC
+O_CLOEXEC
+O_CREAT
+
+mode - only when using O_CREAT
+effective permissions are mode & ~umask
+
+S_IRWXU
+00700 user (file owner) has read, write and execute permission
+S_IRUSR
+00400 user has read permission
+S_IWUSR
+00200 user has write permission
+S_IXUSR
+00100 user has execute permission
+S_IRWXG
+00070 group has read, write and execute permission
+S_IRGRP
+00040 group has read permission
+S_IWGRP
+00020 group has write permission
+S_IXGRP
+00010 group has execute permission
+S_IRWXO
+00007 others have read, write and execute permission
+S_IROTH
+00004 others have read permission
+S_IWOTH
+00002 others have write permission
+S_IXOTH
+00001 others have execute permission
+
+O_DIRECT
+O_LARGEFILE
+O_NOATIME
+O_NONBLOCK
+O_NDELAY
+O_SYNC
+
+errors
+
+EACCES
+EDQUOT
+EEXIST
+EFAULT
+EFBIG
+EINTR
+EISDIR
+ELOOP
+EMFILE
+ENAMETOOLONG
+ENFILE
+ENODEV
+ENOENT
+ENOMEM
+ENOSPC
+ENOTDIR
+ENXIO
+EOVERFLOW
+EPERM
+EROFS
+ETXTBSY
+EWOULDBLOCK
+
+*/
+
 		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
 	}
 

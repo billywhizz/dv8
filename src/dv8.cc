@@ -161,6 +161,10 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
 		dv8::httpParser::InitAll(exports);
     args.GetReturnValue().Set(exports);
     return;
+  } else if (strcmp("picoHttpParser", module_name) == 0) {
+		dv8::picoHttpParser::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
   } else if (strcmp("openssl", module_name) == 0) {
 		dv8::openssl::InitAll(exports);
     args.GetReturnValue().Set(exports);
