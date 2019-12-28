@@ -9,8 +9,7 @@ export V8_DEPS=/deps/v8
 export UV_DEPS=/deps/uv
 export BUILTINS=/src/builtins
 export MODULE_DIR=/src/modules/$MODULE_NAME
-#export CC="ccache g++"
-export CC="g++"
+export CC="ccache g++"
 
 if [[ "$CONFIG" == "release" ]]; then
     export CCFLAGS="-I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$MODULE_DIR -I$ZLIB_INCLUDE -I/src -fPIC -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"

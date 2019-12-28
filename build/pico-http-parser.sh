@@ -17,8 +17,7 @@ else
 fi
 export LDFLAGS="-shared -pthread -msse4 -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group ./$MODULE_NAME.o -Wl,--end-group"
 
-#export CC="ccache g++"
-export CC="g++"
+export CC="ccache g++"
 
 # compile the class
 $CC $CCFLAGS -c -o $MODULE_NAME.o $MODULE_DIR/$MODULE_NAME.cc
