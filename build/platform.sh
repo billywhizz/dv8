@@ -31,19 +31,27 @@ $CC $CCFLAGS -I/src/modules/tty -c -o tty.o /src/modules/tty/tty.cc
 $CC $CCFLAGS -I/src/modules/os -c -o os.o /src/modules/os/os.cc
 $CC $CCFLAGS -I/src/modules/fs -c -o fs.o /src/modules/fs/fs.cc
 
+# compile the main executable
+$CC $CCFLAGS -c -o dv8main.o /src/dv8_main.cc
+
 # compile the dv8 core
 $CC $CCFLAGS -c -o dv8.o /src/dv8.cc
 
 # create the lib
 rm -f dv8.a
-gcc-ar crsT dv8.a buffer.o env.o dv8.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o
-#ar crsT dv8.a buffer.o env.o dv8.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o
 
-# compile the main executable
-$CC $CCFLAGS -c -o dv8main.o /src/dv8_main.cc
+ar crsT dv8.a buffer.o env.o dv8.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o
 
 # link static binaru
 $CC $LDFLAGS -o ./dv8
+
+# compile the dv8 core
+$CC $CCFLAGS -DNO_DLOPEN -c -o dv8.o /src/dv8.cc
+
+# create the lib
+rm -f dv8.a
+
+ar crsT dv8.a buffer.o env.o dv8.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o
 
 # link dynamic binaru
 $CC $LDFLAGS_DYNAMIC -o ./dv8-dynamic

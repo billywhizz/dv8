@@ -116,7 +116,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
   const char *module_name = *str;
-  const char *module_path = "/usr/local/lib/";
+  const char *module_path = "/usr/local/lib/dv8/";
   char lib_name[128];
   Local<Object> exports;
   bool ok = args[1]->ToObject(context).ToLocal(&exports);
@@ -168,6 +168,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     }
     snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
   }
+#ifdef NO_DLOPEN  
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   if (success != 0) {
@@ -188,8 +189,9 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
-  args.GetReturnValue().Set(exports);
   //uv_dlclose(&lib);
+#endif
+  args.GetReturnValue().Set(exports);
 }
 
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer) {
