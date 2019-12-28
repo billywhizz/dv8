@@ -14,3 +14,4 @@ scratch
 deploy.sh
 out
 deps/v8/gen
+.ccache

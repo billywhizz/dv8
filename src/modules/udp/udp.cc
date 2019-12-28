@@ -75,6 +75,7 @@ namespace udp {
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", UDP::Close);
 
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "getPeerName", UDP::GetPeerName);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "getSockName", UDP::GetSockName);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setBroadcast", UDP::SetBroadcast);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onMessage", UDP::OnMessage);
@@ -133,6 +134,34 @@ namespace udp {
 		uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
 		len = strlen(ip);
 		args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked());
+		return;
+	}
+
+	void UDP::GetSockName(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
+		struct sockaddr_storage address;
+		int addrlen = sizeof(address);
+		int r = uv_udp_getsockname(obj->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
+		if (r)
+		{
+			args.GetReturnValue().Set(Integer::New(isolate, r));
+			return;
+		}
+		const sockaddr *addr = reinterpret_cast<const sockaddr *>(&address);
+		char ip[INET_ADDRSTRLEN];
+		const sockaddr_in *a4;
+		a4 = reinterpret_cast<const sockaddr_in *>(addr);
+		int len = sizeof ip;
+		uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
+		len = strlen(ip);
+		char pair[128];
+		snprintf(pair, 128, "%s:%u", ip, a4->sin_port);
+		args.GetReturnValue().Set(String::NewFromUtf8(isolate, pair, v8::NewStringType::kNormal, strlen(pair)).ToLocalChecked());
 		return;
 	}
 

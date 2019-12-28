@@ -15,14 +15,15 @@ if [[ "$CONFIG" == "release" ]]; then
 else
     export CCFLAGS="-I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$MODULE_DIR -I$SOCKET_DIR -I/src -msse4 -fPIC -pthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 fi
-export LDFLAGS="-shared -pthread -msse4 -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group ./$MODULE_NAME.o ./$MODULE_NAME.binding.o -Wl,--end-group"
+export LDFLAGS="-shared -pthread -msse4 -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group ./$MODULE_NAME.o -Wl,--end-group"
 
-# compile the binding
-g++ $CCFLAGS -c -o $MODULE_NAME.binding.o $MODULE_DIR/binding.cc
+#export CC="ccache g++"
+export CC="g++"
+
 # compile the class
-g++ $CCFLAGS -c -o $MODULE_NAME.o $MODULE_DIR/$MODULE_NAME.cc
+$CC $CCFLAGS -c -o $MODULE_NAME.o $MODULE_DIR/$MODULE_NAME.cc
 # create the lib
-g++ $LDFLAGS
+$CC $LDFLAGS
 if [[ "$CONFIG" == "release" ]]; then
     strip ./$MODULE_NAME.so
 fi

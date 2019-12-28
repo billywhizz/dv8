@@ -67,12 +67,16 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
   env->error->exception = (char*)calloc(strlen(exception_string), 1);
   memcpy(env->error->exception, exception_string, strlen(exception_string));
   err_obj->Set(context, String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
+  
   String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
   char *sourceline_string = *sourceline;
   env->error->sourceline = (char*)calloc(strlen(sourceline_string), 1);
   memcpy(env->error->sourceline, sourceline_string, strlen(sourceline_string));
   err_obj->Set(context, String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
   Local<Value> stack_trace_string;
+  //Local<v8::StackTrace> trace = message->GetStackTrace();
+  //v8::internal::Isolate::Current()->PrintStack((FILE*) stderr, 1);
+  
   if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0) {
     String::Utf8Value stack_trace(isolate, stack_trace_string);
     char *stack_trace_string = *stack_trace;
@@ -120,66 +124,48 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     args.GetReturnValue().Set(Null(isolate));
     return;
   }
-  #ifdef STATIC_BUILD
-  if (strcmp("loop", module_name) == 0) {
-		dv8::loop::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("socket", module_name) == 0) {
-		dv8::socket::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("timer", module_name) == 0) {
-		dv8::timer::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("thread", module_name) == 0) {
-		dv8::thread::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("fs", module_name) == 0) {
-		dv8::fs::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("process", module_name) == 0) {
-		dv8::process::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("os", module_name) == 0) {
-		dv8::os::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("udp", module_name) == 0) {
-		dv8::udp::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("libz", module_name) == 0) {
-		dv8::libz::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("httpParser", module_name) == 0) {
-		dv8::httpParser::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("picoHttpParser", module_name) == 0) {
-		dv8::picoHttpParser::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("openssl", module_name) == 0) {
-		dv8::openssl::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("tty", module_name) == 0) {
-		dv8::tty::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  }
-  #endif
   if (args.Length() > 2) {
     String::Utf8Value str(args.GetIsolate(), args[2]);
     module_path = *str;
     snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
   } else {
+    if (strcmp("loop", module_name) == 0) {
+      dv8::loop::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("socket", module_name) == 0) {
+      dv8::socket::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("timer", module_name) == 0) {
+      dv8::timer::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("thread", module_name) == 0) {
+      dv8::thread::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("fs", module_name) == 0) {
+      dv8::fs::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("udp", module_name) == 0) {
+      dv8::udp::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("process", module_name) == 0) {
+      dv8::process::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("tty", module_name) == 0) {
+      dv8::tty::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("os", module_name) == 0) {
+      dv8::os::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    }
     snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
   }
   uv_lib_t lib;
@@ -203,7 +189,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
   args.GetReturnValue().Set(exports);
-  uv_dlclose(&lib);
+  //uv_dlclose(&lib);
 }
 
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer) {

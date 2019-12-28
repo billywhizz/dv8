@@ -73,7 +73,10 @@ int main(int argc, char *argv[]) {
     }
     uint64_t now = uv_hrtime();
     module->Evaluate(context);
-
+    if (try_catch.HasCaught()) {
+      dv8::ReportException(isolate, &try_catch);
+      return 1;
+    }
     v8::platform::PumpMessageLoop(platform.get(), isolate);
     dv8::shutdown(uv_default_loop());
     uv_tty_reset_mode();
@@ -83,7 +86,7 @@ int main(int argc, char *argv[]) {
     }
   }
   // cleanup
-  isolate->Dispose();
+  //isolate->Dispose();
   delete create_params.array_buffer_allocator;
   v8::V8::Dispose();
   v8::V8::ShutdownPlatform();

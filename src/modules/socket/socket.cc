@@ -284,6 +284,7 @@ void on_connection(uv_stream_t *server, int status)
       Local<Value> result = foo->Call(context, context->Global(), 0, argv).ToLocalChecked();
       if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
+        return;
       }
       Local<Object> sock;
       bool ok = result->ToObject(context).ToLocal(&sock);

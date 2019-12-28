@@ -9,22 +9,21 @@ COPY deps/uv/include /deps/uv/include
 COPY deps/uv/libuv.a /deps/uv/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
-COPY build/platform-dynamic.sh /build/platform-dynamic.sh
 COPY build/module.sh /build/module.sh
 COPY build/http-parser.sh /build/http-parser.sh
 COPY build/openssl.sh /build/openssl.sh
-#RUN ./platform.sh && \
-#    ./platform-dynamic.sh && \
-#    ./module.sh os && \
-#    ./module.sh process && \
-#    ./module.sh socket && \
-#    ./module.sh thread && \
-#    ./module.sh timer && \
-#    ./module.sh tty && \
-#    ./module.sh loop && \
-#    ./module.sh libz && \
-#    ./module.sh fs && \
-#    ./module.sh udp && \
-#    ./http-parser.sh && \
-#    ./openssl.sh
+RUN ./platform.sh && \
+    ./module.sh os && \
+    ./module.sh process && \
+    ./module.sh socket && \
+    ./module.sh thread && \
+    ./module.sh timer && \
+    ./module.sh tty && \
+    ./module.sh loop && \
+    ./module.sh libz && \
+    ./module.sh fs && \
+    ./module.sh udp && \
+    ./http-parser.sh httpParser && \
+    ./pico-http-parser.sh picoHttpParser && \
+    ./openssl.sh openssl
 CMD ["/bin/sh"]

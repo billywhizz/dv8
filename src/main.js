@@ -68,6 +68,8 @@ function readFile (path) {
   return file
 }
 
+global.readFile = readFile
+
 class Parser {
   constructor (rb, wb) {
     this.position = 0
@@ -496,7 +498,7 @@ if (global.workerData) {
       }, thread.buffer)
       if (r !== 0) onComplete({ err: new Error(`Bad Status: ${r}`, thread, 0) })
     })
-    return thread
+   return thread
   }
   process.env = ENV
   process.PID = _process.pid()

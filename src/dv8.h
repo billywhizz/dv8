@@ -12,7 +12,6 @@
 #include <env.h>
 #include <string.h>
 
-#ifdef STATIC_BUILD
 #include <modules/loop/loop.h>
 #include <modules/timer/timer.h>
 #include <modules/thread/thread.h>
@@ -22,11 +21,6 @@
 #include <modules/fs/fs.h>
 #include <modules/socket/socket.h>
 #include <modules/udp/udp.h>
-#include <modules/libz/libz.h>
-#include <modules/httpParser/httpParser.h>
-#include <modules/picoHttpParser/picoHttpParser.h>
-#include <modules/openssl/openssl.h>
-#endif
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1

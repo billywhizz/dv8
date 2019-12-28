@@ -10,7 +10,8 @@ export BUILTINS=/src/builtins
 export MODULE_DIR=/src/modules/$MODULE_NAME
 export SOCKET_DIR=/src/modules/socket
 export SSL_PREFIX=/usr/lib/x86_64-linux-gnu
-export CC="ccache g++"
+#export CC="ccache g++"
+export CC="g++"
 
 if [[ "$CONFIG" == "release" ]]; then
     export CCFLAGS="-I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$MODULE_DIR -I$SOCKET_DIR -I/src -fPIC -pthread -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
