@@ -492,9 +492,9 @@ if (global.workerData) {
     thread.buffer.write(argsJSON, envJSON.length + 13)
     threads[thread.id] = thread
     process.nextTick(() => {
-      const r = thread.start(fun, (err, status) => {
+      const r = thread.start(fun, err => {
         delete threads[thread.id]
-        onComplete({ err, thread, status })
+        onComplete({ err, thread })
       }, thread.buffer)
       if (r !== 0) onComplete({ err: new Error(`Bad Status: ${r}`, thread, 0) })
     })

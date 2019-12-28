@@ -12,6 +12,7 @@ COPY build/platform.sh /build/platform.sh
 COPY build/module.sh /build/module.sh
 COPY build/http-parser.sh /build/http-parser.sh
 COPY build/openssl.sh /build/openssl.sh
+COPY build/pico-http-parser.sh /build/pico-http-parser.sh
 RUN ./platform.sh && \
     ./module.sh os && \
     ./module.sh process && \
