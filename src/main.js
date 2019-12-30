@@ -68,6 +68,8 @@ function readFile (path) {
   return file
 }
 
+global.readFile = readFile
+
 class Parser {
   constructor (rb, wb) {
     this.position = 0
@@ -268,6 +270,8 @@ process.loop = loop
 
 process.sleep = seconds => _process.sleep(seconds)
 process.usleep = microseconds => _process.usleep(microseconds)
+process.cwd = () => _process.cwd()
+process.nanosleep = (seconds, nanoseconds) => _process.nanosleep(seconds, nanoseconds)
 
 process.cpuUsage = () => {
   _process.cpuUsage(cpu)
@@ -414,7 +418,6 @@ if (global.workerData) {
   const argsLength = dv.getUint32(9 + envLength)
   const argsJSON = global.workerData.read(13 + envLength, argsLength)
   process.args = JSON.parse(argsJSON)
-  delete global.workerData
   if (process.fd !== 0) {
     const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
     const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
@@ -489,12 +492,13 @@ if (global.workerData) {
     thread.buffer.write(argsJSON, envJSON.length + 13)
     threads[thread.id] = thread
     process.nextTick(() => {
-      thread.start(fun, (err, status) => {
+      const r = thread.start(fun, err => {
         delete threads[thread.id]
-        onComplete({ err, thread, status })
+        onComplete({ err, thread })
       }, thread.buffer)
+      if (r !== 0) onComplete({ err: new Error(`Bad Status: ${r}`, thread, 0) })
     })
-    return thread
+   return thread
   }
   process.env = ENV
   process.PID = _process.pid()

@@ -88,6 +88,7 @@ int InstructionScheduler::GetTargetInstructionFlags(
     case kArm64Float32Abs:
     case kArm64Float32Neg:
     case kArm64Float32Sqrt:
+    case kArm64Float32Fnmul:
     case kArm64Float32RoundDown:
     case kArm64Float32Max:
     case kArm64Float32Min:
@@ -101,6 +102,7 @@ int InstructionScheduler::GetTargetInstructionFlags(
     case kArm64Float64Abs:
     case kArm64Float64Neg:
     case kArm64Float64Sqrt:
+    case kArm64Float64Fnmul:
     case kArm64Float64RoundDown:
     case kArm64Float64RoundTiesAway:
     case kArm64Float64RoundTruncate:
@@ -282,6 +284,12 @@ int InstructionScheduler::GetTargetInstructionFlags(
     case kArm64TestAndBranch:
     case kArm64CompareAndBranch32:
     case kArm64CompareAndBranch:
+    case kArm64DecompressSigned:
+    case kArm64DecompressPointer:
+    case kArm64DecompressAny:
+    case kArm64CompressSigned:
+    case kArm64CompressPointer:
+    case kArm64CompressAny:
       return kNoOpcodeFlags;
 
     case kArm64LdrS:
@@ -310,6 +318,8 @@ int InstructionScheduler::GetTargetInstructionFlags(
     case kArm64Strh:
     case kArm64StrW:
     case kArm64Str:
+    case kArm64StrCompressTagged:
+    case kArm64DmbIsh:
     case kArm64DsbIsb:
       return kHasSideEffect;
 

@@ -9,8 +9,8 @@
 #ifndef V8_OBJECTS_JS_DATE_TIME_FORMAT_INL_H_
 #define V8_OBJECTS_JS_DATE_TIME_FORMAT_INL_H_
 
-#include "src/objects-inl.h"
 #include "src/objects/js-date-time-format.h"
+#include "src/objects/objects-inl.h"
 
 // Has to be the last include (doesn't have include guards):
 #include "src/objects/object-macros.h"
@@ -20,10 +20,12 @@ namespace internal {
 
 OBJECT_CONSTRUCTORS_IMPL(JSDateTimeFormat, JSObject)
 
-ACCESSORS(JSDateTimeFormat, icu_locale, Managed<icu::Locale>, kICULocaleOffset);
+ACCESSORS(JSDateTimeFormat, icu_locale, Managed<icu::Locale>, kIcuLocaleOffset)
 ACCESSORS(JSDateTimeFormat, icu_simple_date_format,
-          Managed<icu::SimpleDateFormat>, kICUSimpleDateFormatOffset)
-ACCESSORS(JSDateTimeFormat, bound_format, Object, kBoundFormatOffset);
+          Managed<icu::SimpleDateFormat>, kIcuSimpleDateFormatOffset)
+ACCESSORS(JSDateTimeFormat, icu_date_interval_format,
+          Managed<icu::DateIntervalFormat>, kIcuDateIntervalFormatOffset)
+ACCESSORS(JSDateTimeFormat, bound_format, Object, kBoundFormatOffset)
 SMI_ACCESSORS(JSDateTimeFormat, flags, kFlagsOffset)
 
 inline void JSDateTimeFormat::set_hour_cycle(Intl::HourCycle hour_cycle) {
@@ -58,7 +60,7 @@ inline JSDateTimeFormat::DateTimeStyle JSDateTimeFormat::time_style() const {
   return TimeStyleBits::decode(flags());
 }
 
-CAST_ACCESSOR(JSDateTimeFormat);
+CAST_ACCESSOR(JSDateTimeFormat)
 
 }  // namespace internal
 }  // namespace v8

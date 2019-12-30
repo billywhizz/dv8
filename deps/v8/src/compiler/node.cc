@@ -56,7 +56,6 @@ Node* Node::New(Zone* zone, NodeId id, const Operator* op, int input_count,
   Node* node;
   bool is_inline;
 
-#if DEBUG
   // Verify that none of the inputs are {nullptr}.
   for (int i = 0; i < input_count; i++) {
     if (inputs[i] == nullptr) {
@@ -64,7 +63,6 @@ Node* Node::New(Zone* zone, NodeId id, const Operator* op, int input_count,
             op->mnemonic(), i);
     }
   }
-#endif
 
   if (input_count > kMaxInlineCapacity) {
     // Allocate out-of-line inputs.
@@ -305,7 +303,13 @@ void Node::Print() const {
 void Node::Print(std::ostream& os) const {
   os << *this << std::endl;
   for (Node* input : this->inputs()) {
-    os << "  " << *input << std::endl;
+    os << "  ";
+    if (input) {
+      os << *input;
+    } else {
+      os << "(NULL)";
+    }
+    os << std::endl;
   }
 }
 

@@ -31,7 +31,7 @@ class ObjectWrap
     {
         if (persistent().IsEmpty())
             return;
-        assert(persistent().IsNearDeath());
+        //assert(persistent().IsNearDeath());
         persistent().ClearWeak();
         persistent().Reset();
     }

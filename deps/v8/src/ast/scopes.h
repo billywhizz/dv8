@@ -8,10 +8,11 @@
 #include "src/ast/ast.h"
 #include "src/base/compiler-specific.h"
 #include "src/base/hashmap.h"
-#include "src/function-kind.h"
-#include "src/globals.h"
-#include "src/objects.h"
-#include "src/pointer-with-payload.h"
+#include "src/base/threaded-list.h"
+#include "src/common/globals.h"
+#include "src/objects/function-kind.h"
+#include "src/objects/objects.h"
+#include "src/utils/pointer-with-payload.h"
 #include "src/zone/zone.h"
 
 namespace v8 {
@@ -29,17 +30,22 @@ class Statement;
 class StringSet;
 class VariableProxy;
 
+using UnresolvedList =
+    base::ThreadedList<VariableProxy, VariableProxy::UnresolvedNext>;
+
 // A hash map to support fast variable declaration and lookup.
-class VariableMap: public ZoneHashMap {
+class VariableMap : public ZoneHashMap {
  public:
   explicit VariableMap(Zone* zone);
 
   Variable* Declare(Zone* zone, Scope* scope, const AstRawString* name,
                     VariableMode mode, VariableKind kind,
                     InitializationFlag initialization_flag,
-                    MaybeAssignedFlag maybe_assigned_flag, bool* was_added);
+                    MaybeAssignedFlag maybe_assigned_flag,
+                    RequiresBrandCheckFlag requires_brand_check,
+                    bool* was_added);
 
-  Variable* Lookup(const AstRawString* name);
+  V8_EXPORT_PRIVATE Variable* Lookup(const AstRawString* name);
   void Remove(Variable* var);
   void Add(Zone* zone, Variable* var);
 };
@@ -78,13 +84,12 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
   }
 #endif
 
-  typedef base::ThreadedList<VariableProxy, VariableProxy::UnresolvedNext>
-      UnresolvedList;
-
   DeclarationScope* AsDeclarationScope();
   const DeclarationScope* AsDeclarationScope() const;
   ModuleScope* AsModuleScope();
   const ModuleScope* AsModuleScope() const;
+  ClassScope* AsClassScope();
+  const ClassScope* AsClassScope() const;
 
   class Snapshot final {
    public:
@@ -346,9 +351,12 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
   bool is_module_scope() const { return scope_type_ == MODULE_SCOPE; }
   bool is_script_scope() const { return scope_type_ == SCRIPT_SCOPE; }
   bool is_catch_scope() const { return scope_type_ == CATCH_SCOPE; }
-  bool is_block_scope() const { return scope_type_ == BLOCK_SCOPE; }
+  bool is_block_scope() const {
+    return scope_type_ == BLOCK_SCOPE || scope_type_ == CLASS_SCOPE;
+  }
   bool is_with_scope() const { return scope_type_ == WITH_SCOPE; }
   bool is_declaration_scope() const { return is_declaration_scope_; }
+  bool is_class_scope() const { return scope_type_ == CLASS_SCOPE; }
 
   bool inner_scope_calls_eval() const { return inner_scope_calls_eval_; }
   bool IsAsmModule() const;
@@ -455,6 +463,10 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
   // sloppy eval call. One if this->calls_sloppy_eval().
   int ContextChainLengthUntilOutermostSloppyEval() const;
 
+  // Find the closest class scope in the current scope and outer scopes. If no
+  // class scope is found, nullptr will be returned.
+  ClassScope* GetClassScope();
+
   // Find the first function, script, eval or (declaration) block scope. This is
   // the scope where var declarations will be hoisted to in the implementation.
   DeclarationScope* GetDeclarationScope();
@@ -473,6 +485,8 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
 
   // Find the innermost outer scope that needs a context.
   Scope* GetOuterScopeWithContext();
+
+  bool HasThisReference() const;
 
   // Analyze() must have been called once to create the ScopeInfo.
   Handle<ScopeInfo> scope_info() const {
@@ -544,7 +558,7 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
                     MaybeAssignedFlag maybe_assigned_flag, bool* was_added) {
     Variable* result =
         variables_.Declare(zone, this, name, mode, kind, initialization_flag,
-                           maybe_assigned_flag, was_added);
+                           maybe_assigned_flag, kNoBrandCheck, was_added);
     if (*was_added) locals_.Add(result);
     return result;
   }
@@ -586,9 +600,10 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
   static Variable* LookupSloppyEval(VariableProxy* proxy, Scope* scope,
                                     Scope* outer_scope_end, Scope* entry_point,
                                     bool force_context_allocation);
+  static void ResolvePreparsedVariable(VariableProxy* proxy, Scope* scope,
+                                       Scope* end);
   void ResolveTo(ParseInfo* info, VariableProxy* proxy, Variable* var);
-  V8_WARN_UNUSED_RESULT bool ResolveVariable(ParseInfo* info,
-                                             VariableProxy* proxy);
+  void ResolveVariable(ParseInfo* info, VariableProxy* proxy);
   V8_WARN_UNUSED_RESULT bool ResolveVariablesRecursively(ParseInfo* info);
 
   // Finds free variables of this scope. This mutates the unresolved variables
@@ -633,6 +648,7 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
   void SetDefaults();
 
   friend class DeclarationScope;
+  friend class ClassScope;
   friend class ScopeTestHelper;
 
   Zone* zone_;
@@ -698,7 +714,6 @@ class V8_EXPORT_PRIVATE Scope : public NON_EXPORTED_BASE(ZoneObject) {
 
   // True if one of the inner scopes or the scope itself calls eval.
   bool inner_scope_calls_eval_ : 1;
-  bool force_context_allocation_ : 1;
   bool force_context_allocation_for_parameters_ : 1;
 
   // True if it holds 'var' declarations.
@@ -753,6 +768,8 @@ class V8_EXPORT_PRIVATE DeclarationScope : public Scope {
     DCHECK_NOT_NULL(var);
     return var;
   }
+
+  void DeserializeReceiver(AstValueFactory* ast_value_factory);
 
 #ifdef DEBUG
   void set_is_being_lazily_parsed(bool is_being_lazily_parsed) {
@@ -837,17 +854,12 @@ class V8_EXPORT_PRIVATE DeclarationScope : public Scope {
 
   // The variable corresponding to the 'this' value.
   Variable* receiver() {
-    DCHECK(has_this_declaration());
+    DCHECK(has_this_declaration() || is_script_scope());
     DCHECK_NOT_NULL(receiver_);
     return receiver_;
   }
 
-  // TODO(wingo): Add a GLOBAL_SCOPE scope type which will lexically allocate
-  // "this" (and no other variable) on the native context.  Script scopes then
-  // will not have a "this" declaration.
-  bool has_this_declaration() const {
-    return (is_function_scope() && !is_arrow_scope()) || is_module_scope();
-  }
+  bool has_this_declaration() const { return has_this_declaration_; }
 
   // The variable corresponding to the 'new.target' value.
   Variable* new_target_var() { return new_target_; }
@@ -1019,6 +1031,13 @@ class V8_EXPORT_PRIVATE DeclarationScope : public Scope {
     return preparse_data_builder_;
   }
 
+  void set_has_this_reference() { has_this_reference_ = true; }
+  bool has_this_reference() const { return has_this_reference_; }
+  void UsesThis() {
+    set_has_this_reference();
+    GetReceiverScope()->receiver()->ForceContextAllocation();
+  }
+
  private:
   V8_INLINE void AllocateParameter(Variable* var, int index);
 
@@ -1055,11 +1074,13 @@ class V8_EXPORT_PRIVATE DeclarationScope : public Scope {
   bool is_skipped_function_ : 1;
   bool has_inferred_function_name_ : 1;
   bool has_checked_syntax_ : 1;
-
-  int num_parameters_ = 0;
+  bool has_this_reference_ : 1;
+  bool has_this_declaration_ : 1;
 
   // If the scope is a function scope, this is the function kind.
   const FunctionKind function_kind_;
+
+  int num_parameters_ = 0;
 
   // Parameter list in source order.
   ZonePtrList<Variable> params_;
@@ -1128,27 +1149,99 @@ Scope::Snapshot::Snapshot(Scope* scope)
 
 class ModuleScope final : public DeclarationScope {
  public:
-  ModuleScope(DeclarationScope* script_scope,
-              AstValueFactory* ast_value_factory);
+  ModuleScope(DeclarationScope* script_scope, AstValueFactory* avfactory);
 
-  // Deserialization.
-  // The generated ModuleDescriptor does not preserve all information.  In
-  // particular, its module_requests map will be empty because we no longer need
-  // the map after parsing.
+  // Deserialization. Does not restore the module descriptor.
   ModuleScope(Isolate* isolate, Handle<ScopeInfo> scope_info,
-              AstValueFactory* ast_value_factory);
+              AstValueFactory* avfactory);
 
-  ModuleDescriptor* module() const {
-    DCHECK_NOT_NULL(module_descriptor_);
-    return module_descriptor_;
-  }
+  // Returns nullptr in a deserialized scope.
+  SourceTextModuleDescriptor* module() const { return module_descriptor_; }
 
   // Set MODULE as VariableLocation for all variables that will live in a
   // module's export table.
   void AllocateModuleVariables();
 
  private:
-  ModuleDescriptor* module_descriptor_;
+  SourceTextModuleDescriptor* const module_descriptor_;
+};
+
+class V8_EXPORT_PRIVATE ClassScope : public Scope {
+ public:
+  ClassScope(Zone* zone, Scope* outer_scope);
+  // Deserialization.
+  ClassScope(Zone* zone, AstValueFactory* ast_value_factory,
+             Handle<ScopeInfo> scope_info);
+
+  // Declare a private name in the private name map and add it to the
+  // local variables of this scope.
+  Variable* DeclarePrivateName(const AstRawString* name,
+                               RequiresBrandCheckFlag requires_brand_check,
+                               bool* was_added);
+
+  void AddUnresolvedPrivateName(VariableProxy* proxy);
+
+  // Try resolving all unresolved private names found in the current scope.
+  // Called from DeclarationScope::AllocateVariables() when reparsing a
+  // method to generate code or when eval() is called to access private names.
+  // If there are any private names that cannot be resolved, returns false.
+  V8_WARN_UNUSED_RESULT bool ResolvePrivateNames(ParseInfo* info);
+
+  // Called after the entire class literal is parsed.
+  // - If we are certain a private name cannot be resolve, return that
+  //   variable proxy.
+  // - If we find the private name in the scope chain, return nullptr.
+  //   If the name is found in the current class scope, resolve it
+  //   immediately.
+  // - If we are not sure if the private name can be resolved or not yet,
+  //   return nullptr.
+  VariableProxy* ResolvePrivateNamesPartially();
+
+  // Get the current tail of unresolved private names to be used to
+  // reset the tail.
+  UnresolvedList::Iterator GetUnresolvedPrivateNameTail();
+
+  // Reset the tail of unresolved private names, discard everything
+  // between the tail passed into this method and the current tail.
+  void ResetUnresolvedPrivateNameTail(UnresolvedList::Iterator tail);
+
+  // Migrate private names added between the tail passed into this method
+  // and the current tail.
+  void MigrateUnresolvedPrivateNameTail(AstNodeFactory* ast_node_factory,
+                                        UnresolvedList::Iterator tail);
+  Variable* DeclareBrandVariable(AstValueFactory* ast_value_factory,
+                                 int class_token_pos);
+  Variable* brand() {
+    return rare_data_ == nullptr ? nullptr : rare_data_->brand;
+  }
+
+ private:
+  friend class Scope;
+  // Find the private name declared in the private name map first,
+  // if it cannot be found there, try scope info if there is any.
+  // Returns nullptr if it cannot be found.
+  Variable* LookupPrivateName(VariableProxy* proxy);
+  // Lookup a private name from the local private name map of the current
+  // scope.
+  Variable* LookupLocalPrivateName(const AstRawString* name);
+  // Lookup a private name from the scope info of the current scope.
+  Variable* LookupPrivateNameInScopeInfo(const AstRawString* name);
+
+  struct RareData : public ZoneObject {
+    explicit RareData(Zone* zone) : private_name_map(zone) {}
+    UnresolvedList unresolved_private_names;
+    VariableMap private_name_map;
+    Variable* brand = nullptr;
+  };
+
+  V8_INLINE RareData* EnsureRareData() {
+    if (rare_data_ == nullptr) {
+      rare_data_ = new (zone_) RareData(zone_);
+    }
+    return rare_data_;
+  }
+
+  RareData* rare_data_ = nullptr;
 };
 
 }  // namespace internal

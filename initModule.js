@@ -23,54 +23,24 @@ async function mkdirpAsync(p, mode = 0o777) {
 	}
 }
 
-function getBinding(name, className) {
-	return `#include "${name}.h"
-
-namespace dv8 {
-namespace ${name} {
-	using v8::Local;
-	using v8::Object;
-
-	void InitAll(Local<Object> exports) {
-		${className}::Init(exports);
-	}
-}
-}
-
-extern "C" {
-	void* _register_${name}() {
-		return (void*)dv8::${name}::InitAll;
-	}
-}
-`
-}
-
 function getSource(name, className) {
 	return `#include "${name}.h"
 
 namespace dv8 {
 
 namespace ${name} {
-	using v8::Context;
-	using v8::Function;
-	using v8::FunctionCallbackInfo;
-	using v8::FunctionTemplate;
-	using v8::Isolate;
-	using v8::Local;
-	using v8::Number;
-	using v8::Integer;
-	using v8::Object;
-	using v8::Persistent;
-	using v8::String;
-	using v8::Value;
-	using v8::Array;
 	using dv8::builtins::Environment;
+
+	void InitAll(Local<Object> exports)
+	{
+		${className}::Init(exports);
+	}
 
 	void ${className}::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "${className}"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "${className}").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hello", ${className}::Hello);
@@ -92,7 +62,7 @@ namespace ${name} {
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		${className}* obj = ObjectWrap::Unwrap<${className}>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -100,6 +70,12 @@ namespace ${name} {
 	
 }
 }	
+
+extern "C" {
+	void* _register_${name}() {
+		return (void*)dv8::${name}::InitAll;
+	}
+}
 `
 }
 
@@ -112,6 +88,22 @@ function getHeader(name, className) {
 namespace dv8 {
 
 namespace ${name} {
+
+using v8::Array;
+using v8::Context;
+using v8::Function;
+using v8::FunctionCallbackInfo;
+using v8::FunctionTemplate;
+using v8::Integer;
+using v8::Isolate;
+using v8::Local;
+using v8::Number;
+using v8::Object;
+using v8::Persistent;
+using v8::String;
+using v8::Value;
+
+void InitAll(Local<Object> exports);
 
 class ${className} : public dv8::ObjectWrap {
 	public:
@@ -140,7 +132,6 @@ async function run(args) {
 	const [name, className] = args
 	console.log(`name: ${name}, className: ${className}`)
 	await mkdirpAsync(`./src/modules/${name}`)
-	await writeFileAsync(`./src/modules/${name}/binding.cc`, getBinding(name, className))
 	await writeFileAsync(`./src/modules/${name}/${name}.cc`, getSource(name, className))
 	await writeFileAsync(`./src/modules/${name}/${name}.h`, getHeader(name, className))
 }

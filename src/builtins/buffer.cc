@@ -26,13 +26,14 @@ using v8::Uint8Array;
 using v8::Value;
 using v8::EscapableHandleScope;
 using v8::WeakCallbackInfo;
+using v8::SharedArrayBuffer;
 
 void Buffer::Init(Local<Object> exports)
 {
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-  tpl->SetClassName(String::NewFromUtf8(isolate, "Buffer"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "Buffer").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "alloc", Buffer::Alloc);
@@ -40,6 +41,7 @@ void Buffer::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "read", Buffer::Read);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Buffer::Write);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "copy", Buffer::Copy);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "size", Buffer::Size);
 
   DV8_SET_EXPORT(isolate, tpl, "Buffer", exports);
 }
@@ -90,7 +92,7 @@ void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)
     }
   } else {
     Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, b->_length, ArrayBufferCreationMode::kExternalized);
+    Local<SharedArrayBuffer> ab = SharedArrayBuffer::New(isolate, b->_data, b->_length, ArrayBufferCreationMode::kExternalized);
     args.GetReturnValue().Set(scope.Escape(ab));
   }
 }
@@ -124,7 +126,7 @@ void Buffer::Read(const FunctionCallbackInfo<Value> &args)
   int32_t len = args[1]->Int32Value(context).ToChecked();
   Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
   const char *data = b->_data + off;
-  args.GetReturnValue().Set(String::NewFromUtf8(isolate, data, v8::String::kNormalString, len));
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, data, v8::NewStringType::kNormal, len).ToLocalChecked());
 }
 
 void Buffer::Write(const FunctionCallbackInfo<Value> &args)
@@ -140,6 +142,13 @@ void Buffer::Write(const FunctionCallbackInfo<Value> &args)
   int written;
   str->WriteUtf8(isolate, data, length, &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
   args.GetReturnValue().Set(Integer::New(isolate, written));
+}
+
+void Buffer::Size(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+  args.GetReturnValue().Set(Integer::New(isolate, b->_length));
 }
 
 } // namespace builtins

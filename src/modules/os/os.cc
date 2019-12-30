@@ -17,7 +17,7 @@ void OS::Init(Local<Object> exports)
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-  tpl->SetClassName(String::NewFromUtf8(isolate, "OS"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "OS").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onSignal", OS::OnSignal);
@@ -41,7 +41,7 @@ void OS::OnSignal(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   OS *os = ObjectWrap::Unwrap<OS>(args.Holder());
   if (args.Length() > 0)
   {
@@ -72,7 +72,7 @@ void OS::on_signal(uv_signal_t *handle, int signum)
   OS *os = (OS *)handle->data;
   Local<Value> argv[1] = {Number::New(isolate, signum)};
   Local<Function> Callback = Local<Function>::New(isolate, os->_onSignal);
-  Local<Value> ret = Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+  Local<Value> ret = Callback->Call(context, context->Global(), 1, argv).ToLocalChecked();
   uint32_t close = ret->Uint32Value(context).ToChecked();
   if (close == 1)
   {
@@ -83,3 +83,9 @@ void OS::on_signal(uv_signal_t *handle, int signum)
 
 } // namespace os
 } // namespace dv8
+
+extern "C" {
+	void* _register_os() {
+		return (void*)dv8::os::InitAll;
+	}
+}

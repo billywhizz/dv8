@@ -17,7 +17,7 @@ void Timer::Init(Local<Object> exports)
     Isolate *isolate = exports->GetIsolate();
     Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-    tpl->SetClassName(String::NewFromUtf8(isolate, "Timer"));
+    tpl->SetClassName(String::NewFromUtf8(isolate, "Timer").ToLocalChecked());
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", Timer::Start);
@@ -35,7 +35,7 @@ void Timer::New(const FunctionCallbackInfo<Value> &args)
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall()) {
         Local<Context> context = isolate->GetCurrentContext();
-        Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+        Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
         Timer *obj = new Timer();
         obj->handle = (uv_timer_t *)calloc(1, sizeof(uv_timer_t));
         int r = uv_timer_init(env->loop, obj->handle);
@@ -50,7 +50,7 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     Local<Function> onTimeout = Local<Function>::Cast(args[0]);
     Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
     t->onTimeout.Reset(isolate, onTimeout);
@@ -112,9 +112,10 @@ void Timer::OnTimeout(uv_timer_t *handle)
     v8::HandleScope handleScope(isolate);
     const unsigned int argc = 0;
     Local<Value> argv[argc] = {};
-    Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
     v8::TryCatch try_catch(isolate);
-    cb->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
+	Local<Context> ctx = isolate->GetCurrentContext();
+    cb->Call(ctx, ctx->Global(), 0, argv);
     if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
     }
@@ -122,3 +123,9 @@ void Timer::OnTimeout(uv_timer_t *handle)
 
 } // namespace timer
 } // namespace dv8
+
+extern "C" {
+	void* _register_timer() {
+		return (void*)dv8::timer::InitAll;
+	}
+}

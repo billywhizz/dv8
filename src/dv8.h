@@ -12,21 +12,15 @@
 #include <env.h>
 #include <string.h>
 
-#ifdef STATIC_BUILD
 #include <modules/loop/loop.h>
-#include <modules/socket/socket.h>
 #include <modules/timer/timer.h>
 #include <modules/thread/thread.h>
 #include <modules/process/process.h>
-#include <modules/udp/udp.h>
 #include <modules/tty/tty.h>
 #include <modules/os/os.h>
 #include <modules/fs/fs.h>
-#include <modules/libz/libz.h>
-#include <modules/httpParser/httpParser.h>
-#include <modules/picoHttpParser/picoHttpParser.h>
-#include <modules/openssl/openssl.h>
-#endif
+#include <modules/socket/socket.h>
+#include <modules/udp/udp.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
@@ -77,11 +71,6 @@ using v8::Platform;
 
 using InitializerCallback = void (*)(Local<Object> exports);
 
-enum {
-  kModuleEmbedderDataIndex,
-  kInspectorClientIndex
-};
-
 class InspectorFrontend final : public V8Inspector::Channel {
  public:
 
@@ -114,7 +103,10 @@ class InspectorFrontend final : public V8Inspector::Channel {
     if (callback->IsFunction()) {
       v8::TryCatch try_catch(isolate_);
       Local<Value> args[] = {message};
-      Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 1, args);
+      Local<Value> ret = Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 1, args).ToLocalChecked();
+      if (ret->IsNull()) {
+
+      }
     }
   }
 
@@ -145,7 +137,10 @@ class InspectorClient : public V8InspectorClient {
     if (callback->IsFunction()) {
       v8::TryCatch try_catch(isolate_);
       Local<Value> args[] = {};
-      Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args);
+      Local<Value> ret = Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args).ToLocalChecked();
+      if (ret->IsNull()) {
+
+      }
     }
   }
 
@@ -156,7 +151,10 @@ class InspectorClient : public V8InspectorClient {
     if (callback->IsFunction()) {
       v8::TryCatch try_catch(isolate_);
       Local<Value> args[] = {};
-      Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args);
+      Local<Value> ret = Local<Function>::Cast(callback)->Call(context, Undefined(isolate_), 0, args).ToLocalChecked();
+      if (ret->IsNull()) {
+
+      }
     }
   }
 
@@ -237,12 +235,14 @@ inline void DV8_SET_PROTOTYPE_METHOD(v8::Isolate *isolate, v8::Local<v8::Functio
 
 inline void DV8_SET_EXPORT(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate> recv, const char *name, v8::Local<v8::Object> exports) {
   v8::Local<v8::String> class_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
-  exports->Set(class_name, recv->GetFunction());
+  Local<Context> context = isolate->GetCurrentContext();
+  exports->Set(context, class_name, recv->GetFunction(context).ToLocalChecked());
 }
 
 inline void DV8_SET_EXPORT_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> obj, const char *name, v8::Local<v8::Object> exports) {
   v8::Local<v8::String> constant_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
-  exports->Set(constant_name, obj);
+  Local<Context> context = isolate->GetCurrentContext();
+  exports->Set(context, constant_name, obj);
 }
 
 inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate) {

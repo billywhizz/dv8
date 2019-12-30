@@ -31,7 +31,7 @@ using dv8::socket::socket_plugin;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "Hmac"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "Hmac").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", Hmac::Setup);
@@ -136,7 +136,7 @@ using dv8::socket::socket_plugin;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "Hash"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "Hash").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", Hash::Setup);
@@ -241,7 +241,7 @@ using dv8::socket::socket_plugin;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "SecureContext"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "SecureContext").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", SecureContext::Setup);
@@ -287,11 +287,13 @@ using dv8::socket::socket_plugin;
 		MaybeLocal<Value> ret;
 		Local<Function> onHost = Local<Function>::New(isolate, sock->_onHost);
 		if (servername) {
-			Local<Value> argv[1] = { String::NewFromUtf8(isolate, servername, v8::String::kNormalString) };
-			ret = onHost->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+			Local<Value> argv[1] = { String::NewFromUtf8(isolate, servername, v8::NewStringType::kNormal).ToLocalChecked() };
+			Local<Context> ctx = isolate->GetCurrentContext();
+			ret = onHost->Call(ctx, ctx->Global(), 1, argv);
 		} else {
 			Local<Value> argv[0] = {};
-			ret = onHost->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+			Local<Context> ctx = isolate->GetCurrentContext();
+			ret = onHost->Call(ctx, ctx->Global(), 0, argv);
 		}
 		if (ret.IsEmpty()) {
 			return SSL_TLSEXT_ERR_OK;
@@ -317,7 +319,7 @@ using dv8::socket::socket_plugin;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		SecureContext* obj = ObjectWrap::Unwrap<SecureContext>(args.Holder());
 		int sockType = SERVER_SOCKET;
@@ -409,7 +411,7 @@ using dv8::socket::socket_plugin;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "SecureSocket"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "SecureSocket").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", SecureSocket::Setup);
@@ -472,7 +474,8 @@ using dv8::socket::socket_plugin;
 					v8::HandleScope handleScope(isolate);
 					Local<Value> argv[1] = {Number::New(isolate, n)};
 					Local<Function> onRead = Local<Function>::New(isolate, secure->_onRead);
-					onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+					Local<Context> ctx = isolate->GetCurrentContext();
+					onRead->Call(ctx, ctx->Global(), 1, argv);
 				}
 				socket_plugin* plugin = (socket_plugin*)secure->plugin;
 				if (plugin->next) {
@@ -639,11 +642,12 @@ using dv8::socket::socket_plugin;
 		size_t outlen = context->out.len;
 		size_t inlen = context->in.len;
 		int n = SSL_do_handshake(secure->ssl);
+		Local<Context> ctx = isolate->GetCurrentContext();
 		if (n == 0) {
 			if (secure->callbacks.onError == 1) {
-				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::NewStringType::kNormal).ToLocalChecked()};
 				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+				onError->Call(ctx, ctx->Global(), 2, argv);
 			}
 			return n;
 		}
@@ -651,7 +655,7 @@ using dv8::socket::socket_plugin;
 			if (secure->callbacks.onSecure == 1) {
 				Local<Value> argv[0] = {};
 				Local<Function> onSecure = Local<Function>::New(isolate, secure->_onSecure);
-				onSecure->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+				onSecure->Call(ctx, ctx->Global(), 0, argv);
 			}
 			cycleOut(secure, (uv_stream_t *)context->handle, out, outlen);
 			return 0;
@@ -663,16 +667,16 @@ using dv8::socket::socket_plugin;
 		}
 		if (n == SSL_ERROR_SSL) {
 			if (secure->callbacks.onError == 1) {
-				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+				Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::NewStringType::kNormal).ToLocalChecked()};
 				Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-				onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+				onError->Call(ctx, ctx->Global(), 2, argv);
 			}
 			return n;
 		}
 		if (secure->callbacks.onError == 1) {
-			Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::String::kNormalString)};
+			Local<Value> argv[2] = {Number::New(isolate, n), String::NewFromUtf8(isolate, ERR_error_string(ERR_get_error(), NULL), v8::NewStringType::kNormal).ToLocalChecked()};
 			Local<Function> onError = Local<Function>::New(isolate, secure->_onError);
-			onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+			onError->Call(ctx, ctx->Global(), 2, argv);
 		}
 		return n;
 	}
@@ -688,7 +692,7 @@ using dv8::socket::socket_plugin;
 	void SecureSocket::Setup(const FunctionCallbackInfo<Value> &args) {
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		SecureSocket* secure = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
 		SecureContext *secureContext = ObjectWrap::Unwrap<SecureContext>(args[0].As<v8::Object>());
@@ -739,3 +743,9 @@ using dv8::socket::socket_plugin;
 
 }
 }	
+
+extern "C" {
+	void* _register_openssl() {
+		return (void*)dv8::openssl::InitAll;
+	}
+}

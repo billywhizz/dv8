@@ -40,7 +40,7 @@ private:
   static void Read(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Write(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Copy(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static void Length(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Size(const v8::FunctionCallbackInfo<v8::Value> &args);
 };
 
 } // namespace builtins

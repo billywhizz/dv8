@@ -5,11 +5,13 @@ app/count
 app/*.sh
 *.o
 *.so
-*.a
 build/dv8
 *.ods
 build/count
 *.gz
+*.a
 scratch
 deploy.sh
 out
+deps/v8/gen
+.ccache

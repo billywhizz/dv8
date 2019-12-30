@@ -59,7 +59,8 @@ void after_write(uv_write_t *req, int status)
   {
     Local<Value> argv[2] = {Integer::New(isolate, wr->buf.len), Integer::New(isolate, status)};
     Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-    onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+    Local<Context> ctx = isolate->GetCurrentContext();
+    onWrite->Call(ctx, ctx->Global(), 2, argv);
   }
   if (status < 0)
   {
@@ -71,7 +72,8 @@ void after_write(uv_write_t *req, int status)
     {
       Local<Value> argv[1] = {Number::New(isolate, status)};
       Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
-      Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      Local<Context> ctx = isolate->GetCurrentContext();
+      Callback->Call(ctx, ctx->Global(), 1, argv);
     }
     return;
   }
@@ -89,7 +91,8 @@ void after_write(uv_write_t *req, int status)
       {
         Local<Value> argv[0] = {};
         Local<Function> Callback = Local<Function>::New(isolate, socket->_onDrain);
-        Callback->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+        Local<Context> ctx = isolate->GetCurrentContext();
+        Callback->Call(ctx, ctx->Global(), 0, argv);
       }
       ctx->stats.out.drain++;
       ctx->blocked = false;
@@ -117,7 +120,8 @@ void on_close(uv_handle_t *peer)
   {
     Local<Value> argv[0] = {};
     Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
-    onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    Local<Context> context = isolate->GetCurrentContext();
+    onClose->Call(context, context->Global(), 0, argv);
   }
   context_free(peer);
   if (s->first) {
@@ -135,7 +139,8 @@ void on_close2(uv_handle_t *peer)
   {
     Local<Value> argv[0] = {};
     Local<Function> onClose = Local<Function>::New(isolate, s->_onClose);
-    onClose->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    Local<Context> ctx = isolate->GetCurrentContext();
+    onClose->Call(ctx, ctx->Global(), 0, argv);
   }
   free(peer);
 }
@@ -174,7 +179,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       Local<Value> argv[1] = {Number::New(isolate, nread)};
       Local<Function> onRead = Local<Function>::New(isolate, s->_onRead);
-      onRead->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+      Local<Context> context = isolate->GetCurrentContext();
+      onRead->Call(context, context->Global(), 1, argv);
     }
   }
   else if (nread == UV_EOF) {
@@ -182,7 +188,8 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
     {
       Local<Value> argv[0] = {};
       Local<Function> onEnd = Local<Function>::New(isolate, s->_onEnd);
-      onEnd->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+      Local<Context> context = isolate->GetCurrentContext();
+      onEnd->Call(context, context->Global(), 0, argv);
     }
     ctx->stats.in.end++;
     if (uv_is_closing((uv_handle_t *)handle) == 0) {
@@ -193,9 +200,10 @@ void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
   else if (nread < 0) {
     if (s->callbacks.onError == 1)
     {
-      Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::String::kNormalString)};
+      Local<Value> argv[2] = {Number::New(isolate, nread), String::NewFromUtf8(isolate, uv_strerror(nread), v8::NewStringType::kNormal).ToLocalChecked()};
       Local<Function> onError = Local<Function>::New(isolate, s->_onError);
-      onError->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+      Local<Context> context = isolate->GetCurrentContext();
+      onError->Call(context, context->Global(), 2, argv);
     }
     ctx->stats.in.end++;
     ctx->stats.error++;
@@ -244,7 +252,7 @@ void on_connection(uv_stream_t *server, int status)
   Isolate *isolate = Isolate::GetCurrent();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (s->socktype == TCP)
   {
     stream = (uv_stream_t *)malloc(sizeof(uv_tcp_t));
@@ -273,9 +281,10 @@ void on_connection(uv_stream_t *server, int status)
       Local<Value> argv[0] = {};
       Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
       v8::TryCatch try_catch(isolate);
-      Local<Value> result = foo->Call(context->Global(), 0, argv);
+      Local<Value> result = foo->Call(context, context->Global(), 0, argv).ToLocalChecked();
       if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
+        return;
       }
       Local<Object> sock;
       bool ok = result->ToObject(context).ToLocal(&sock);
@@ -294,7 +303,7 @@ void Socket::Init(Local<Object> exports)
   Isolate *isolate = exports->GetIsolate();
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-  tpl->SetClassName(String::NewFromUtf8(isolate, "Socket"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "Socket").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listen", Listen);
@@ -437,7 +446,7 @@ void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
   int len = sizeof ip;
   uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
   len = strlen(ip);
-  args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::String::kNormalString, len));
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked());
   return;
 }
 
@@ -487,7 +496,8 @@ int onNewConnection(_context *ctx)
     Local<Value> argv[0] = {};
     Local<Function> foo = Local<Function>::New(isolate, obj->_onConnect);
     v8::TryCatch try_catch(isolate);
-    foo->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+    Local<Context> context = isolate->GetCurrentContext();
+    foo->Call(context, context->Global(), 0, argv);
     if (try_catch.HasCaught()) {
       dv8::ReportException(isolate, &try_catch);
     }
@@ -518,7 +528,7 @@ void Socket::SetKeepAlive(const FunctionCallbackInfo<Value> &args)
   Local<Context> context = isolate->GetCurrentContext();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
-  int enable = static_cast<int>(args[0]->BooleanValue(context).ToChecked());
+  int enable = static_cast<int>(args[0]->BooleanValue(isolate));
   unsigned int delay = args[1]->Uint32Value(context).ToChecked();
   int r = uv_tcp_keepalive((uv_tcp_t *)ctx->handle, enable, delay);
   args.GetReturnValue().Set(Integer::New(isolate, r));
@@ -535,10 +545,9 @@ void Socket::UnRef(const FunctionCallbackInfo<Value> &args)
 void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
-  Local<Context> context = isolate->GetCurrentContext();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
-  int enable = static_cast<int>(args[0]->BooleanValue(context).ToChecked());
+  int enable = static_cast<int>(args[0]->BooleanValue(isolate));
   int r = uv_tcp_nodelay((uv_tcp_t *)ctx->handle, enable);
   args.GetReturnValue().Set(Integer::New(isolate, r));
 }
@@ -612,7 +621,8 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
       {
         Local<Value> argv[1] = {Number::New(isolate, r)};
         Local<Function> Callback = Local<Function>::New(isolate, socket->_onError);
-        Callback->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+        Local<Context> context = isolate->GetCurrentContext();
+        Callback->Call(context, context->Global(), 1, argv);
       }
     }
     else if ((uint32_t)r < len)
@@ -632,7 +642,8 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
       {
         Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, status)};
         Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+        Local<Context> context = isolate->GetCurrentContext();
+        onWrite->Call(context, context->Global(), 2, argv);
       }
       if (status != 0)
       {
@@ -645,7 +656,8 @@ void Socket::Write(const FunctionCallbackInfo<Value> &args)
       {
         Local<Value> argv[2] = {Integer::New(isolate, r), Integer::New(isolate, 0)};
         Local<Function> onWrite = Local<Function>::New(isolate, socket->_onWrite);
-        onWrite->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+        Local<Context> context = isolate->GetCurrentContext();
+        onWrite->Call(context, context->Global(), 2, argv);
       }
     }
   } else {
@@ -748,7 +760,7 @@ void Socket::Connect(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   s->isServer = false;
   if (s->socktype == TCP)
   {
@@ -910,7 +922,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
   if (args[0]->IsNumber())
   { // we have been passed a socket handle that has already been bound
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     int fd = args[0]->Int32Value(context).ToChecked();
     if (s->socktype == TCP)
     {
@@ -975,7 +987,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
   else if (s->socktype == TCP)
   { // we are getting a port so must be TCP
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
     sock->data = s;
     String::Utf8Value str(args.GetIsolate(), args[0]);
@@ -1015,7 +1027,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
   else if (s->socktype == UNIX)
   { // use first argument as path to domain socket
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     String::Utf8Value str(args.GetIsolate(), args[0]);
     const char *path = *str;
     uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
@@ -1063,7 +1075,7 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   int argc = args.Length();
   if (argc == 0) {
     int fd[2];
@@ -1119,7 +1131,7 @@ void Socket::Bind(const FunctionCallbackInfo<Value> &args)
   if (s->socktype == TCP)
   {
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     const unsigned int port = args[1]->IntegerValue(context).ToChecked();
     uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
     sock->data = s;
@@ -1151,7 +1163,7 @@ void Socket::Bind(const FunctionCallbackInfo<Value> &args)
   else if (s->socktype == UNIX)
   { // it is a domain socket
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     String::Utf8Value str(args.GetIsolate(), args[0]);
     const char *path = *str;
     uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
@@ -1182,3 +1194,9 @@ void Socket::Bind(const FunctionCallbackInfo<Value> &args)
 }
 } // namespace socket
 } // namespace dv8
+
+extern "C" {
+	void* _register_socket() {
+		return (void*)dv8::socket::InitAll;
+	}
+}

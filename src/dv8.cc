@@ -8,7 +8,7 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
   HandleScope handle_scope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   PromiseRejectEvent event = message.GetEvent();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (!env->onUnhandledRejection.IsEmpty() && event == v8::kPromiseRejectWithNoHandler) {
     const unsigned int argc = 3;
     Local<Object> globalInstance = context->Global();
@@ -17,7 +17,7 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
     Local<Value> argv[argc] = { promise, value, Integer::New(isolate, event) };
     Local<Function> onUnhandledRejection = Local<Function>::New(isolate, env->onUnhandledRejection);
     TryCatch try_catch(isolate);
-    onUnhandledRejection->Call(globalInstance, 3, argv);
+    onUnhandledRejection->Call(context, globalInstance, 3, argv);
     if (try_catch.HasCaught()) {
       dv8::ReportException(isolate, &try_catch);
     }
@@ -44,14 +44,14 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
   HandleScope handle_scope(isolate);
   Local<Context> context(isolate->GetCurrentContext());
   Local<Object> globalInstance = context->Global();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   Local<Value> er = try_catch->Exception();
   Local<Message> message = try_catch->Message();
   if (message.IsEmpty()) {
     message = Exception::CreateMessage(isolate, er);
   }
   String::Utf8Value filename(isolate, message->GetScriptOrigin().ResourceName());
-  Local<Value> func = globalInstance->Get(String::NewFromUtf8(isolate, "onUncaughtException", NewStringType::kNormal).ToLocalChecked());
+  Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onUncaughtException", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
   Local<Function> onUncaughtException = Local<Function>::Cast(func);
   Local<Object> err_obj = er->ToObject(context).ToLocalChecked();
   env->err.Reset(isolate, err_obj);
@@ -63,25 +63,29 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
   env->error->linenum = linenum;
   env->error->filename = (char*)calloc(strlen(filename_string), 1);
   memcpy(env->error->filename, filename_string, strlen(filename_string));
-  err_obj->Set(String::NewFromUtf8(isolate, "fileName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, filename_string, v8::NewStringType::kNormal).ToLocalChecked());
+  err_obj->Set(context, String::NewFromUtf8(isolate, "fileName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, filename_string, v8::NewStringType::kNormal).ToLocalChecked());
   env->error->exception = (char*)calloc(strlen(exception_string), 1);
   memcpy(env->error->exception, exception_string, strlen(exception_string));
-  err_obj->Set(String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
+  err_obj->Set(context, String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
+  
   String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
   char *sourceline_string = *sourceline;
   env->error->sourceline = (char*)calloc(strlen(sourceline_string), 1);
   memcpy(env->error->sourceline, sourceline_string, strlen(sourceline_string));
-  err_obj->Set(String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
+  err_obj->Set(context, String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
   Local<Value> stack_trace_string;
+  //Local<v8::StackTrace> trace = message->GetStackTrace();
+  //v8::internal::Isolate::Current()->PrintStack((FILE*) stderr, 1);
+  
   if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) && stack_trace_string->IsString() && Local<String>::Cast(stack_trace_string)->Length() > 0) {
     String::Utf8Value stack_trace(isolate, stack_trace_string);
     char *stack_trace_string = *stack_trace;
     env->error->stack = (char*)calloc(strlen(stack_trace_string), 1);
-    err_obj->Set(String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, stack_trace_string, v8::NewStringType::kNormal).ToLocalChecked());
+    err_obj->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, stack_trace_string, v8::NewStringType::kNormal).ToLocalChecked());
     memcpy(env->error->stack, stack_trace_string, strlen(stack_trace_string));
   }
   Local<Value> argv[1] = { err_obj };
-  onUncaughtException->Call(globalInstance, 1, argv);
+  onUncaughtException->Call(context, globalInstance, 1, argv);
 }
 
 void Version(const FunctionCallbackInfo<Value> &args) {
@@ -112,7 +116,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
   const char *module_name = *str;
-  const char *module_path = "/usr/local/lib/";
+  const char *module_path = "/usr/local/lib/dv8/";
   char lib_name[128];
   Local<Object> exports;
   bool ok = args[1]->ToObject(context).ToLocal(&exports);
@@ -120,72 +124,51 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     args.GetReturnValue().Set(Null(isolate));
     return;
   }
-#ifdef STATIC_BUILD
-  if (strcmp("loop", module_name) == 0) {
-		dv8::loop::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("socket", module_name) == 0) {
-		dv8::socket::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("timer", module_name) == 0) {
-		dv8::timer::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("thread", module_name) == 0) {
-		dv8::thread::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("process", module_name) == 0) {
-		dv8::process::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("udp", module_name) == 0) {
-		dv8::udp::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("os", module_name) == 0) {
-		dv8::os::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("tty", module_name) == 0) {
-		dv8::tty::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("os", module_name) == 0) {
-		dv8::os::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("fs", module_name) == 0) {
-		dv8::fs::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("libz", module_name) == 0) {
-		dv8::libz::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("openssl", module_name) == 0) {
-		dv8::openssl::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("httpParser", module_name) == 0) {
-		dv8::httpParser::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  } else if (strcmp("picoHttpParser", module_name) == 0) {
-		dv8::picoHttpParser::InitAll(exports);
-    args.GetReturnValue().Set(exports);
-    return;
-  }
-#endif
   if (args.Length() > 2) {
     String::Utf8Value str(args.GetIsolate(), args[2]);
     module_path = *str;
     snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
   } else {
+    if (strcmp("loop", module_name) == 0) {
+      dv8::loop::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("socket", module_name) == 0) {
+      dv8::socket::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("timer", module_name) == 0) {
+      dv8::timer::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("thread", module_name) == 0) {
+      dv8::thread::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("fs", module_name) == 0) {
+      dv8::fs::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("udp", module_name) == 0) {
+      dv8::udp::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("process", module_name) == 0) {
+      dv8::process::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("tty", module_name) == 0) {
+      dv8::tty::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("os", module_name) == 0) {
+      dv8::os::InitAll(exports);
+      args.GetReturnValue().Set(exports);
+      return;
+    }
     snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
   }
+#ifdef NO_DLOPEN  
   uv_lib_t lib;
   int success = uv_dlopen(lib_name, &lib);
   if (success != 0) {
@@ -206,8 +189,9 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
+  //uv_dlclose(&lib);
+#endif
   args.GetReturnValue().Set(exports);
-  uv_dlclose(&lib);
 }
 
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer) {
@@ -227,12 +211,13 @@ void CollectGarbage(const FunctionCallbackInfo<Value> &args) {
 void EnvVars(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
   int size = 0;
   while (environ[size]) size++;
   Local<v8::Array> envarr = v8::Array::New(isolate);
   for (int i = 0; i < size; ++i) {
     const char *var = environ[i];
-    envarr->Set(i, String::NewFromUtf8(isolate, var, v8::String::kNormalString, strlen(var)));
+    envarr->Set(context, i, String::NewFromUtf8(isolate, var, v8::NewStringType::kNormal, strlen(var)).ToLocalChecked());
   }
   args.GetReturnValue().Set(envarr);
 }
@@ -241,7 +226,7 @@ void OnExit(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (args[0]->IsFunction()) {
     Local<Function> onExit = Local<Function>::Cast(args[0]);
     env->onExit.Reset(isolate, onExit);
@@ -254,7 +239,7 @@ void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   size_t rss;
   int err = uv_resident_set_memory(&rss);
   if (err) {
-    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::String::kNormalString));
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::NewStringType::kNormal).ToLocalChecked());
   }
   HeapStatistics v8_heap_stats;
   isolate->GetHeapStatistics(&v8_heap_stats);
@@ -281,7 +266,7 @@ void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (args[0]->IsFunction()) {
     Local<Function> onUnhandledRejection = Local<Function>::Cast(args[0]);
     env->onUnhandledRejection.Reset(isolate, onUnhandledRejection);

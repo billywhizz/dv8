@@ -5,8 +5,9 @@
 #ifndef V8_REGEXP_REGEXP_MACRO_ASSEMBLER_H_
 #define V8_REGEXP_REGEXP_MACRO_ASSEMBLER_H_
 
-#include "src/label.h"
+#include "src/codegen/label.h"
 #include "src/regexp/regexp-ast.h"
+#include "src/regexp/regexp.h"
 
 namespace v8 {
 namespace internal {
@@ -206,7 +207,12 @@ class NativeRegExpMacroAssembler: public RegExpMacroAssembler {
   // FAILURE: Matching failed.
   // SUCCESS: Matching succeeded, and the output array has been filled with
   //        capture positions.
-  enum Result { RETRY = -2, EXCEPTION = -1, FAILURE = 0, SUCCESS = 1 };
+  enum Result {
+    FAILURE = RegExp::kInternalRegExpFailure,
+    SUCCESS = RegExp::kInternalRegExpSuccess,
+    EXCEPTION = RegExp::kInternalRegExpException,
+    RETRY = RegExp::kInternalRegExpRetry,
+  };
 
   NativeRegExpMacroAssembler(Isolate* isolate, Zone* zone);
   ~NativeRegExpMacroAssembler() override;
@@ -244,9 +250,11 @@ class NativeRegExpMacroAssembler: public RegExpMacroAssembler {
   }
 
   // Returns a {Result} sentinel, or the number of successful matches.
-  static int Execute(Code code, String input, int start_offset,
-                     const byte* input_start, const byte* input_end,
-                     int* output, int output_size, Isolate* isolate);
+  V8_EXPORT_PRIVATE static int Execute(Code code, String input,
+                                       int start_offset,
+                                       const byte* input_start,
+                                       const byte* input_end, int* output,
+                                       int output_size, Isolate* isolate);
 };
 
 }  // namespace internal

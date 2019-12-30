@@ -33,16 +33,20 @@ typedef struct
 	char* source;
 	char* name;
 	js_error error;
+	uv_async_t *async;
+	uv_thread_t tid;
 } thread_handle;
 
 void InitAll(Local<Object> exports);
+
+void on_context_complete(thread_handle *th, int status);
 
 class Thread : public dv8::ObjectWrap
 {
   public:
 	static void Init(v8::Local<v8::Object> exports);
-	uv_work_t *handle;
 	v8::Persistent<v8::Function> onComplete;
+	thread_handle *handle;
 
   private:
 	Thread()

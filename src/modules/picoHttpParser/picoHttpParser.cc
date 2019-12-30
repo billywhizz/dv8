@@ -16,7 +16,7 @@ using dv8::socket::socket_plugin;
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "PicoHTTPParser"));
+		tpl->SetClassName(String::NewFromUtf8(isolate, "PicoHTTPParser").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", PicoHTTPParser::Reset);
@@ -73,7 +73,8 @@ using dv8::socket::socket_plugin;
 				if (parser->callbacks.onHeaders == 1) {
 					Local<Value> argv[0] = {};
 					Local<Function> onHeaders = Local<Function>::New(isolate, parser->_onHeaders);
-					onHeaders->Call(isolate->GetCurrentContext()->Global(), 0, argv);
+					Local<Context> context = isolate->GetCurrentContext();
+					onHeaders->Call(context, context->Global(), 0, argv);
 				}
 			}
 			off += 16 - nlen;
@@ -136,3 +137,9 @@ using dv8::socket::socket_plugin;
 	
 }
 }	
+
+extern "C" {
+	void* _register_picoHttpParser() {
+		return (void*)dv8::picoHttpParser::InitAll;
+	}
+}
