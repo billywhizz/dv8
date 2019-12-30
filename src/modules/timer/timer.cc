@@ -35,7 +35,7 @@ void Timer::New(const FunctionCallbackInfo<Value> &args)
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall()) {
         Local<Context> context = isolate->GetCurrentContext();
-        Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+        Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
         Timer *obj = new Timer();
         obj->handle = (uv_timer_t *)calloc(1, sizeof(uv_timer_t));
         int r = uv_timer_init(env->loop, obj->handle);
@@ -50,7 +50,7 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     Local<Function> onTimeout = Local<Function>::Cast(args[0]);
     Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
     t->onTimeout.Reset(isolate, onTimeout);

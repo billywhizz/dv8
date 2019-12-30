@@ -71,11 +71,6 @@ using v8::Platform;
 
 using InitializerCallback = void (*)(Local<Object> exports);
 
-enum {
-  kModuleEmbedderDataIndex,
-  kInspectorClientIndex
-};
-
 class InspectorFrontend final : public V8Inspector::Channel {
  public:
 

@@ -5,6 +5,9 @@
 
 namespace dv8
 {
+const int kModuleEmbedderDataIndex = 32;
+const int kInspectorClientIndex = 33;
+
 
 namespace builtins
 {
@@ -19,7 +22,7 @@ class Environment
 
     inline void AssignToContext(v8::Local<v8::Context> context)
     {
-        context->SetAlignedPointerInEmbedderData(32, this);
+        context->SetAlignedPointerInEmbedderData(kModuleEmbedderDataIndex, this);
     }
     Environment()
     {

@@ -62,7 +62,7 @@ namespace ${name} {
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		${className}* obj = ObjectWrap::Unwrap<${className}>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));

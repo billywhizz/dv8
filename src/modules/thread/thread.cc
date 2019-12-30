@@ -105,7 +105,7 @@ void on_context_complete(uv_async_t *async)
 	Isolate *isolate = Isolate::GetCurrent();
 	v8::HandleScope handleScope(isolate);
 	Local<Context> context = isolate->GetCurrentContext();
-	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 	Local<Function> foo = Local<Function>::New(isolate, t->onComplete);
 	Local<Value> errObj;
 	if (env->err.IsEmpty()) {
@@ -179,7 +179,7 @@ void Thread::Stop(const FunctionCallbackInfo<Value> &args)
 {
 	Isolate *isolate = args.GetIsolate();
 	Local<Context> context = isolate->GetCurrentContext();
-	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 	v8::HandleScope handleScope(isolate);
 	//TODO: need to signal the thread. then it should invoke an onExit event and shutdown event loop when it returns
 	// i.e. same behaviour as when thread gets SIGTERM
@@ -190,7 +190,7 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 {
 	Isolate *isolate = args.GetIsolate();
 	Local<Context> context = isolate->GetCurrentContext();
-	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 	v8::HandleScope handleScope(isolate);
 	int argc = args.Length();
 	Thread *obj = ObjectWrap::Unwrap<Thread>(args.Holder());

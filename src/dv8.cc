@@ -8,7 +8,7 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
   HandleScope handle_scope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   PromiseRejectEvent event = message.GetEvent();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (!env->onUnhandledRejection.IsEmpty() && event == v8::kPromiseRejectWithNoHandler) {
     const unsigned int argc = 3;
     Local<Object> globalInstance = context->Global();
@@ -44,7 +44,7 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
   HandleScope handle_scope(isolate);
   Local<Context> context(isolate->GetCurrentContext());
   Local<Object> globalInstance = context->Global();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   Local<Value> er = try_catch->Exception();
   Local<Message> message = try_catch->Message();
   if (message.IsEmpty()) {
@@ -226,7 +226,7 @@ void OnExit(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (args[0]->IsFunction()) {
     Local<Function> onExit = Local<Function>::Cast(args[0]);
     env->onExit.Reset(isolate, onExit);
@@ -266,7 +266,7 @@ void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (args[0]->IsFunction()) {
     Local<Function> onUnhandledRejection = Local<Function>::Cast(args[0]);
     env->onUnhandledRejection.Reset(isolate, onUnhandledRejection);

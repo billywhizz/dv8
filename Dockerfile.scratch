@@ -1,4 +1,4 @@
-FROM alpine:3.9 AS builder
+FROM alpine:3.10 AS builder
 RUN apk update
 RUN adduser -D -g '' appuser
 FROM scratch

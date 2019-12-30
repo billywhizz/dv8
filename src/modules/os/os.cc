@@ -41,7 +41,7 @@ void OS::OnSignal(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   OS *os = ObjectWrap::Unwrap<OS>(args.Holder());
   if (args.Length() > 0)
   {

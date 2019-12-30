@@ -49,7 +49,7 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   HeapSpaceStatistics s;
   size_t number_of_heap_spaces = isolate->NumberOfHeapSpaces();
   Local<Object> o = Object::New(isolate);

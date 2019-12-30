@@ -41,7 +41,7 @@ using dv8::builtins::Buffer;
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		if (args.IsConstructCall()) {
 			EventLoop* obj = new EventLoop();
 
@@ -80,7 +80,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		uv_stop(env->loop);
@@ -91,7 +91,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		int mode = args[0]->IntegerValue(context).ToChecked();
@@ -103,7 +103,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		uv_ref((uv_handle_t*)obj->idle_handle);
@@ -114,7 +114,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
@@ -148,7 +148,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		uv_unref((uv_handle_t*)obj->idle_handle);
@@ -159,7 +159,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		int alive = uv_loop_alive(env->loop);
@@ -175,7 +175,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		int ok = uv_loop_close(env->loop);
@@ -186,7 +186,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		uv_close((uv_handle_t*)obj->prepare_handle, OnClose);
@@ -239,7 +239,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		int argc = args.Length();
@@ -259,7 +259,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		int argc = args.Length();
@@ -279,7 +279,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		int argc = args.Length();

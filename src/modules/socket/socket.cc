@@ -252,7 +252,7 @@ void on_connection(uv_stream_t *server, int status)
   Isolate *isolate = Isolate::GetCurrent();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   if (s->socktype == TCP)
   {
     stream = (uv_stream_t *)malloc(sizeof(uv_tcp_t));
@@ -760,7 +760,7 @@ void Socket::Connect(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   s->isServer = false;
   if (s->socktype == TCP)
   {
@@ -922,7 +922,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
   if (args[0]->IsNumber())
   { // we have been passed a socket handle that has already been bound
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     int fd = args[0]->Int32Value(context).ToChecked();
     if (s->socktype == TCP)
     {
@@ -987,7 +987,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
   else if (s->socktype == TCP)
   { // we are getting a port so must be TCP
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
     sock->data = s;
     String::Utf8Value str(args.GetIsolate(), args[0]);
@@ -1027,7 +1027,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
   else if (s->socktype == UNIX)
   { // use first argument as path to domain socket
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     String::Utf8Value str(args.GetIsolate(), args[0]);
     const char *path = *str;
     uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
@@ -1075,7 +1075,7 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   int argc = args.Length();
   if (argc == 0) {
     int fd[2];
@@ -1131,7 +1131,7 @@ void Socket::Bind(const FunctionCallbackInfo<Value> &args)
   if (s->socktype == TCP)
   {
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     const unsigned int port = args[1]->IntegerValue(context).ToChecked();
     uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
     sock->data = s;
@@ -1163,7 +1163,7 @@ void Socket::Bind(const FunctionCallbackInfo<Value> &args)
   else if (s->socktype == UNIX)
   { // it is a domain socket
     Local<Context> context = isolate->GetCurrentContext();
-    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+    Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     String::Utf8Value str(args.GetIsolate(), args[0]);
     const char *path = *str;
     uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));

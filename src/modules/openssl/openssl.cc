@@ -319,7 +319,7 @@ using dv8::socket::socket_plugin;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		SecureContext* obj = ObjectWrap::Unwrap<SecureContext>(args.Holder());
 		int sockType = SERVER_SOCKET;
@@ -692,7 +692,7 @@ using dv8::socket::socket_plugin;
 	void SecureSocket::Setup(const FunctionCallbackInfo<Value> &args) {
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		SecureSocket* secure = ObjectWrap::Unwrap<SecureSocket>(args.Holder());
 		SecureContext *secureContext = ObjectWrap::Unwrap<SecureContext>(args[0].As<v8::Object>());

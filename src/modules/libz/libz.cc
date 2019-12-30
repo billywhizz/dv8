@@ -100,7 +100,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		ZLib* obj = ObjectWrap::Unwrap<ZLib>(args.Holder());
     Buffer *in = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
@@ -134,7 +134,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		ZLib* obj = ObjectWrap::Unwrap<ZLib>(args.Holder());
 		unsigned int flush = Z_NO_FLUSH;
@@ -215,7 +215,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		ZLib* obj = ObjectWrap::Unwrap<ZLib>(args.Holder());
 		deflateEnd(&obj->strm_);

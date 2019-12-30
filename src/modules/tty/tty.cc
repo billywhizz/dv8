@@ -191,7 +191,7 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
     HandleScope handle_scope(isolate);
     if (args.IsConstructCall()) {
         Local<Context> context = isolate->GetCurrentContext();
-        Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(32));
+        Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 
         TTY *obj = new TTY();
         obj->handle = (uv_tty_t *)calloc(1, sizeof(uv_tty_t));

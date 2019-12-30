@@ -56,7 +56,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		String::Utf8Value filename(isolate, args[0]);
@@ -75,7 +75,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		int argc = args.Length();
@@ -97,7 +97,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		int argc = args.Length();
@@ -119,7 +119,7 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		String::Utf8Value filename(isolate, args[0]);
@@ -264,7 +264,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -274,7 +274,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -284,7 +284,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -294,7 +294,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -304,7 +304,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -314,7 +314,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -324,7 +324,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
@@ -334,7 +334,7 @@ EWOULDBLOCK
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(32));
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
