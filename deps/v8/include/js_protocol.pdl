@@ -224,8 +224,19 @@ domain Debugger
       # Id of the script to get source for.
       Runtime.ScriptId scriptId
     returns
-      # Script source.
+      # Script source (empty in case of Wasm bytecode).
       string scriptSource
+      # Wasm bytecode.
+      optional binary bytecode
+
+  # This command is deprecated. Use getScriptSource instead.
+  deprecated command getWasmBytecode
+    parameters
+      # Id of the Wasm script to get source for.
+      Runtime.ScriptId scriptId
+    returns
+      # Script source.
+      binary bytecode
 
   # Returns stack trace with given `stackTraceId`.
   experimental command getStackTrace
@@ -237,7 +248,7 @@ domain Debugger
   # Stops on the next JavaScript statement.
   command pause
 
-  experimental command pauseOnAsyncCall
+  experimental deprecated command pauseOnAsyncCall
     parameters
       # Debugger will pause when async call with given stack trace is started.
       Runtime.StackTraceId parentStackTraceId
@@ -435,7 +446,7 @@ domain Debugger
   # Steps into the function call.
   command stepInto
     parameters
-      # Debugger will issue additional Debugger.paused notification if any async task is scheduled
+      # Debugger will pause on the execution of the first async task which was scheduled
       # before next pause.
       experimental optional boolean breakOnAsyncCall
 
@@ -479,9 +490,8 @@ domain Debugger
       optional Runtime.StackTrace asyncStackTrace
       # Async stack trace, if any.
       experimental optional Runtime.StackTraceId asyncStackTraceId
-      # Just scheduled async call will have this stack trace as parent stack during async execution.
-      # This field is available only after `Debugger.stepInto` call with `breakOnAsynCall` flag.
-      experimental optional Runtime.StackTraceId asyncCallStackTraceId
+      # Never present, will be removed.
+      experimental deprecated optional Runtime.StackTraceId asyncCallStackTraceId
 
   # Fired when the virtual machine resumed execution.
   event resumed
@@ -775,6 +785,14 @@ domain Profiler
       # Type profile entries for parameters and return values of the functions in the script.
       array of TypeProfileEntry entries
 
+  # Collected counter information.
+  experimental type CounterInfo extends object
+    properties
+      # Counter name.
+      string name
+      # Counter value.
+      integer value
+
   command disable
 
   command enable
@@ -831,6 +849,18 @@ domain Profiler
     returns
       # Type profile for all scripts since startTypeProfile() was turned on.
       array of ScriptTypeProfile result
+
+  # Enable run time call stats collection.
+  experimental command enableRuntimeCallStats
+
+  # Disable run time call stats collection.
+  experimental command disableRuntimeCallStats
+
+  # Retrieve run time call stats.
+  experimental command getRuntimeCallStats
+    returns
+      # Collected counter information.
+      array of CounterInfo result
 
   event consoleProfileFinished
     parameters
@@ -1243,9 +1273,14 @@ domain Runtime
       # resolved.
       optional boolean awaitPromise
       # Whether to throw an exception if side effect cannot be ruled out during evaluation.
+      # This implies `disableBreaks` below.
       experimental optional boolean throwOnSideEffect
       # Terminate execution after timing out (number of milliseconds).
       experimental optional TimeDelta timeout
+      # Disable breakpoints during execution.
+      experimental optional boolean disableBreaks
+      # Reserved flag for future REPL mode support. Setting this flag has currently no effect.
+      experimental optional boolean replMode
     returns
       # Evaluation result.
       RemoteObject result

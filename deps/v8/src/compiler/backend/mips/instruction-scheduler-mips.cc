@@ -41,6 +41,26 @@ int InstructionScheduler::GetTargetInstructionFlags(
     case kMipsDivS:
     case kMipsDivU:
     case kMipsExt:
+    case kMipsF64x2Abs:
+    case kMipsF64x2Neg:
+    case kMipsF64x2Sqrt:
+    case kMipsF64x2Add:
+    case kMipsF64x2Sub:
+    case kMipsF64x2Mul:
+    case kMipsF64x2Div:
+    case kMipsF64x2Eq:
+    case kMipsF64x2Ne:
+    case kMipsF64x2Lt:
+    case kMipsF64x2Le:
+    case kMipsF64x2Splat:
+    case kMipsF64x2ExtractLane:
+    case kMipsF64x2ReplaceLane:
+    case kMipsI64x2Add:
+    case kMipsI64x2Sub:
+    case kMipsI64x2Neg:
+    case kMipsI64x2Shl:
+    case kMipsI64x2ShrS:
+    case kMipsI64x2ShrU:
     case kMipsF32x4Abs:
     case kMipsF32x4Add:
     case kMipsF32x4AddHoriz:
@@ -51,8 +71,10 @@ int InstructionScheduler::GetTargetInstructionFlags(
     case kMipsF32x4Max:
     case kMipsF32x4Min:
     case kMipsF32x4Mul:
+    case kMipsF32x4Div:
     case kMipsF32x4Ne:
     case kMipsF32x4Neg:
+    case kMipsF32x4Sqrt:
     case kMipsF32x4RecipApprox:
     case kMipsF32x4RecipSqrtApprox:
     case kMipsF32x4ReplaceLane:
@@ -226,6 +248,7 @@ int InstructionScheduler::GetTargetInstructionFlags(
     case kMipsS8x16PackEven:
     case kMipsS8x16PackOdd:
     case kMipsS8x16Shuffle:
+    case kMipsS8x16Swizzle:
     case kMipsS8x2Reverse:
     case kMipsS8x4Reverse:
     case kMipsS8x8Reverse:
@@ -1673,7 +1696,6 @@ int InstructionScheduler::GetInstructionLatency(const Instruction* instr) {
     case kMipsCmp:
       return 0;
     case kArchDebugBreak:
-    case kArchStackPointer:
     case kArchFramePointer:
     case kArchParentFramePointer:
     case kMipsShl:

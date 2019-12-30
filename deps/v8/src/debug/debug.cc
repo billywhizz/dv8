@@ -36,7 +36,6 @@
 #include "src/objects/js-generator-inl.h"
 #include "src/objects/js-promise-inl.h"
 #include "src/objects/slots.h"
-#include "src/snapshot/natives.h"
 #include "src/snapshot/snapshot.h"
 #include "src/wasm/wasm-objects-inl.h"
 
@@ -341,9 +340,9 @@ void Debug::ThreadInit() {
   thread_local_.last_statement_position_ = kNoSourcePosition;
   thread_local_.last_frame_count_ = -1;
   thread_local_.fast_forward_to_return_ = false;
-  thread_local_.ignore_step_into_function_ = Smi::kZero;
+  thread_local_.ignore_step_into_function_ = Smi::zero();
   thread_local_.target_frame_count_ = -1;
-  thread_local_.return_value_ = Smi::kZero;
+  thread_local_.return_value_ = Smi::zero();
   thread_local_.last_breakpoint_id_ = 0;
   clear_suspended_generator();
   thread_local_.restart_fp_ = kNullAddress;
@@ -622,10 +621,7 @@ bool Debug::SetBreakPointForScript(Handle<Script> script,
   Handle<BreakPoint> break_point =
       isolate_->factory()->NewBreakPoint(*id, condition);
   if (script->type() == Script::TYPE_WASM) {
-    Handle<WasmModuleObject> module_object(
-        WasmModuleObject::cast(script->wasm_module_object()), isolate_);
-    return WasmModuleObject::SetBreakPoint(module_object, source_position,
-                                           break_point);
+    return WasmScript::SetBreakPoint(script, source_position, break_point);
   }
 
   HandleScope scope(isolate_);
@@ -859,9 +855,22 @@ void Debug::PrepareStepIn(Handle<JSFunction> function) {
   if (in_debug_scope()) return;
   if (break_disabled()) return;
   Handle<SharedFunctionInfo> shared(function->shared(), isolate_);
+  // If stepping from JS into Wasm, prepare for it.
+  if (shared->HasWasmExportedFunctionData()) {
+    auto imported_function = Handle<WasmExportedFunction>::cast(function);
+    Handle<WasmInstanceObject> wasm_instance(imported_function->instance(),
+                                             isolate_);
+    Handle<WasmDebugInfo> wasm_debug_info =
+        WasmInstanceObject::GetOrCreateDebugInfo(wasm_instance);
+    int func_index = shared->wasm_exported_function_data().function_index();
+    WasmDebugInfo::PrepareStepIn(wasm_debug_info, func_index);
+    // We need to reset all of this since break would be
+    // handled in Wasm Interpreter now. Otherwise it would be a loop here.
+    ClearStepping();
+  }
   if (IsBlackboxed(shared)) return;
   if (*function == thread_local_.ignore_step_into_function_) return;
-  thread_local_.ignore_step_into_function_ = Smi::kZero;
+  thread_local_.ignore_step_into_function_ = Smi::zero();
   FloodWithOneShot(Handle<SharedFunctionInfo>(function->shared(), isolate_));
 }
 
@@ -950,7 +959,6 @@ void Debug::PrepareStepOnThrow() {
   }
 }
 
-
 void Debug::PrepareStep(StepAction step_action) {
   HandleScope scope(isolate_);
 
@@ -972,53 +980,62 @@ void Debug::PrepareStep(StepAction step_action) {
   StandardFrame* frame = frames_it.frame();
 
   // Handle stepping in wasm functions via the wasm interpreter.
-  if (frame->is_wasm()) {
-    // If the top frame is compiled, we cannot step.
-    if (frame->is_wasm_compiled()) return;
+  if (frame->is_wasm_interpreter_entry()) {
     WasmInterpreterEntryFrame* wasm_frame =
         WasmInterpreterEntryFrame::cast(frame);
-    wasm_frame->debug_info().PrepareStep(step_action);
-    return;
-  }
-
-  JavaScriptFrame* js_frame = JavaScriptFrame::cast(frame);
-  DCHECK(js_frame->function().IsJSFunction());
-
-  // Get the debug info (create it if it does not exist).
-  auto summary = FrameSummary::GetTop(frame).AsJavaScript();
-  Handle<JSFunction> function(summary.function());
-  Handle<SharedFunctionInfo> shared(function->shared(), isolate_);
-  if (!EnsureBreakInfo(shared)) return;
-  PrepareFunctionForDebugExecution(shared);
-
-  Handle<DebugInfo> debug_info(shared->GetDebugInfo(), isolate_);
-
-  BreakLocation location = BreakLocation::FromFrame(debug_info, js_frame);
-
-  // Any step at a return is a step-out, and a step-out at a suspend behaves
-  // like a return.
-  if (location.IsReturn() || (location.IsSuspend() && step_action == StepOut)) {
-    // On StepOut we'll ignore our further calls to current function in
-    // PrepareStepIn callback.
-    if (last_step_action() == StepOut) {
-      thread_local_.ignore_step_into_function_ = *function;
+    if (wasm_frame->NumberOfActiveFrames() > 0) {
+      wasm_frame->debug_info().PrepareStep(step_action);
+      return;
     }
-    step_action = StepOut;
-    thread_local_.last_step_action_ = StepIn;
   }
+  // If this is wasm, but there are no interpreted frames on top, all we can do
+  // is step out.
+  if (frame->is_wasm()) step_action = StepOut;
 
-  // We need to schedule DebugOnFunction call callback
-  UpdateHookOnFunctionCall();
-
-  // A step-next in blackboxed function is a step-out.
-  if (step_action == StepNext && IsBlackboxed(shared)) step_action = StepOut;
-
-  thread_local_.last_statement_position_ =
-      summary.abstract_code()->SourceStatementPosition(summary.code_offset());
+  BreakLocation location = BreakLocation::Invalid();
+  Handle<SharedFunctionInfo> shared;
   int current_frame_count = CurrentFrameCount();
-  thread_local_.last_frame_count_ = current_frame_count;
-  // No longer perform the current async step.
-  clear_suspended_generator();
+
+  if (frame->is_java_script()) {
+    JavaScriptFrame* js_frame = JavaScriptFrame::cast(frame);
+    DCHECK(js_frame->function().IsJSFunction());
+
+    // Get the debug info (create it if it does not exist).
+    auto summary = FrameSummary::GetTop(frame).AsJavaScript();
+    Handle<JSFunction> function(summary.function());
+    shared = Handle<SharedFunctionInfo>(function->shared(), isolate_);
+    if (!EnsureBreakInfo(shared)) return;
+    PrepareFunctionForDebugExecution(shared);
+
+    Handle<DebugInfo> debug_info(shared->GetDebugInfo(), isolate_);
+
+    location = BreakLocation::FromFrame(debug_info, js_frame);
+
+    // Any step at a return is a step-out, and a step-out at a suspend behaves
+    // like a return.
+    if (location.IsReturn() ||
+        (location.IsSuspend() && step_action == StepOut)) {
+      // On StepOut we'll ignore our further calls to current function in
+      // PrepareStepIn callback.
+      if (last_step_action() == StepOut) {
+        thread_local_.ignore_step_into_function_ = *function;
+      }
+      step_action = StepOut;
+      thread_local_.last_step_action_ = StepIn;
+    }
+
+    // We need to schedule DebugOnFunction call callback
+    UpdateHookOnFunctionCall();
+
+    // A step-next in blackboxed function is a step-out.
+    if (step_action == StepNext && IsBlackboxed(shared)) step_action = StepOut;
+
+    thread_local_.last_statement_position_ =
+        summary.abstract_code()->SourceStatementPosition(summary.code_offset());
+    thread_local_.last_frame_count_ = current_frame_count;
+    // No longer perform the current async step.
+    clear_suspended_generator();
+  }
 
   switch (step_action) {
     case StepNone:
@@ -1027,7 +1044,8 @@ void Debug::PrepareStep(StepAction step_action) {
       // Clear last position info. For stepping out it does not matter.
       thread_local_.last_statement_position_ = kNoSourcePosition;
       thread_local_.last_frame_count_ = -1;
-      if (!location.IsReturnOrSuspend() && !IsBlackboxed(shared)) {
+      if (!shared.is_null() && !location.IsReturnOrSuspend() &&
+          !IsBlackboxed(shared)) {
         // At not return position we flood return positions with one shots and
         // will repeat StepOut automatically at next break.
         thread_local_.target_frame_count_ = current_frame_count;
@@ -1039,8 +1057,10 @@ void Debug::PrepareStep(StepAction step_action) {
       // and deoptimize every frame along the way.
       bool in_current_frame = true;
       for (; !frames_it.done(); frames_it.Advance()) {
-        // TODO(clemensh): Implement stepping out from JS to wasm.
-        if (frames_it.frame()->is_wasm()) continue;
+        if (frames_it.frame()->is_wasm()) {
+          in_current_frame = false;
+          continue;
+        }
         JavaScriptFrame* frame = JavaScriptFrame::cast(frames_it.frame());
         if (last_step_action() == StepIn) {
           // Deoptimize frame to ensure calls are checked for step-in.
@@ -1069,7 +1089,7 @@ void Debug::PrepareStep(StepAction step_action) {
       thread_local_.target_frame_count_ = current_frame_count;
       V8_FALLTHROUGH;
     case StepIn:
-      // TODO(clemensh): Implement stepping from JS into wasm.
+      // TODO(clemensb): Implement stepping from JS into wasm.
       FloodWithOneShot(shared);
       break;
   }
@@ -1110,7 +1130,7 @@ void Debug::ClearStepping() {
 
   thread_local_.last_step_action_ = StepNone;
   thread_local_.last_statement_position_ = kNoSourcePosition;
-  thread_local_.ignore_step_into_function_ = Smi::kZero;
+  thread_local_.ignore_step_into_function_ = Smi::zero();
   thread_local_.fast_forward_to_return_ = false;
   thread_local_.last_frame_count_ = -1;
   thread_local_.target_frame_count_ = -1;
@@ -1138,10 +1158,6 @@ void Debug::DeoptimizeFunction(Handle<SharedFunctionInfo> shared) {
   // Deoptimize all code compiled from this shared function info including
   // inlining.
   isolate_->AbortConcurrentOptimization(BlockingBehavior::kBlock);
-
-  // TODO(mlippautz): Try to remove this call.
-  isolate_->heap()->PreciseCollectAllGarbage(
-      Heap::kNoGCFlags, GarbageCollectionReason::kDebugger);
 
   bool found_something = false;
   Code::OptimizedCodeIterator iterator(isolate_);
@@ -1171,7 +1187,7 @@ void Debug::PrepareFunctionForDebugExecution(
   if (debug_info->flags() & DebugInfo::kPreparedForDebugExecution) return;
 
   // Make a copy of the bytecode array if available.
-  Handle<Object> maybe_original_bytecode_array =
+  Handle<HeapObject> maybe_original_bytecode_array =
       isolate_->factory()->undefined_value();
   if (shared->HasBytecodeArray()) {
     Handle<BytecodeArray> original_bytecode_array =
@@ -1224,8 +1240,12 @@ void Debug::InstallDebugBreakTrampoline() {
 
   Handle<Code> trampoline = BUILTIN_CODE(isolate_, DebugBreakTrampoline);
   std::vector<Handle<JSFunction>> needs_compile;
-  std::vector<Handle<AccessorPair>> needs_instantiate;
+  using AccessorPairWithContext =
+      std::pair<Handle<AccessorPair>, Handle<NativeContext>>;
+  std::vector<AccessorPairWithContext> needs_instantiate;
   {
+    // Deduplicate {needs_instantiate} by recording all collected AccessorPairs.
+    std::set<AccessorPair> recorded;
     HeapObjectIterator iterator(isolate_->heap());
     for (HeapObject obj = iterator.Next(); !obj.is_null();
          obj = iterator.Next()) {
@@ -1242,11 +1262,26 @@ void Debug::InstallDebugBreakTrampoline() {
         } else {
           fun.set_code(*trampoline);
         }
-      } else if (obj.IsAccessorPair()) {
-        AccessorPair accessor_pair = AccessorPair::cast(obj);
-        if (accessor_pair.getter().IsFunctionTemplateInfo() ||
-            accessor_pair.setter().IsFunctionTemplateInfo()) {
-          needs_instantiate.push_back(handle(accessor_pair, isolate_));
+      } else if (obj.IsJSObject()) {
+        JSObject object = JSObject::cast(obj);
+        DescriptorArray descriptors = object.map().instance_descriptors();
+
+        for (InternalIndex i : object.map().IterateOwnDescriptors()) {
+          if (descriptors.GetDetails(i).kind() == PropertyKind::kAccessor) {
+            Object value = descriptors.GetStrongValue(i);
+            if (!value.IsAccessorPair()) continue;
+
+            AccessorPair accessor_pair = AccessorPair::cast(value);
+            if (!accessor_pair.getter().IsFunctionTemplateInfo() &&
+                !accessor_pair.setter().IsFunctionTemplateInfo()) {
+              continue;
+            }
+            if (recorded.find(accessor_pair) != recorded.end()) continue;
+
+            needs_instantiate.emplace_back(handle(accessor_pair, isolate_),
+                                           object.GetCreationContext());
+            recorded.insert(accessor_pair);
+          }
         }
       }
     }
@@ -1254,10 +1289,13 @@ void Debug::InstallDebugBreakTrampoline() {
 
   // Forcibly instantiate all lazy accessor pairs to make sure that they
   // properly hit the debug break trampoline.
-  for (Handle<AccessorPair> accessor_pair : needs_instantiate) {
+  for (AccessorPairWithContext tuple : needs_instantiate) {
+    Handle<AccessorPair> accessor_pair = tuple.first;
+    Handle<NativeContext> native_context = tuple.second;
     if (accessor_pair->getter().IsFunctionTemplateInfo()) {
       Handle<JSFunction> fun =
           ApiNatives::InstantiateFunction(
+              isolate_, native_context,
               handle(FunctionTemplateInfo::cast(accessor_pair->getter()),
                      isolate_))
               .ToHandleChecked();
@@ -1266,6 +1304,7 @@ void Debug::InstallDebugBreakTrampoline() {
     if (accessor_pair->setter().IsFunctionTemplateInfo()) {
       Handle<JSFunction> fun =
           ApiNatives::InstantiateFunction(
+              isolate_, native_context,
               handle(FunctionTemplateInfo::cast(accessor_pair->setter()),
                      isolate_))
               .ToHandleChecked();
@@ -1734,9 +1773,6 @@ bool Debug::IsFrameBlackboxed(JavaScriptFrame* frame) {
 
 void Debug::OnException(Handle<Object> exception, Handle<Object> promise,
                         v8::debug::ExceptionType exception_type) {
-  // TODO(kozyatinskiy): regress-662674.js test fails on arm without this.
-  if (!AllowJavascriptExecution::IsAllowed(isolate_)) return;
-
   Isolate::CatchType catch_type = isolate_->PredictExceptionCatcher();
 
   // Don't notify listener of exceptions that are internal to a desugaring.
@@ -1774,6 +1810,11 @@ void Debug::OnException(Handle<Object> exception, Handle<Object> promise,
     }
     if (it.done()) return;  // Do not trigger an event with an empty stack.
   }
+
+  // Do not trigger exception event on stack overflow. We cannot perform
+  // anything useful for debugging in that situation.
+  StackLimitCheck stack_limit_check(isolate_);
+  if (stack_limit_check.JsHasOverflowed()) return;
 
   DebugScope debug_scope(this);
   HandleScope scope(isolate_);
@@ -1876,6 +1917,7 @@ bool Debug::CanBreakAtEntry(Handle<SharedFunctionInfo> shared) {
 bool Debug::SetScriptSource(Handle<Script> script, Handle<String> source,
                             bool preview, debug::LiveEditResult* result) {
   DebugScope debug_scope(this);
+  feature_tracker()->Track(DebugFeatureTracker::kLiveEdit);
   running_live_edit_ = true;
   LiveEdit::PatchScript(isolate_, script, source, preview, result);
   running_live_edit_ = false;
@@ -1943,11 +1985,11 @@ void Debug::UpdateState() {
   if (is_active) {
     // Note that the debug context could have already been loaded to
     // bootstrap test cases.
-    isolate_->compilation_cache()->Disable();
+    isolate_->compilation_cache()->DisableScriptAndEval();
     is_active = true;
     feature_tracker()->Track(DebugFeatureTracker::kActive);
   } else {
-    isolate_->compilation_cache()->Enable();
+    isolate_->compilation_cache()->EnableScriptAndEval();
     Unload();
   }
   is_active_ = is_active;
