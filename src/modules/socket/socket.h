@@ -191,6 +191,7 @@ private:
   static void UnRef(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
   static void Open(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
   static void PortNumber(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the port number
+  static void Create(const v8::FunctionCallbackInfo<v8::Value> &args);     // create a new pipe but don't open it yet
 
   // TCP only methods
   static void RemoteAddress(const v8::FunctionCallbackInfo<v8::Value> &args); // remote ip4 address as string

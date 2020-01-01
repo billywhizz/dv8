@@ -4,6 +4,7 @@ namespace dv8 {
 
 namespace process {
 using dv8::builtins::Environment;
+using dv8::socket::Socket;
 
 void InitAll(Local<Object> exports)
 {
@@ -26,6 +27,8 @@ void Process::Init(Local<Object> exports) {
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "nanosleep", Process::NanoSleep);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
   // spawn, kill, getTitle, setTitle, rss, uptime, rusage, ppid, interfaces, loadavg, exepath, cwd, chdir, homedir, tmpdir, passwd, memory, handles, hostname, getPriority, setPriority 
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "spawn", Process::Spawn);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runScript", Process::RunScript);
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
 }
 
@@ -43,6 +46,40 @@ void Process::PID(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   args.GetReturnValue().Set(Integer::New(isolate, uv_os_getpid()));
+}
+
+void Process::RunScript(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+  v8::TryCatch try_catch(isolate);
+  Local<String> source = args[0].As<String>();
+  Local<String> path = args[1].As<String>();
+  v8::ScriptOrigin baseorigin(path, // resource name
+    v8::Integer::New(isolate, 0), // line offset
+    v8::Integer::New(isolate, 0),  // column offset
+    v8::False(isolate), // is shared cross-origin
+    v8::Local<v8::Integer>(),  // script id
+    v8::Local<v8::Value>(), // source map url
+    v8::False(isolate), // is opaque
+    v8::False(isolate), // is wasm
+    v8::False(isolate)); // is module
+  v8::Local<v8::Script> script;
+  v8::ScriptCompiler::Source basescript(source, baseorigin);
+  if (!v8::ScriptCompiler::Compile(context, &basescript).ToLocal(&script)) {
+    dv8::ReportException(isolate, &try_catch);
+    return;
+  }
+  if (try_catch.HasCaught()) {
+    dv8::ReportException(isolate, &try_catch);
+    return;
+  }
+  script->Run(context);
+  if (try_catch.HasCaught()) {
+    dv8::ReportException(isolate, &try_catch);
+    return;
+  }
 }
 
 void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
@@ -105,6 +142,77 @@ void Process::USleep(const FunctionCallbackInfo<Value> &args) {
   Local<Context> context = isolate->GetCurrentContext();
   int microseconds = args[0]->IntegerValue(context).ToChecked();
   usleep(microseconds);
+}
+
+void on_exit(uv_process_t *req, int64_t exit_status, int term_signal) {
+  Isolate *isolate = Isolate::GetCurrent();
+  Process *obj = (Process *)req->data;
+  v8::HandleScope handleScope(isolate);
+  Local<Value> argv[2] = { v8::BigInt::New(isolate, exit_status), v8::Integer::New(isolate, term_signal) };
+  Local<Function> Callback = Local<Function>::New(isolate, obj->onExit);
+  Local<Context> context = isolate->GetCurrentContext();
+  uv_close((uv_handle_t*) req, NULL);
+  Callback->Call(context, context->Global(), 2, argv);
+}
+
+void Process::Spawn(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+
+  char* argv[3];
+  int written;
+  uv_process_t child_req;
+  uv_process_options_t options;
+  uv_stdio_container_t child_stdio[3];
+
+  memset(&options, 0, sizeof(uv_process_options_t));
+
+  Local<String> filePath = args[0].As<String>();
+  Local<String> cwd = args[1].As<String>();
+  Local<String> argument1 = args[2].As<String>();
+
+  Socket* in = ObjectWrap::Unwrap<Socket>(args[3].As<v8::Object>());
+  Socket* out = ObjectWrap::Unwrap<Socket>(args[4].As<v8::Object>());
+  Socket* err = ObjectWrap::Unwrap<Socket>(args[5].As<v8::Object>());
+
+  Process* obj = ObjectWrap::Unwrap<Process>(args.Holder());
+  Local<Function> onExit = Local<Function>::Cast(args[6]);
+  obj->onExit.Reset(isolate, onExit);
+
+  argv[0] = (char*)calloc(1, filePath->Length());
+  argv[1] = (char*)calloc(1, argument1->Length());
+  argv[2] = NULL;
+  options.cwd = (char*)calloc(1, cwd->Length());
+  filePath->WriteUtf8(isolate, argv[0], filePath->Length(), &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+  argument1->WriteUtf8(isolate, argv[1], argument1->Length(), &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+  cwd->WriteUtf8(isolate, (char*)options.cwd, cwd->Length(), &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+
+  options.stdio_count = 3;
+  //child_stdio[0].flags = UV_IGNORE;
+  //child_stdio[1].flags = UV_IGNORE;
+  child_stdio[0].flags = static_cast<uv_stdio_flags>(UV_CREATE_PIPE | UV_READABLE_PIPE);
+  child_stdio[0].data.stream = in->context->handle;
+  child_stdio[1].flags = static_cast<uv_stdio_flags>(UV_CREATE_PIPE | UV_WRITABLE_PIPE);
+  child_stdio[1].data.stream = out->context->handle;
+  child_stdio[2].flags = static_cast<uv_stdio_flags>(UV_CREATE_PIPE | UV_WRITABLE_PIPE);
+  child_stdio[2].data.stream = err->context->handle;
+  options.stdio = child_stdio;
+  options.exit_cb = on_exit;
+  options.file = argv[0];
+  options.args = argv;
+
+  child_req.data = obj;
+
+  int r = uv_spawn(env->loop, &child_req, &options);
+  if (r) {
+    // will always be negative
+    args.GetReturnValue().Set(Integer::New(isolate, r));
+    //fprintf(stderr, "error: %s\n", uv_strerror(r));
+    return;
+  }
+  args.GetReturnValue().Set(Integer::New(isolate, child_req.pid));
 }
 
 void Process::NanoSleep(const FunctionCallbackInfo<Value> &args) {

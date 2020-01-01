@@ -323,6 +323,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", Stats);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", UnRef);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", Open);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "create", Create);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "portNumber", PortNumber);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onConnect", onConnect);
@@ -337,6 +338,7 @@ void Socket::Init(Local<Object> exports)
 
   DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, TCP), "TCP", exports);
   DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "UNIX", exports);
+  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "PIPE", exports);
 }
 
 void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
@@ -1122,6 +1124,25 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
     onNewConnection(ctx);
     args.GetReturnValue().Set(Integer::New(isolate, status));
   }
+}
+
+void Socket::Create(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+  uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+  int status = uv_pipe_init(env->loop, sock, 0);
+  if (status)
+  {
+    args.GetReturnValue().Set(Integer::New(isolate, status));
+    return;
+  }
+  _context *ctx = context_init((uv_stream_t*)sock, s);
+  ctx->paused = true;
+  //s->_stream = (uv_stream_t *)sock;
+  args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 
 void Socket::Bind(const FunctionCallbackInfo<Value> &args)

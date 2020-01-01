@@ -3,6 +3,7 @@
 
 #include <dv8.h>
 #include <time.h>
+#include <modules/socket/socket.h>
 
 namespace dv8 {
 
@@ -25,11 +26,14 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
+static void on_exit(uv_process_t *req, int64_t exit_status, int term_signal);
+
 void InitAll(Local<Object> exports);
 
 class Process : public dv8::ObjectWrap {
 public:
   static void Init(v8::Local<v8::Object> exports);
+  v8::Persistent<v8::Function> onExit;
 
 private:
   Process() {}
@@ -47,6 +51,8 @@ private:
   static void USleep(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void NanoSleep(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void RunMicroTasks(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Spawn(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void RunScript(const v8::FunctionCallbackInfo<v8::Value> &args);
 };
 
 } // namespace process

@@ -185,38 +185,55 @@ const heap = [
 ]
 
 Error.stackTraceLimit = Infinity
-
+/*
 Error.prepareStackTrace = (err, stack) => {
-  err.stack = []
+  const result = []
+  let fName
+  let lNumber
   for (const callsite of stack) {
     const typeName = callsite.getTypeName()
     const functionName = callsite.getFunctionName()
     const methodName = callsite.getMethodName()
-    const fileName = callsite.getFileName()
-    const lineNumber = callsite.getLineNumber()
-    const columnNumber = callsite.getColumnNumber()
+    const scriptName = callsite.getFileName()
+    if (scriptName && !fName) fName = scriptName
+    const line = callsite.getLineNumber()
+    if (line && !lNumber) lNumber = line
+    const column = callsite.getColumnNumber()
     const isToplevel = callsite.isToplevel()
     const isEval = callsite.isEval()
-    const isNative = callsite.isEval()
+    const isWasm = false
+    const isNative = callsite.isNative()
+    const isUserJavascript = true
     const isConstructor = callsite.isConstructor()
-    err.stack.push({ typeName, functionName, methodName, fileName, lineNumber, columnNumber, isToplevel, isEval, isNative, isConstructor })
+    result.push({ typeName, functionName, methodName, scriptName, line, column, isToplevel, isEval, isNative, isConstructor, isWasm, isUserJavascript })
   }
+  Object.defineProperty(err, 'stack', {
+    value: result,
+    writable: false,
+    enumerable: true
+  });  
+  Object.defineProperty(err, 'lineNumber', {
+    value: lNumber,
+    writable: false,
+    enumerable: true
+  });  
+  Object.defineProperty(err, 'fileName', {
+    value: fName,
+    writable: false,
+    enumerable: true
+  });  
+  return result
 }
 
 global.onUncaughtException = err => {
-  print('onUncaughtException:')
-  const keys = Object.getOwnPropertyNames(err)
-  for (const key of keys) {
-    if (key === 'stack') {
-      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${JSON.stringify(err[key], null, '  ')}`)
-    } else {
-      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${err[key]}`)
-    }
-  }
+  const stack = []
+  err.stack.forEach(v => stack.push(v))
+  delete err.stack
+  err.stack = stack
+  print(`onUncaughtException:\n${JSON.stringify(err, null, '  ')}`)
 }
 
-global.onUnhandledRejection((promise, value, eventType) => {
-  print('onUnhandledRejection:')
+global.onUnhandledRejection((promise, err, eventType) => {
   const keys = Object.getOwnPropertyNames(value)
   for (const key of keys) {
     if (key === 'stack') {
@@ -226,6 +243,9 @@ global.onUnhandledRejection((promise, value, eventType) => {
     }
   }
 })
+*/
+global.onUncaughtException = err => print(err.stack)
+global.onUnhandledRejection((promise, err, eventType) => print(err.stack))
 
 function setTimeout (fn, delay) {
   const t = new Timer()
@@ -357,12 +377,7 @@ const nextTick = fn => {
     let len = queue.length
     while (len--) {
       const fun = queue.shift()
-      try {
-        fun()
-      } catch (err) {
-        print(err.message)
-        throw (err)
-      }
+      if (fun) fun()
     }
     if (!queue.length) {
       idleActive = false
@@ -382,24 +397,25 @@ global.onExit(() => {
   if (process.onExit) process.onExit()
 })
 
+const _require = global.require
+
 global.require = path => {
-  const module = { exports: {} }
   const { text } = readFile(path)
-  Function('module', `"use strict";\n${text}`)(module) // eslint-disable-line no-new-func
-  return module.exports
+  global.module = { exports: {} }
+  _require(path, text)
+  return global.module.exports
 }
 
 global.runScript = path => {
   const { text } = readFile(path)
-  Function('global', `"use strict";\n${text}`)(global) // eslint-disable-line no-new-func
+  _process.runScript(text, path)
 }
 
 global.evalScript = text => {
-  Function('global', `"use strict";\n${text}`)(global) // eslint-disable-line no-new-func
+  _process.runScript(text, 'eval')
 }
 
 function runLoop () {
-  loop.run()
   do {
     loop.run()
   } while (loop.isAlive())

@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
     v8::Context::Scope context_scope(context);
     context->AllowCodeGenerationFromStrings(true);
     isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
+    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
     dv8::builtins::Environment *env = new dv8::builtins::Environment();
     env->AssignToContext(context);
     env->loop = uv_default_loop();
