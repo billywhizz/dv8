@@ -215,6 +215,7 @@ void MemoryUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void OnExit(const FunctionCallbackInfo<Value> &args);
 void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args);
+void Require(const FunctionCallbackInfo<Value> &args);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
   v8::HandleScope handle_scope(isolate);

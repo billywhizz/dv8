@@ -244,8 +244,74 @@ global.onUnhandledRejection((promise, err, eventType) => {
   }
 })
 */
-global.onUncaughtException = err => print(err.stack)
-global.onUnhandledRejection((promise, err, eventType) => print(err.stack))
+Error.prepareStackTrace = (err, stack) => {
+  const result = []
+  for (const callsite of stack) {
+    const typeName = callsite.getTypeName()
+    const functionName = callsite.getFunctionName()
+    const methodName = callsite.getMethodName()
+    const scriptName = callsite.getFileName()
+    const line = callsite.getLineNumber()
+    const column = callsite.getColumnNumber()
+    const isToplevel = callsite.isToplevel()
+    const isEval = callsite.isEval()
+    const isWasm = false
+    const isNative = callsite.isNative()
+    const isUserJavascript = true
+    const isConstructor = callsite.isConstructor()
+    result.push({ typeName, functionName, methodName, scriptName, line, column, isToplevel, isEval, isNative, isConstructor, isWasm, isUserJavascript })
+  }
+  Object.defineProperty(err, 'frames', {
+    value: result,
+    writable: false,
+    enumerable: true
+  });  
+  Object.defineProperty(err, 'fileName', {
+    value: result[0].scriptName,
+    writable: false,
+    enumerable: true
+  });
+  Object.defineProperty(err, 'lineNumber', {
+    value: result[0].line,
+    writable: false,
+    enumerable: true
+  });
+  if (!Object.getOwnPropertyDescriptor(err, 'type')) {
+    Object.defineProperty(err, 'type', {
+      value: 'GeneralException',
+      writable: true,
+      enumerable: true
+    });
+  }
+  return err.stack
+}
+
+global.onUncaughtException = err => {
+  Object.defineProperty(err, 'type', {
+    value: 'UncaughtException',
+    writable: false,
+    enumerable: true
+  })
+  const stack = err.stack
+  if (process.onUncaughtException) return process.onUncaughtException(err) 
+  print(`${err.type}\n${stack}`)
+}
+
+global.onUnhandledRejection = (err, promise) => {
+  Object.defineProperty(err, 'type', {
+    value: 'UnhandledRejection',
+    writable: false,
+    enumerable: true
+  })
+  Object.defineProperty(err, 'promise', {
+    value: promise,
+    writable: false,
+    enumerable: true
+  })
+  const stack = err.stack
+  if (process.onUncaughtException) return process.onUncaughtException(err) 
+  print(`${err.type}\n${stack}`)
+}
 
 function setTimeout (fn, delay) {
   const t = new Timer()
@@ -419,8 +485,9 @@ function runLoop () {
   do {
     loop.run()
   } while (loop.isAlive())
-  loop.close()
+  //loop.close()
 }
+process.runLoop = runLoop
 
 if (global.workerData) {
   global.workerData.bytes = global.workerData.alloc()

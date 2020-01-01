@@ -9,19 +9,22 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
   Local<Context> context = isolate->GetCurrentContext();
   PromiseRejectEvent event = message.GetEvent();
   Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-  if (!env->onUnhandledRejection.IsEmpty() && event == v8::kPromiseRejectWithNoHandler) {
-    const unsigned int argc = 3;
+  //if (!env->onUnhandledRejection.IsEmpty() && event == v8::kPromiseRejectWithNoHandler) {
     Local<Object> globalInstance = context->Global();
     Local<Value> value = message.GetValue();
     if (value.IsEmpty()) value = Undefined(isolate);
-    Local<Value> argv[argc] = { promise, value, Integer::New(isolate, event) };
-    Local<Function> onUnhandledRejection = Local<Function>::New(isolate, env->onUnhandledRejection);
+    Local<Value> argv[2] = { value, promise };
+
+    Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+    Local<Function> onUnhandledRejection = Local<Function>::Cast(func);
+
+    //Local<Function> onUnhandledRejection = Local<Function>::New(isolate, env->onUnhandledRejection);
     TryCatch try_catch(isolate);
-    onUnhandledRejection->Call(context, globalInstance, 3, argv);
+    onUnhandledRejection->Call(context, globalInstance, 2, argv);
     if (try_catch.HasCaught()) {
       dv8::ReportException(isolate, &try_catch);
     }
-  }
+  //}
 }
 
 void on_handle_close(uv_handle_t *h) {
