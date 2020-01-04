@@ -29,19 +29,24 @@ void start_context(void *data)
 		isolate->SetFatalErrorHandler(dv8::OnFatalError);
 		isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
 		isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
+    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
 		Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
+
 		global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
 		global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
+		global->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
 		global->Set(String::NewFromUtf8(isolate, "library", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
+		global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
 		global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
 		global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
 		global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
-		global->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
 		global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
-
+		global->Set(String::NewFromUtf8(isolate, "runScript", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunScript));
 		global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
+
 		v8::Local<v8::Context> context = Context::New(isolate, NULL, global);
 		dv8::builtins::Environment *env = new dv8::builtins::Environment();
+    context->AllowCodeGenerationFromStrings(true);
 		env->error = &th->error;
 		env->AssignToContext(context);
 		env->err.Reset();
@@ -62,7 +67,7 @@ void start_context(void *data)
 		uv_loop_init(loop);
 
 		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len));
-		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, th->name, v8::NewStringType::kNormal).ToLocalChecked(), 
+		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "main.js", v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
 			v8::Integer::New(isolate, 0), 
 			v8::False(isolate), 
@@ -86,6 +91,7 @@ void start_context(void *data)
 		if (th->size > 0) {
 			globalInstance->Set(context, String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
 		}
+		globalInstance->Set(context, String::NewFromUtf8(isolate, "workerName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->name, v8::NewStringType::kNormal).ToLocalChecked());
 		module->Evaluate(context);
 	}
 	isolate->Dispose();
@@ -116,7 +122,6 @@ void on_context_complete(uv_async_t *async)
 		errObj = Local<Object>::New(isolate, env->err);
 	}
 	js_error* jsError = &th->error;
-	free(th);
 	if (jsError->hasError == 1) {
 		Local<Object> o = Object::New(isolate);
 		o->Set(context, String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
@@ -139,6 +144,7 @@ void on_context_complete(uv_async_t *async)
 		Local<Value> argv[1] = { o };
 		v8::TryCatch try_catch(isolate);
 		foo->Call(context, context->Global(), 1, argv);
+		free(th);
 		if (try_catch.HasCaught()) {
 			dv8::ReportException(isolate, &try_catch);
 		}
@@ -146,6 +152,7 @@ void on_context_complete(uv_async_t *async)
 		Local<Value> argv[1] = { v8::Null(isolate) };
 		v8::TryCatch try_catch(isolate);
 		foo->Call(context, context->Global(), 1, argv);
+		free(th);
 		if (try_catch.HasCaught()) {
 			dv8::ReportException(isolate, &try_catch);
 		}

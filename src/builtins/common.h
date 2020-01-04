@@ -78,7 +78,18 @@ class ObjectWrap
     }
 
     virtual void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+/*
+        v8::Isolate *isolate = data.GetIsolate();
+        v8::HandleScope handleScope(isolate);
+        //ObjectWrap *wrap = data.GetParameter();
 
+        v8::Local<v8::Object> o = v8::Local<v8::Object>::New(isolate, persistent());
+        v8::Local<v8::String> name = o->GetConstructorName();
+        char *cname = (char*)calloc(1, name->Length());
+        int written;
+        name->WriteUtf8(isolate, cname, name->Length(), &written, v8::String::HINT_MANY_WRITES_EXPECTED | v8::String::NO_NULL_TERMINATION);
+        fprintf(stderr, "%s destroyed\n", cname);
+*/
     }
 
     virtual void Ref()

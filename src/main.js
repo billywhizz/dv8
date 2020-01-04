@@ -11,27 +11,143 @@ const { Socket, UNIX } = library('socket', {})
 const { File, O_RDONLY } = library('fs', {})
 const { UV_TTY_MODE_NORMAL, TTY } = library('tty', {})
 
+function pathModule () {
+  const CHAR_FORWARD_SLASH = 47
+  const CHAR_BACKWARD_SLASH = 92
+  const CHAR_DOT = 46
+
+  function baseName (path) {
+    return path.slice(0, path.lastIndexOf('/') + 1)
+  }
+
+  function isPathSeparator (code) {
+    return code === CHAR_FORWARD_SLASH || code === CHAR_BACKWARD_SLASH
+  }
+
+  function isPosixPathSeparator (code) {
+    return code === CHAR_FORWARD_SLASH
+  }
+
+  function normalizeString (path, allowAboveRoot, separator) {
+    let res = ''
+    let lastSegmentLength = 0
+    let lastSlash = -1
+    let dots = 0
+    let code = 0
+    for (let i = 0; i <= path.length; ++i) {
+      if (i < path.length) {
+        code = path.charCodeAt(i)
+      } else if (isPathSeparator(code)) {
+        break
+      } else {
+        code = CHAR_FORWARD_SLASH
+      }
+
+      if (isPathSeparator(code)) {
+        if (lastSlash === i - 1 || dots === 1) {
+          // NOOP
+        } else if (dots === 2) {
+          if (res.length < 2 || lastSegmentLength !== 2 ||
+              res.charCodeAt(res.length - 1) !== CHAR_DOT ||
+              res.charCodeAt(res.length - 2) !== CHAR_DOT) {
+            if (res.length > 2) {
+              const lastSlashIndex = res.lastIndexOf(separator)
+              if (lastSlashIndex === -1) {
+                res = ''
+                lastSegmentLength = 0
+              } else {
+                res = res.slice(0, lastSlashIndex)
+                lastSegmentLength = res.length - 1 - res.lastIndexOf(separator)
+              }
+              lastSlash = i
+              dots = 0
+              continue
+            } else if (res.length !== 0) {
+              res = ''
+              lastSegmentLength = 0
+              lastSlash = i
+              dots = 0
+              continue
+            }
+          }
+          if (allowAboveRoot) {
+            res += res.length > 0 ? `${separator}..` : '..'
+            lastSegmentLength = 2
+          }
+        } else {
+          if (res.length > 0) {
+            res += `${separator}${path.slice(lastSlash + 1, i)}`
+          } else {
+            res = path.slice(lastSlash + 1, i)
+          }
+          lastSegmentLength = i - lastSlash - 1
+        }
+        lastSlash = i
+        dots = 0
+      } else if (code === CHAR_DOT && dots !== -1) {
+        ++dots
+      } else {
+        dots = -1
+      }
+    }
+    return res
+  }
+
+  function normalize (path) {
+    if (path.length === 0) return '.'
+
+    const isAbsolute = path.charCodeAt(0) === CHAR_FORWARD_SLASH
+    const trailingSeparator = path.charCodeAt(path.length - 1) === CHAR_FORWARD_SLASH
+    path = normalizeString(path, !isAbsolute, '/', isPosixPathSeparator)
+
+    if (path.length === 0) {
+      if (isAbsolute) return '/'
+      return trailingSeparator ? './' : '.'
+    }
+    if (trailingSeparator) path += '/'
+
+    return isAbsolute ? `/${path}` : path
+  }
+
+  function join (...args) {
+    if (args.length === 0) return '.'
+    let joined
+    for (let i = 0; i < args.length; ++i) {
+      const arg = args[i]
+      if (arg.length > 0) {
+        if (joined === undefined) {
+          joined = arg
+        } else {
+          joined += `/${arg}`
+        }
+      }
+    }
+    if (joined === undefined) return '.'
+    return normalize(joined)
+  }
+
+  return { join, baseName }
+}
+
+const { join, baseName } = pathModule()
+
 function repl () {
   const BUFFER_SIZE = 64 * 1024
   const MAX_BUFFER = 4 * BUFFER_SIZE
   const stdin = new TTY(0)
   const buf = Buffer.alloc(BUFFER_SIZE)
-  function parse (statement) {
-    return Function(`"use strict"; return (${statement})`)() // eslint-disable-line no-new-func
-  }
   stdin.setup(buf, UV_TTY_MODE_NORMAL)
   stdin.onRead(len => {
     const source = buf.read(0, len)
     try {
-      const result = parse(source)
-      let payload = `${JSON.stringify(result, null, 2)}\n`
-      if (!result) payload = '(null)\n'
-      if (!payload) payload = '(null)\n'
-      if (payload === undefined) payload = '(undefined)\n'
-      const r = stdout.write(buf.write(payload, 0))
-      if (r < 0) return stdout.close()
+      const result = global.evalScript(source, 'repl')
+      if (result && result !== undefined) {
+        let payload = `${JSON.stringify(result, null, 2)}\n`
+        const r = stdout.write(buf.write(payload, 0))
+        if (r < 0) return stdout.close()
+      }
     } catch (err) {
-      print(err.message)
+      print(err.stack)
     }
     const r = stdout.write(buf.write('> ', 0))
     if (r < 0) return stdout.close()
@@ -42,7 +158,7 @@ function repl () {
   const stdout = new TTY(1)
   stdout.setup(buf, UV_TTY_MODE_NORMAL)
   stdout.onDrain(() => stdin.resume())
-  stdout.onError((e, message) => print(`stdout.error:\n${e.toString()}\n${message}`))
+  stdout.onClose(() => stdin.close())
   if (stdout.write(buf.write('> ', 0)) < 0) {
     stdout.close()
   } else {
@@ -50,19 +166,24 @@ function repl () {
   }
 }
 
+global.repl = repl
+
 function readFile (path) {
-  const buf = Buffer.alloc(16384)
+  const BUFSIZE = 4096
+  const buf = Buffer.alloc(BUFSIZE)
   const file = new File()
   const parts = []
   file.setup(buf, buf)
   file.fd = file.open(path, O_RDONLY)
+  if (file.fd < 0) throw new Error(`Error opening ${path}: ${loop.error(file.fd)}`)
   file.size = 0
-  let len = file.read(16384, file.size)
+  let len = file.read(BUFSIZE, file.size)
   while (len > 0) {
     file.size += len
     parts.push(buf.read(0, len))
-    len = file.read(16384, file.size)
+    len = file.read(BUFSIZE, file.size)
   }
+  if (len < 0) throw new Error(`Error reading ${path}: ${loop.error(len)}`)
   file.close()
   file.text = parts.join('')
   return file
@@ -184,66 +305,8 @@ const heap = [
   new Float64Array(4)
 ]
 
-Error.stackTraceLimit = Infinity
-/*
-Error.prepareStackTrace = (err, stack) => {
-  const result = []
-  let fName
-  let lNumber
-  for (const callsite of stack) {
-    const typeName = callsite.getTypeName()
-    const functionName = callsite.getFunctionName()
-    const methodName = callsite.getMethodName()
-    const scriptName = callsite.getFileName()
-    if (scriptName && !fName) fName = scriptName
-    const line = callsite.getLineNumber()
-    if (line && !lNumber) lNumber = line
-    const column = callsite.getColumnNumber()
-    const isToplevel = callsite.isToplevel()
-    const isEval = callsite.isEval()
-    const isWasm = false
-    const isNative = callsite.isNative()
-    const isUserJavascript = true
-    const isConstructor = callsite.isConstructor()
-    result.push({ typeName, functionName, methodName, scriptName, line, column, isToplevel, isEval, isNative, isConstructor, isWasm, isUserJavascript })
-  }
-  Object.defineProperty(err, 'stack', {
-    value: result,
-    writable: false,
-    enumerable: true
-  });  
-  Object.defineProperty(err, 'lineNumber', {
-    value: lNumber,
-    writable: false,
-    enumerable: true
-  });  
-  Object.defineProperty(err, 'fileName', {
-    value: fName,
-    writable: false,
-    enumerable: true
-  });  
-  return result
-}
+Error.stackTraceLimit = 1000 // Infinity
 
-global.onUncaughtException = err => {
-  const stack = []
-  err.stack.forEach(v => stack.push(v))
-  delete err.stack
-  err.stack = stack
-  print(`onUncaughtException:\n${JSON.stringify(err, null, '  ')}`)
-}
-
-global.onUnhandledRejection((promise, err, eventType) => {
-  const keys = Object.getOwnPropertyNames(value)
-  for (const key of keys) {
-    if (key === 'stack') {
-      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${JSON.stringify(value[key], null, '  ')}`)
-    } else {
-      print(`${key.padEnd(20, ' ').slice(0, 20)} : ${value[key]}`)
-    }
-  }
-})
-*/
 Error.prepareStackTrace = (err, stack) => {
   const result = []
   for (const callsite of stack) {
@@ -351,6 +414,7 @@ global.Buffer = {
 
 const _process = new Process()
 const process = {}
+
 const loop = new EventLoop()
 process.loop = loop
 
@@ -358,6 +422,7 @@ process.sleep = seconds => _process.sleep(seconds)
 process.usleep = microseconds => _process.usleep(microseconds)
 process.cwd = () => _process.cwd()
 process.nanosleep = (seconds, nanoseconds) => _process.nanosleep(seconds, nanoseconds)
+global.__dirname = process.cwd()
 
 process.cpuUsage = () => {
   _process.cpuUsage(cpu)
@@ -424,10 +489,14 @@ const activeHandles = () => {
   const handles = []
   while (1) {
     const active = bytes[off]
+    if (active === 255) break
     const len = bytes[off + 1]
-    if (len === 0) break
-    const type = buf.read(off + 2, len)
-    handles.push({ active, type })
+    if (len > 0) {
+      const type = buf.read(off + 2, len)
+      handles.push({ active, type })
+    } else {
+      handles.push({ active, type: 'unknown' })
+    }
     off += (2 + len)
   }
   return handles
@@ -450,44 +519,113 @@ const nextTick = fn => {
       loop.onIdle()
     }
   })
-  loop.ref() // ensure we run
+  loop.ref()
   idleActive = true
 }
-// TODO: rename this as it's not the same as node.js nextTick
 process.nextTick = nextTick
 
+// why??
 global.onExit(() => {
-  // at this point the main loop is done so if you want to run anything you have to manually pump the loop
   process.loop.reset()
   process.loop.run(2)
-  if (process.onExit) process.onExit()
 })
 
-const _require = global.require
+const _runScript = global.runScript
 
-global.require = path => {
-  const { text } = readFile(path)
-  global.module = { exports: {} }
-  _require(path, text)
-  return global.module.exports
+global.evalScript = (text, path = 'eval') => {
+  return _runScript(text, path)
 }
 
 global.runScript = path => {
-  const { text } = readFile(path)
-  _process.runScript(text, path)
+  const newPath = join(global.__dirname, path)
+  const { text } = readFile(newPath)
+  global.__dirname = baseName(newPath)
+  return global.evalScript(text, newPath)
+  global.__dirname = dirname
 }
 
-global.evalScript = text => {
-  _process.runScript(text, 'eval')
+global.require = path => {
+  const newPath = join(global.__dirname, path)
+  if (process.env.DV8_TRACE_REQUIRE && process.env.DV8_TRACE_REQUIRE === 'on') {
+    print(`require: ${newPath}`)
+  }
+  const { text } = readFile(newPath)
+  global.module = { exports: {} }
+  const dirname = global.__dirname
+  global.__dirname = baseName(newPath)
+  const exports = global.evalScript(`(function() {${text};return module.exports})()`, newPath)
+  global.__dirname = dirname
+  return exports
 }
 
 function runLoop () {
   do {
     loop.run()
   } while (loop.isAlive())
-  //loop.close()
+  if (process.onExit) process.onExit()
 }
 process.runLoop = runLoop
+process.join = join
+
+process.exec = (...args) => _process.spawn.apply(_process, args)
+
+process.spawn = (fun, onComplete, opts = { ipc: false, dirname: global.__dirname }) => {
+  const thread = new Thread()
+  const envJSON = JSON.stringify(process.env)
+  const argsJSON = JSON.stringify(process.args)
+  opts.dirname = opts.dirname || global.__dirname
+  const bufferSize = envJSON.length + argsJSON.length + opts.dirname.length + 17
+  thread.buffer = Buffer.alloc(bufferSize)
+  const view = new DataView(thread.buffer.bytes)
+  if (opts.ipc) {
+    const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
+    const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
+    const sock = new Socket(UNIX)
+    const parser = new Parser(rb, wb)
+    sock.onConnect(() => {
+      sock.setup(rb, wb)
+      sock.resume()
+    })
+    sock.onEnd(() => sock.close())
+    sock.onRead(len => parser.read(len))
+    parser.onMessage = message => thread._onMessage(message)
+    thread.onMessage = fn => {
+      thread._onMessage = fn
+    }
+    thread._onMessage = message => {}
+    thread.send = o => sock.write(parser.write(o))
+    thread.sendString = s => {
+      sock.write(parser.write(s, 2))
+    }
+    thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
+    const fd = sock.open()
+    if (fd < 0) {
+      throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
+    }
+    view.setUint32(1, fd)
+    thread.sock = sock
+  } else {
+    view.setUint32(1, 0)
+  }
+  thread.view = view
+  thread.id = next++
+  view.setUint8(0, thread.id)
+  view.setUint32(5, envJSON.length)
+  thread.buffer.write(envJSON, 9)
+  view.setUint32(envJSON.length + 9, argsJSON.length)
+  thread.buffer.write(argsJSON, envJSON.length + 13)
+  view.setUint32(envJSON.length + argsJSON.length + 13, opts.dirname.length)
+  thread.buffer.write(opts.dirname, envJSON.length + argsJSON.length + 17)
+  threads[thread.id] = thread
+  //process.nextTick(() => {
+    const r = thread.start(fun, err => {
+      delete threads[thread.id]
+      onComplete({ err, thread })
+    }, thread.buffer)
+    if (r !== 0) onComplete({ err: new Error(`Bad Status: ${r} (${loop.error(r)})`, thread, 0) })
+  //})
+  return thread
+}
 
 if (global.workerData) {
   global.workerData.bytes = global.workerData.alloc()
@@ -501,6 +639,10 @@ if (global.workerData) {
   const argsLength = dv.getUint32(9 + envLength)
   const argsJSON = global.workerData.read(13 + envLength, argsLength)
   process.args = JSON.parse(argsJSON)
+  const dirNameLength = dv.getUint32(13 + envLength + argsLength)
+  if (dirNameLength > 0) {
+    global.__dirname = global.workerData.read(17 + envLength + argsLength, dirNameLength)
+  }
   if (process.fd !== 0) {
     const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
     const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
@@ -511,7 +653,6 @@ if (global.workerData) {
       sock.resume()
     })
     parser.onMessage = message => sock.onMessage(message)
-    // TODO: messages too big
     process.send = o => sock.write(parser.write(o))
     process.sendString = s => {
       sock.write(parser.write(s, 2))
@@ -525,64 +666,13 @@ if (global.workerData) {
     sock.open(process.fd)
     process.sock = sock
   }
-  const { workerSource } = global
+  const { workerSource, workerName } = global
   delete global.workerSource
-  global.evalScript(workerSource.slice(workerSource.indexOf('{') + 1, workerSource.lastIndexOf('}')))
+  delete global.workerName
+  const newPath = join(global.__dirname, process.args[1])
+  const threadName = `${newPath}.#${process.TID}.${workerName || 'anonymous'}`
+  global.evalScript(workerSource.slice(workerSource.indexOf('{') + 1, workerSource.lastIndexOf('}')), threadName)
 } else {
-  process.spawn = (fun, onComplete, opts = { ipc: false }) => {
-    const thread = new Thread()
-    const envJSON = JSON.stringify(process.env)
-    const argsJSON = JSON.stringify(process.args)
-    const bufferSize = envJSON.length + argsJSON.length + 13
-    thread.buffer = Buffer.alloc(bufferSize)
-    const view = new DataView(thread.buffer.bytes)
-    if (opts.ipc) {
-      const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
-      const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
-      const sock = new Socket(UNIX)
-      const parser = new Parser(rb, wb)
-      sock.onConnect(() => {
-        sock.setup(rb, wb)
-        sock.resume()
-      })
-      sock.onEnd(() => sock.close())
-      sock.onRead(len => parser.read(len))
-      parser.onMessage = message => thread._onMessage(message)
-      thread.onMessage = fn => {
-        thread._onMessage = fn
-      }
-      thread._onMessage = message => {}
-      thread.send = o => sock.write(parser.write(o))
-      thread.sendString = s => {
-        sock.write(parser.write(s, 2))
-      }
-      thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
-      const fd = sock.open()
-      if (fd < 0) {
-        throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
-      }
-      view.setUint32(1, fd)
-      thread.sock = sock
-    } else {
-      view.setUint32(1, 0)
-    }
-    thread.view = view
-    thread.id = next++
-    view.setUint8(0, thread.id)
-    view.setUint32(5, envJSON.length)
-    thread.buffer.write(envJSON, 9)
-    view.setUint32(envJSON.length + 9, argsJSON.length)
-    thread.buffer.write(argsJSON, envJSON.length + 13)
-    threads[thread.id] = thread
-    process.nextTick(() => {
-      const r = thread.start(fun, err => {
-        delete threads[thread.id]
-        onComplete({ err, thread })
-      }, thread.buffer)
-      if (r !== 0) onComplete({ err: new Error(`Bad Status: ${r}`, thread, 0) })
-    })
-   return thread
-  }
   process.env = ENV
   process.PID = _process.pid()
   process.TID = 0
@@ -591,8 +681,11 @@ if (global.workerData) {
   if (process.args.length < 2) {
     repl()
   } else {
-    global.runScript(process.args[1])
+    if (process.args[1] === '-e') {
+      global.evalScript(global.args[2])
+    } else {
+      global.runScript(process.args[1])
+    }
   }
 }
-
 runLoop()

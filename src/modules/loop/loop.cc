@@ -23,6 +23,7 @@ using dv8::builtins::Buffer;
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "isAlive", EventLoop::IsAlive);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", EventLoop::Close);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", EventLoop::Reset);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "error", EventLoop::Error);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onIdle", EventLoop::OnIdle);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onPrepare", EventLoop::OnPrepare);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onCheck", EventLoop::OnCheck);
@@ -74,6 +75,15 @@ using dv8::builtins::Buffer;
 		uv_close((uv_handle_t*)obj->prepare_handle, OnClose);
 		uv_close((uv_handle_t*)obj->check_handle, OnClose);
 		uv_close((uv_handle_t*)obj->idle_handle, OnClose);
+	}
+
+	void EventLoop::Error(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		int r = args[1]->IntegerValue(context).ToChecked();
+		const char *error = uv_strerror(r);
+		args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), error, NewStringType::kNormal).ToLocalChecked());
 	}
 
 	void EventLoop::Stop(const FunctionCallbackInfo<Value> &args)
@@ -131,16 +141,24 @@ using dv8::builtins::Buffer;
 			work++;
 			handles->off++;
 			const char* type = uv_handle_type_name(handle->type);
-			int typelen = strlen(type);
+			int typelen = 0;
+			if (type == NULL) {
+
+			} else {
+				typelen = strlen(type);
+			}
 			work[0] = typelen;
 			work++;
 			handles->off++;
-			memcpy(work, type, typelen);
-			work += typelen;
-			handles->off += typelen;
+			if (typelen > 0) {
+				memcpy(work, type, typelen);
+				work += typelen;
+				handles->off += typelen;
+			}
 			handles->size++;
-			work[0] = 0;
 		}, &handles);
+		work = handles.buf + handles.off;
+		work[0] = 255;
 		args.GetReturnValue().Set(Integer::New(isolate, handles.size));
 	}
 	

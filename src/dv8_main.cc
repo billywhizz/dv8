@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
   setvbuf(stdout, nullptr, _IONBF, 0);
   setvbuf(stderr, nullptr, _IONBF, 0);
-
+  uv_disable_stdio_inheritance();
   v8::Isolate::CreateParams create_params;
   create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
   v8::Isolate *isolate = v8::Isolate::New(create_params);
@@ -42,15 +42,8 @@ int main(int argc, char *argv[]) {
     dv8::InspectorClient inspector_client(context, true);
 
     v8::TryCatch try_catch(isolate);
-    v8::MaybeLocal<v8::String> base;
-     const char* base_name;
-    if (argc == 3 && strcmp("-e", argv[1]) == 0) {
-      base = v8::String::NewFromUtf8(isolate, src_base_js, v8::NewStringType::kNormal, static_cast<int>(src_base_js_len));
-      base_name = "base.js";
-    } else {
-      base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len));
-      base_name = "main.js";
-    }
+    const char* base_name = "main.js";
+    v8::Local<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len)).ToLocalChecked();
    // https://v8docs.nodesource.com/node-10.6/db/d84/classv8_1_1_script_origin.html
     v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, base_name, v8::NewStringType::kNormal).ToLocalChecked(), // resource name
       v8::Integer::New(isolate, 0), // line offset
@@ -62,7 +55,7 @@ int main(int argc, char *argv[]) {
       v8::False(isolate), // is wasm
       v8::True(isolate)); // is module
     v8::Local<v8::Module> module;
-    v8::ScriptCompiler::Source basescript(base.ToLocalChecked(), baseorigin);
+    v8::ScriptCompiler::Source basescript(base, baseorigin);
     if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
       dv8::ReportException(isolate, &try_catch);
       return 1;

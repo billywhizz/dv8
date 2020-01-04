@@ -1,10 +1,14 @@
-xxd -i src/base.js > src/builtins.h
+MAIN=${2:-default}
+OVERRIDE=${3:-src/override.js}
+if [[ "$MAIN" == "override" ]]; then
+  echo "building overridden main with $OVERRIDE"
+  cp src/main.js src/backup.js
+  cp $OVERRIDE src/main.js
+fi
+xxd -i src/main.js > src/builtins.h
 sed -i 's/unsigned char/static const char/g' src/builtins.h
 sed -i 's/unsigned int/static unsigned int/g' src/builtins.h
 sed -i 's/examples_//g' src/builtins.h
-xxd -i src/main.js > src/main.h
-sed -i 's/unsigned char/static const char/g' src/main.h
-sed -i 's/unsigned int/static unsigned int/g' src/main.h
-sed -i 's/examples_//g' src/main.h
-cat src/main.h >> src/builtins.h
-rm src/main.h
+if [[ "$MAIN" == "override" ]]; then
+  cp src/backup.js src/main.js
+fi

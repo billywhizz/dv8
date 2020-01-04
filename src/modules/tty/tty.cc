@@ -27,7 +27,7 @@ void on_close(uv_handle_t *handle)
         Local<Context> ctx = isolate->GetCurrentContext();
         Callback->Call(ctx, ctx->Global(), 0, argv);
     }
-    free(handle);
+    //free(handle);
 }
 
 void after_write(uv_write_t *req, int status)
@@ -164,7 +164,6 @@ void TTY::Init(Local<Object> exports)
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", TTY::Setup);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pause", TTY::Pause);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "resume", TTY::Resume);
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "error", TTY::Error);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "queueSize", TTY::QueueSize);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", TTY::Stats);
 
@@ -237,15 +236,6 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
         obj->Wrap(args.This());
         args.GetReturnValue().Set(args.This());
     }
-}
-
-void TTY::Error(const FunctionCallbackInfo<Value> &args)
-{
-    Isolate *isolate = args.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    int r = args[1]->IntegerValue(context).ToChecked();
-    const char *error = uv_strerror(r);
-    args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), error, NewStringType::kNormal).ToLocalChecked());
 }
 
 void TTY::Setup(const FunctionCallbackInfo<Value> &args)
@@ -361,7 +351,9 @@ void TTY::Close(const FunctionCallbackInfo<Value> &args)
         t->closing = true;
     }
     else {
-        uv_close((uv_handle_t *)t->handle, on_close);
+        if (!uv_is_closing((uv_handle_t *)t->handle)) {
+            uv_close((uv_handle_t *)t->handle, on_close);
+        }
         t->closing = false;
     }
 }

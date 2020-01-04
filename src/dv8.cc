@@ -39,8 +39,53 @@ void shutdown(uv_loop_t *loop) {
   }, NULL);
 }
 
+void RunScript(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+  v8::TryCatch try_catch(isolate);
+  Local<String> source = args[0].As<String>();
+  Local<String> path = args[1].As<String>();
+  v8::ScriptOrigin baseorigin(path, // resource name
+    v8::Integer::New(isolate, 0), // line offset
+    v8::Integer::New(isolate, 0),  // column offset
+    v8::False(isolate), // is shared cross-origin
+    v8::Local<v8::Integer>(),  // script id
+    v8::Local<v8::Value>(), // source map url
+    v8::False(isolate), // is opaque
+    v8::False(isolate), // is wasm
+    v8::False(isolate)); // is module
+  v8::Local<v8::Script> script;
+  v8::ScriptCompiler::Source basescript(source, baseorigin);
+  if (!v8::ScriptCompiler::Compile(context, &basescript).ToLocal(&script)) {
+    dv8::ReportException(isolate, &try_catch);
+    return;
+  }
+  if (try_catch.HasCaught()) {
+    dv8::ReportException(isolate, &try_catch);
+    return;
+  }
+  MaybeLocal<Value> result = script->Run(context);
+  if (try_catch.HasCaught()) {
+    dv8::ReportException(isolate, &try_catch);
+    return;
+  }
+  args.GetReturnValue().Set(result.ToLocalChecked());
+}
+
 void Shutdown(const FunctionCallbackInfo<Value> &args) {
-  shutdown(uv_default_loop());
+  Isolate *isolate = args.GetIsolate();
+  HandleScope handle_scope(isolate);
+  Local<Context> context(isolate->GetCurrentContext());
+  Local<Object> globalInstance = context->Global();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+  Local<Function> onExit = Local<Function>::New(isolate, env->onExit);
+  //Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+  //Local<Function> onExit = Local<Function>::Cast(func);
+  Local<Value> argv[0] = { };
+  onExit->Call(context, globalInstance, 0, argv);
+  shutdown(env->loop);
 }
 
 void ReportException(Isolate *isolate, TryCatch *try_catch) {
@@ -189,7 +234,6 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
   const char *module_name = *str;
-  const char *module_path = "/usr/local/lib/dv8/";
   char lib_name[128];
   Local<Object> exports;
   bool ok = args[1]->ToObject(context).ToLocal(&exports);
@@ -197,6 +241,8 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     args.GetReturnValue().Set(Null(isolate));
     return;
   }
+#ifdef DLOPEN
+  const char *module_path = "/usr/local/lib/dv8/";
   if (args.Length() > 2) {
     String::Utf8Value str(args.GetIsolate(), args[2]);
     module_path = *str;
@@ -241,13 +287,11 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     }
     snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
   }
-#ifdef NO_DLOPEN  
   uv_lib_t lib;
+  args.GetReturnValue().Set(exports);
   int success = uv_dlopen(lib_name, &lib);
   if (success != 0) {
-    fprintf(stderr, "uv_dlopen failed: %i\n", success);
-    fprintf(stderr, "%s\n", uv_dlerror(&lib));
-    args.GetReturnValue().Set(Null(isolate));
+    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlopen failed").ToLocalChecked()));
     return;
   }
   char register_name[128];
@@ -255,16 +299,54 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   void *address;
   success = uv_dlsym(&lib, register_name, &address);
   if (success != 0) {
-    fprintf(stderr, "uv_dlsym failed: %i\n", success);
-    args.GetReturnValue().Set(Null(isolate));
+    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlsym failed").ToLocalChecked()));
     return;
   }
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
   //uv_dlclose(&lib);
+#else
+  if (strcmp("loop", module_name) == 0) {
+    dv8::loop::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("socket", module_name) == 0) {
+    dv8::socket::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("timer", module_name) == 0) {
+    dv8::timer::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("thread", module_name) == 0) {
+    dv8::thread::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("fs", module_name) == 0) {
+    dv8::fs::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("udp", module_name) == 0) {
+    dv8::udp::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("process", module_name) == 0) {
+    dv8::process::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("tty", module_name) == 0) {
+    dv8::tty::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("os", module_name) == 0) {
+    dv8::os::InitAll(exports);
+    args.GetReturnValue().Set(exports);
+    return;
+  }
+  // we do not have dlopen available (defined or static build) so we cannot load anything other than builtins
+  isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "Library Not Found").ToLocalChecked()));
 #endif
-  args.GetReturnValue().Set(exports);
 }
 
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer) {
@@ -357,6 +439,7 @@ Local<Context> CreateContext(Isolate *isolate) {
   global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
   global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
+  global->Set(String::NewFromUtf8(isolate, "runScript", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunScript));
   global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
   return Context::New(isolate, NULL, global);
 }

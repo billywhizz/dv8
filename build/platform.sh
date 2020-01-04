@@ -46,7 +46,7 @@ ar crsT dv8.a buffer.o env.o dv8.o loop.o process.o timer.o thread.o tty.o os.o 
 $CC $LDFLAGS -o ./dv8
 
 # compile the dv8 core
-$CC $CCFLAGS -DNO_DLOPEN -c -o dv8.o /src/dv8.cc
+$CC $CCFLAGS -DDLOPEN=1 -c -o dv8.o /src/dv8.cc
 
 # create the lib
 rm -f dv8.a

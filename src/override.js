@@ -1,0 +1,1 @@
+runScript(args[2])

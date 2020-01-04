@@ -213,6 +213,7 @@ void Shutdown(const FunctionCallbackInfo<Value> &args);
 void CollectGarbage(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
+void RunScript(const FunctionCallbackInfo<Value> &args);
 void OnExit(const FunctionCallbackInfo<Value> &args);
 void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args);
 void Require(const FunctionCallbackInfo<Value> &args);

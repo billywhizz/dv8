@@ -101,7 +101,6 @@ private:
   static void Resume(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void QueueSize(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static void Error(const v8::FunctionCallbackInfo<v8::Value> &args);
 
   static void onError(const v8::FunctionCallbackInfo<v8::Value> &args);   // when we have an error on the socket
   static void onRead(const v8::FunctionCallbackInfo<v8::Value> &args);    // when we receive bytes on the socket

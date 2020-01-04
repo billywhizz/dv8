@@ -235,7 +235,7 @@ void on_client_connection(uv_connect_t *client, int status)
   s->context = ctx;
   if (!uv_is_readable(client->handle) || !uv_is_writable(client->handle) || uv_is_closing((uv_handle_t *)client->handle))
   {
-    fprintf(stderr, "foo\n");
+    fprintf(stderr, "Socket::on_client_connection bad client handle\n");
     return;
   }
   callback(ctx);
