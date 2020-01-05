@@ -1,4 +1,4 @@
-#include <buffer.h>
+#include <builtins/buffer.h>
 
 namespace dv8
 {
@@ -42,6 +42,7 @@ void Buffer::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Buffer::Write);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "copy", Buffer::Copy);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "size", Buffer::Size);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "load", Buffer::Load);
 
   DV8_SET_EXPORT(isolate, tpl, "Buffer", exports);
 }
@@ -95,6 +96,18 @@ void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)
     Local<SharedArrayBuffer> ab = SharedArrayBuffer::New(isolate, b->_data, b->_length, ArrayBufferCreationMode::kExternalized);
     args.GetReturnValue().Set(scope.Escape(ab));
   }
+}
+
+void Buffer::Load(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  EscapableHandleScope scope(isolate);
+  Local<ArrayBuffer> ab = args[0].As<ArrayBuffer>();
+  Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+  v8::ArrayBuffer::Contents foo = ab->Externalize();
+  b->_data = (char*)foo.Data();
+  b->_length = foo.ByteLength();
+  args.GetReturnValue().Set(scope.Escape(ab));
 }
 
 void Buffer::Copy(const FunctionCallbackInfo<Value> &args)

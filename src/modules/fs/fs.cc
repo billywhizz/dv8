@@ -67,7 +67,6 @@ using dv8::builtins::Buffer;
 		}
 		int fd = uv_fs_open(env->loop, &obj->req, *filename, flags, 0, NULL);
 		//uv_ref((uv_handle_t*)obj->req);
-
 		args.GetReturnValue().Set(Integer::New(isolate, fd));
 	}
 

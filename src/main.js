@@ -372,7 +372,7 @@ global.onUnhandledRejection = (err, promise) => {
     enumerable: true
   })
   const stack = err.stack
-  if (process.onUncaughtException) return process.onUncaughtException(err) 
+  if (process.onUnhandledRejection) return process.onUnhandledRejection(err) 
   print(`${err.type}\n${stack}`)
 }
 
@@ -397,6 +397,7 @@ function clearTimeout (t) {
 }
 
 const GlobalBuffer = global.Buffer
+
 global.Buffer = {
   alloc: size => {
     const buf = new GlobalBuffer()
@@ -408,6 +409,13 @@ global.Buffer = {
   fromString: str => {
     const buf = global.Buffer.alloc(str.length)
     buf.write(str)
+    return buf
+  },
+  fromArrayBuffer: ab => {
+    const buf = new GlobalBuffer()
+    buf.load(ab)
+    buf.size = ab.byteLength
+    buf.bytes = ab
     return buf
   }
 }
@@ -551,10 +559,13 @@ global.require = path => {
   }
   const { text } = readFile(newPath)
   global.module = { exports: {} }
+  global.exports = global.module.exports
   const dirname = global.__dirname
   global.__dirname = baseName(newPath)
   const exports = global.evalScript(`(function() {${text};return module.exports})()`, newPath)
   global.__dirname = dirname
+  delete global.module
+  delete global.exports
   return exports
 }
 

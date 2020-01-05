@@ -41,6 +41,8 @@ private:
   static void Write(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Copy(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Size(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Load(const v8::FunctionCallbackInfo<v8::Value> &args);
+
 };
 
 } // namespace builtins
