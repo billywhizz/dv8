@@ -65,7 +65,11 @@ using dv8::builtins::Buffer;
 		if (argc > 1) {
 			flags = args[1]->Int32Value(context).ToChecked();
 		}
-		int fd = uv_fs_open(env->loop, &obj->req, *filename, flags, 0, NULL);
+		int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+		if (argc > 2) {
+			mode = args[2]->Int32Value(context).ToChecked();
+		}
+		int fd = uv_fs_open(env->loop, &obj->req, *filename, flags, mode, NULL);
 		//uv_ref((uv_handle_t*)obj->req);
 		args.GetReturnValue().Set(Integer::New(isolate, fd));
 	}
@@ -155,6 +159,16 @@ using dv8::builtins::Buffer;
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_CREAT), "O_CREAT", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_TRUNC), "O_TRUNC", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_EXCL), "O_EXCL", exports);
+
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IRUSR), "S_IRUSR", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IWUSR), "S_IWUSR", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IXUSR), "S_IXUSR", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IRGRP), "S_IRGRP", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IWGRP), "S_IWGRP", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IXGRP), "S_IXGRP", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IROTH), "S_IROTH", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IWOTH), "S_IWOTH", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IXOTH), "S_IXOTH", exports);
 
 /*
 
