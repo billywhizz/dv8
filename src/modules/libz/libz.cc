@@ -96,6 +96,16 @@ using dv8::builtins::Buffer;
 		}
 	}
 
+	void ZLib::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		ZLib* sock = static_cast<ZLib *>(wrap);
+		#if TRACE
+		fprintf(stderr, "ZLib::Destroy\n");
+		#endif
+	}
+
 	void ZLib::Setup(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();

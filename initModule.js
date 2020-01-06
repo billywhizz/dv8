@@ -58,6 +58,14 @@ namespace ${name} {
 		}
 	}
 
+	void ${className}::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		${className}* obj = static_cast<${className} *>(wrap);
+		fprintf(stderr, "${className}::Destroy\n");
+	}
+
 	void ${className}::Hello(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();

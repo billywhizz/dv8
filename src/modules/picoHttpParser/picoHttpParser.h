@@ -51,6 +51,8 @@ class PicoHTTPParser : public dv8::ObjectWrap {
 		v8::Persistent<v8::Function> _onHeaders;
 		callbacks_t callbacks;
     
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 	private:
 
 		PicoHTTPParser() {

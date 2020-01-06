@@ -71,7 +71,9 @@ using dv8::builtins::Buffer;
 		v8::HandleScope handleScope(isolate);
 		ObjectWrap *wrap = data.GetParameter();
 		EventLoop* obj = static_cast<EventLoop *>(wrap);
-		fprintf(stderr, "EventLoop::Destroy");
+		#if TRACE
+		fprintf(stderr, "EventLoop::Destroy\n");
+		#endif
 		uv_close((uv_handle_t*)obj->prepare_handle, OnClose);
 		uv_close((uv_handle_t*)obj->check_handle, OnClose);
 		uv_close((uv_handle_t*)obj->idle_handle, OnClose);

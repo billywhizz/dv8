@@ -11,124 +11,6 @@ const { Socket, UNIX } = library('socket', {})
 const { File, O_RDONLY } = library('fs', {})
 const { UV_TTY_MODE_NORMAL, TTY } = library('tty', {})
 
-let next = 1
-const queue = []
-const threads = {}
-let idleActive = false
-const process = {}
-const cache = {}
-const mem = new Float64Array(16)
-const cpu = new Float64Array(2)
-const time = new BigInt64Array(1)
-const heap = Array.from(new Array(16)).map(v => new Float64Array(4))
-const GlobalBuffer = global.Buffer
-Error.stackTraceLimit = 1000 // Infinity
-const _process = new Process()
-const loop = new EventLoop()
-
-process.loop = loop
-process.cwd = (...args) => _process.cwd.apply(_process, args)
-process.sleep = (...args) => _process.sleep.apply(_process, args)
-process.usleep = (...args) => _process.usleep.apply(_process, args)
-process.nanosleep = (...args) => _process.nanosleep.apply(_process, args)
-process.runMicroTasks = (...args) => _process.runMicroTasks.apply(_process, args)
-global.process = process
-process.ticks = 0
-global.__dirname = process.cwd()
-global.__filename = 'main.js'
-
-class Parser {
-  constructor (rb, wb) {
-    this.position = 0
-    this.message = {
-      opCode: 0,
-      threadId: 0,
-      payload: ''
-    }
-    this.rb = rb
-    this.wb = wb
-    this.view = {
-      recv: new DataView(rb.bytes),
-      send: new DataView(wb.bytes)
-    }
-    this.onMessage = () => { }
-  }
-
-  read (len, off = 0) {
-    const { rb, view, message } = this
-    let { position } = this
-    const { recv } = view
-    while (off < len) {
-      if (position === 0) {
-        message.threadId = recv.getUint8(off++)
-        position++
-      } else if (position === 1) {
-        message.opCode = recv.getUint8(off++)
-        position++
-      } else if (position === 2) {
-        message.length = recv.getUint8(off++) << 8
-        position++
-      } else if (position === 3) {
-        message.length += recv.getUint8(off++)
-        position++
-        message.payload = ''
-      } else {
-        let toread = message.length - (position - 4)
-        if (toread + off > len) {
-          toread = len - off
-          if (message.opCode !== 3) {
-            message.payload += rb.read(off, toread)
-          }
-          position += toread
-          off = len
-        } else {
-          if (message.opCode === 1) {
-            message.payload += rb.read(off, toread)
-            this.onMessage(Object.assign({}, JSON.parse(message.payload)))
-          } else if (message.opCode === 2) {
-            message.payload += rb.read(off, toread)
-            this.onMessage(Object.assign({}, message))
-          } else if (message.opCode === 3) {
-            message.payload = null
-            message.offset = off
-            this.onMessage(Object.assign({}, message))
-          }
-          off += toread
-          position = 0
-        }
-      }
-    }
-    this.position = position
-  }
-
-  write (o, opCode = 1, off = 0, size = 0) {
-    const { wb, view } = this
-    const { send } = view
-    if (opCode === 1) { // JSON
-      const message = JSON.stringify(o)
-      const len = message.length
-      send.setUint8(off, process.TID || process.PID)
-      send.setUint8(off + 1, opCode)
-      send.setUint16(off + 2, len)
-      wb.write(message, off + 4)
-      return len + 4
-    } else if (opCode === 2) { // String
-      const len = o.length
-      send.setUint8(off, process.TID || process.PID)
-      send.setUint8(off + 1, opCode)
-      send.setUint16(off + 2, len)
-      wb.write(o, off + 4)
-      return len + 4
-    } else if (opCode === 3) { // buffer
-      send.setUint8(off, process.TID || process.PID)
-      send.setUint8(off + 1, opCode)
-      send.setUint16(off + 2, size)
-      return size + 4
-    }
-    return 0
-  }
-}
-
 function pathModule () {
   const CHAR_FORWARD_SLASH = 47
   const CHAR_BACKWARD_SLASH = 92
@@ -306,6 +188,122 @@ function readFile (path) {
   return file
 }
 
+class Parser {
+  constructor (rb, wb) {
+    this.position = 0
+    this.message = {
+      opCode: 0,
+      threadId: 0,
+      payload: ''
+    }
+    this.rb = rb
+    this.wb = wb
+    this.view = {
+      recv: new DataView(rb.bytes),
+      send: new DataView(wb.bytes)
+    }
+    this.onMessage = () => { }
+  }
+
+  read (len, off = 0) {
+    const { rb, view, message } = this
+    let { position } = this
+    const { recv } = view
+    while (off < len) {
+      if (position === 0) {
+        message.threadId = recv.getUint8(off++)
+        position++
+      } else if (position === 1) {
+        message.opCode = recv.getUint8(off++)
+        position++
+      } else if (position === 2) {
+        message.length = recv.getUint8(off++) << 8
+        position++
+      } else if (position === 3) {
+        message.length += recv.getUint8(off++)
+        position++
+        message.payload = ''
+      } else {
+        let toread = message.length - (position - 4)
+        if (toread + off > len) {
+          toread = len - off
+          if (message.opCode !== 3) {
+            message.payload += rb.read(off, toread)
+          }
+          position += toread
+          off = len
+        } else {
+          if (message.opCode !== 3) {
+            message.payload += rb.read(off, toread)
+            this.onMessage(Object.assign({}, message))
+          } else {
+            message.payload = null
+            message.offset = off
+            this.onMessage(Object.assign({}, message))
+          }
+          off += toread
+          position = 0
+        }
+      }
+    }
+    this.position = position
+  }
+
+  write (o, opCode = 1, off = 0, size = 0) {
+    const { wb, view } = this
+    const { send } = view
+    if (opCode === 1) { // JSON
+      const message = JSON.stringify(o)
+      const len = message.length
+      send.setUint8(off, process.TID || process.PID)
+      send.setUint8(off + 1, opCode)
+      send.setUint16(off + 2, len)
+      wb.write(message, off + 4)
+      return len + 4
+    } else if (opCode === 2) { // String
+      const len = o.length
+      send.setUint8(off, process.TID || process.PID)
+      send.setUint8(off + 1, opCode)
+      send.setUint16(off + 2, len)
+      wb.write(o, off + 4)
+      return len + 4
+    } else if (opCode === 3) { // buffer
+      send.setUint8(off, process.TID || process.PID)
+      send.setUint8(off + 1, opCode)
+      send.setUint16(off + 2, size)
+      return size + 4
+    }
+    return 0
+  }
+}
+
+const mem = new Float64Array(16)
+const cpu = new Float64Array(2)
+const time = new BigInt64Array(1)
+let next = 1
+const queue = []
+const threads = {}
+const heap = [
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4),
+  new Float64Array(4)
+]
+
+Error.stackTraceLimit = 1000 // Infinity
+
 Error.prepareStackTrace = (err, stack) => {
   const result = []
   for (const callsite of stack) {
@@ -409,6 +407,8 @@ function clearTimeout (t) {
   t.close()
 }
 
+const GlobalBuffer = global.Buffer
+
 global.Buffer = {
   alloc: size => {
     const buf = new GlobalBuffer()
@@ -430,6 +430,20 @@ global.Buffer = {
     return buf
   }
 }
+
+const _process = new Process()
+const process = {}
+
+const loop = new EventLoop()
+process.loop = loop
+
+process.cwd = (...args) => _process.cwd.apply(_process, args)
+process.sleep = (...args) => _process.sleep.apply(_process, args)
+process.usleep = (...args) => _process.usleep.apply(_process, args)
+process.nanosleep = (...args) => _process.nanosleep.apply(_process, args)
+
+global.__dirname = process.cwd()
+global.__filename = 'main.js'
 
 process.cpuUsage = () => {
   _process.cpuUsage(cpu)
@@ -484,26 +498,22 @@ global.setTimeout = setTimeout
 global.setInterval = setInterval
 global.clearTimeout = clearTimeout
 global.clearInterval = clearTimeout
+global.process = process
+
+process.runMicroTasks = (...args) => _process.runMicroTasks.apply(_process, args)
+process.ticks = 0
+
+let idleActive = false
 
 process.stats = () => {
-  const mem = process.memoryUsage()
-  const all = process.activeHandles()
-  const handles = all.length
-  const active = all.filter(h => h.active).length
-  const summary = {}
-  all.filter(h => h.active).forEach(h => {
-    if (summary[h.type]) return summary[h.type]++
-    summary[h.type] = 1
-  })
-  const cpu = process.cpuUsage()
-  const heap = process.heapUsage()
-  return {
-    threads: Object.keys(threads).length, ticks: process.ticks, queue: queue.length, cpu,
-    mem, handles, active, summary, heap
+  const st = {
+    ticks: process.ticks,
+    queue: queue.length
   }
+  return st
 }
 
-function activeHandles () {
+const activeHandles = () => {
   const buf = Buffer.alloc(16384)
   loop.listHandles(buf)
   const bytes = new Uint8Array(buf.bytes)
@@ -524,7 +534,9 @@ function activeHandles () {
   return handles
 }
 
-function nextTick () {
+process.activeHandles = activeHandles
+
+const nextTick = fn => {
   queue.push(fn)
   if (idleActive) return
   loop.onIdle(() => {
@@ -542,8 +554,16 @@ function nextTick () {
   loop.ref()
   idleActive = true
 }
+process.nextTick = nextTick
+/*
+// why??
+global.onExit(() => {
+  process.loop.reset()
+  process.loop.run(2)
+})
+*/
 
-function runScriptFromFile (path) {
+const runScriptFromFile = path => {
   const newPath = join(global.__dirname, path)
   const { text } = readFile(newPath)
   global.__dirname = baseName(newPath)
@@ -551,12 +571,7 @@ function runScriptFromFile (path) {
   return runScript(text, newPath)
 }
 
-function runLoop () {
-  do {
-    loop.run()
-  } while (loop.isAlive())
-  if (process.onExit) process.onExit()
-}
+const cache = {}
 
 global.require = (path, parent) => {
   let dirName = parent ? parent.dirName : global.__dirname
@@ -575,24 +590,33 @@ global.require = (path, parent) => {
   }
   module.function.call(module.exports, module.exports, p => global.require(p, module), module, p)
   cache[fileName] = module
+  print(`require: ${path}, fileName: ${fileName}, dirName: ${dirName}, size: ${module.text.length}`)
   return module.exports
 }
 
-process.spawn = (fun, onComplete = () => {}, opts = { ipc: false, dirname: global.__dirname }) => {
+function runLoop () {
+  do {
+    loop.run()
+  } while (loop.isAlive())
+  if (process.onExit) process.onExit()
+}
+process.runLoop = runLoop
+
+process.exec = (...args) => _process.spawn.apply(_process, args)
+
+process.spawn = (fun, onComplete, opts = { ipc: false, dirname: global.__dirname }) => {
   const thread = new Thread()
   const envJSON = JSON.stringify(process.env)
   const argsJSON = JSON.stringify(process.args)
   opts.dirname = opts.dirname || global.__dirname
-  const bufferSize = envJSON.length + argsJSON.length + opts.dirname.length + 21
+  const bufferSize = envJSON.length + argsJSON.length + opts.dirname.length + 17
   thread.buffer = Buffer.alloc(bufferSize)
   const view = new DataView(thread.buffer.bytes)
   if (opts.ipc) {
-    const bufSize = parseInt(opts.bufSize || process.env.THREAD_BUFFER_SIZE || 4096, 10)
-    view.setUint32(envJSON.length + argsJSON.length + 17 + opts.dirname.length, bufSize)
+    const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
     const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
     const sock = new Socket(UNIX)
     const parser = new Parser(rb, wb)
-    sock.buffers = { rb, wb }
     sock.onConnect(() => {
       sock.setup(rb, wb)
       sock.resume()
@@ -636,17 +660,7 @@ process.spawn = (fun, onComplete = () => {}, opts = { ipc: false, dirname: globa
   return thread
 }
 
-global.onExit(() => {
-  process.runMicroTasks()
-  loop.reset()
-  loop.run(2)
-})
-
 global.dv8 = { repl, readFile, join, baseName, cache }
-process.activeHandles = activeHandles
-process.nextTick = nextTick
-process.runLoop = runLoop
-process.exec = (...args) => _process.spawn.apply(_process, args)
 
 if (global.workerData) {
   global.workerData.bytes = global.workerData.alloc()
@@ -665,10 +679,9 @@ if (global.workerData) {
     global.__dirname = global.workerData.read(17 + envLength + argsLength, dirNameLength)
   }
   if (process.fd !== 0) {
-    const bufSize = dv.getUint32(17 + envLength + argsLength + dirNameLength)
+    const bufSize = parseInt(process.env.THREAD_BUFFER_SIZE || 1024, 10)
     const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
     const sock = new Socket(UNIX)
-    sock.buffers = { wb, rb }
     const parser = new Parser(rb, wb)
     sock.onConnect(() => {
       sock.setup(rb, wb)
@@ -711,5 +724,4 @@ if (global.workerData) {
     }
   }
 }
-
 runLoop()

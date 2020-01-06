@@ -42,6 +42,16 @@ using dv8::socket::socket_plugin;
 		}
 	}
 
+	void PicoHTTPParser::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		PicoHTTPParser* obj = static_cast<PicoHTTPParser *>(wrap);
+		#if TRACE
+		fprintf(stderr, "PicoHTTPParser::Destroy\n");
+		#endif
+	}
+
 	void on_plugin_close(void* obj) {
 		socket_plugin* plugin = (socket_plugin*)obj;
 		PicoHTTPParser* parser = (PicoHTTPParser*)plugin->data;

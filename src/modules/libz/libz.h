@@ -55,6 +55,9 @@ class ZLib : public dv8::ObjectWrap {
 		Bytef* dictionary_;
 		size_t dictionary_len_;
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
 	private:
 		z_stream strm_;
 

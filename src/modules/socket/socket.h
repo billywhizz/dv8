@@ -121,8 +121,8 @@ typedef struct
 // socket context
 struct _context
 {
-  uint32_t readBufferLength;  // size of read buffer
-  uint32_t writeBufferLength; // size of write buffer
+  //uint32_t readBufferLength;  // size of read buffer
+  //uint32_t writeBufferLength; // size of write buffer
   uint32_t index;             // position in buffer
   uv_buf_t in;                // buffer for reading from socket
   uv_buf_t out;               // buffer for writing to socket

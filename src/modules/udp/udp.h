@@ -33,6 +33,9 @@ class UDP : public dv8::ObjectWrap {
 		v8::Persistent<v8::Function> onClose;
 		v8::Persistent<v8::Function> onSend;
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
 	private:
 
 		UDP() {

@@ -38,6 +38,16 @@ using dv8::builtins::Buffer;
 		}
 	}
 
+	void File::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		File* sock = static_cast<File *>(wrap);
+		#if TRACE
+		fprintf(stderr, "File::Destroy\n");
+		#endif
+	}
+
 	void File::Setup(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate* isolate = args.GetIsolate();
@@ -271,6 +281,16 @@ EWOULDBLOCK
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
 		}
+	}
+
+	void FileSystem::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		FileSystem* sock = static_cast<FileSystem *>(wrap);
+		#if TRACE
+		fprintf(stderr, "FileSystem::Destroy\n");
+		#endif
 	}
 
 	void FileSystem::Unlink(const FunctionCallbackInfo<Value> &args)

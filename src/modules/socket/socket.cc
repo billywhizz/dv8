@@ -222,7 +222,7 @@ void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf)
   // it will not be overwritten until after after_read completes
   _context *ctx = (_context *)handle->data;
   buf->base = ctx->in.base;
-  buf->len = ctx->readBufferLength;
+  buf->len = ctx->in.len;
 }
 
 void on_client_connection(uv_connect_t *client, int status)
@@ -346,6 +346,9 @@ void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   v8::HandleScope handleScope(isolate);
   ObjectWrap *wrap = data.GetParameter();
   Socket* sock = static_cast<Socket *>(wrap);
+		#if TRACE
+		fprintf(stderr, "Socket::Destroy\n");
+		#endif
 }
 
 void Socket::QueueSize(const FunctionCallbackInfo<Value> &args)
@@ -515,12 +518,16 @@ void Socket::Setup(const FunctionCallbackInfo<Value> &args)
   _context* ctx = s->context;
   Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
   size_t len = b->_length;
-  ctx->in = uv_buf_init((char *)b->_data, len);
-  ctx->readBufferLength = len;
+  ctx->in.base = (char *)b->_data;
+  ctx->in.len = len;
+  //ctx->in = uv_buf_init((char *)b->_data, len);
+  //ctx->readBufferLength = len;
   b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
   len = b->_length;
-  ctx->out = uv_buf_init((char *)b->_data, len);
-  ctx->readBufferLength = len;
+  ctx->out.base = (char *)b->_data;
+  ctx->out.len = len;
+  //ctx->out = uv_buf_init((char *)b->_data, len);
+  //ctx->writeBufferLength = len;
   args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 

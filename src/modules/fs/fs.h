@@ -26,6 +26,8 @@ class File : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 	private:
 
 		File() {
@@ -52,6 +54,8 @@ class FileSystem : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 	private:
 
 		FileSystem() {

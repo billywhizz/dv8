@@ -84,6 +84,9 @@ public:
   bool closing;
   bool blocked;
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
 private:
   TTY()
   {

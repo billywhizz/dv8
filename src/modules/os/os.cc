@@ -36,6 +36,16 @@ void OS::New(const FunctionCallbackInfo<Value> &args)
   }
 }
 
+void OS::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  OS* sock = static_cast<OS *>(wrap);
+		#if TRACE
+		fprintf(stderr, "OS::Destroy\n");
+		#endif
+}
+
 void OS::OnSignal(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();

@@ -35,6 +35,9 @@ public:
   static void Init(v8::Local<v8::Object> exports);
   v8::Persistent<v8::Function> onExit;
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
 private:
   Process() {}
 

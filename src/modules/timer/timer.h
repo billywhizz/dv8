@@ -32,6 +32,9 @@ public:
   uv_timer_t *handle;
   v8::Persistent<v8::Function> onTimeout;
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
 private:
   Timer()
   {

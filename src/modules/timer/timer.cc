@@ -45,6 +45,16 @@ void Timer::New(const FunctionCallbackInfo<Value> &args)
     }
 }
 
+void Timer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  Timer* sock = static_cast<Timer *>(wrap);
+		#if TRACE
+		fprintf(stderr, "Timer::Destroy\n");
+		#endif
+}
+
 void Timer::Start(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();

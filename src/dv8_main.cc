@@ -23,7 +23,6 @@ int main(int argc, char *argv[]) {
     v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);
     v8::Context::Scope context_scope(context);
-    context->AllowCodeGenerationFromStrings(true);
     isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
     dv8::builtins::Environment *env = new dv8::builtins::Environment();
@@ -40,7 +39,6 @@ int main(int argc, char *argv[]) {
     globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
     dv8::builtins::Buffer::Init(globalInstance);
     dv8::InspectorClient inspector_client(context, true);
-
     v8::TryCatch try_catch(isolate);
     const char* base_name = "main.js";
     v8::Local<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len)).ToLocalChecked();
@@ -56,20 +54,23 @@ int main(int argc, char *argv[]) {
       v8::True(isolate)); // is module
     v8::Local<v8::Module> module;
     v8::ScriptCompiler::Source basescript(base, baseorigin);
+
     if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
-      dv8::ReportException(isolate, &try_catch);
+      fprintf(stderr, "Error Compiling Module\n");
+      dv8::PrintStackTrace(isolate, try_catch);
       return 1;
     }
     v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
     if (!ok.ToChecked()) {
-      dv8::ReportException(isolate, &try_catch);
+      fprintf(stderr, "Error Instantiating Module\n");
+      dv8::PrintStackTrace(isolate, try_catch);
       return 1;
     }
-    uint64_t now = uv_hrtime();
-    module->Evaluate(context);
+    v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
     if (try_catch.HasCaught()) {
-      dv8::ReportException(isolate, &try_catch);
-      return 1;
+      fprintf(stderr, "Error Evaluating Module\n");
+      dv8::PrintStackTrace(isolate, try_catch);
+      return 2;
     }
     v8::platform::PumpMessageLoop(platform.get(), isolate);
     dv8::shutdown(uv_default_loop());

@@ -26,6 +26,9 @@ void Process::Init(Local<Object> exports) {
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "usleep", Process::USleep);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "nanosleep", Process::NanoSleep);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
+
+  DV8_SET_METHOD(isolate, tpl, "cwd", Process::Cwd);
+
   // spawn, kill, getTitle, setTitle, rss, uptime, rusage, ppid, interfaces, loadavg, exepath, cwd, chdir, homedir, tmpdir, passwd, memory, handles, hostname, getPriority, setPriority 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "spawn", Process::Spawn);
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
@@ -41,6 +44,16 @@ void Process::New(const FunctionCallbackInfo<Value> &args) {
   }
 }
 
+void Process::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  Process* p = static_cast<Process *>(wrap);
+		#if TRACE
+		fprintf(stderr, "Process::Destroy\n");
+		#endif
+}
+
 void Process::PID(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
@@ -51,24 +64,29 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   HeapSpaceStatistics s;
   size_t number_of_heap_spaces = isolate->NumberOfHeapSpaces();
+  Local<Array> spaces = args[0].As<Array>();
   Local<Object> o = Object::New(isolate);
-  size_t argc = args.Length();
-  if (argc < number_of_heap_spaces) {
-    number_of_heap_spaces = argc;
-  }
+  HeapStatistics v8_heap_stats;
+  isolate->GetHeapStatistics(&v8_heap_stats);
+  Local<Object> heaps = Object::New(isolate);
+  o->Set(context, String::NewFromUtf8(isolate, "totalMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.total_heap_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "totalCommittedMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.total_physical_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "usedMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.used_heap_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "availableMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.total_available_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "memoryLimit", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.heap_size_limit()));
+  o->Set(context, String::NewFromUtf8(isolate, "heapSpaces", v8::NewStringType::kNormal).ToLocalChecked(), heaps);
   for (size_t i = 0; i < number_of_heap_spaces; i++) {
     isolate->GetHeapSpaceStatistics(&s, i);
-    Local<Float64Array> array = args[i].As<Float64Array>();
+    Local<Float64Array> array = spaces->Get(context, i).ToLocalChecked().As<Float64Array>();
     Local<ArrayBuffer> ab = array->Buffer();
     double *fields = static_cast<double *>(ab->GetContents().Data());
     fields[0] = s.physical_space_size();
     fields[1] = s.space_available_size();
     fields[2] = s.space_size();
     fields[3] = s.space_used_size();
-    o->Set(context, String::NewFromUtf8(isolate, s.space_name(), v8::NewStringType::kNormal).ToLocalChecked(), array);
+    heaps->Set(context, String::NewFromUtf8(isolate, s.space_name(), v8::NewStringType::kNormal).ToLocalChecked(), array);
   }
   args.GetReturnValue().Set(o);
 }
@@ -110,7 +128,6 @@ void Process::USleep(const FunctionCallbackInfo<Value> &args) {
 }
 
 void on_exit(uv_process_t *req, int64_t exit_status, int term_signal) {
-//fprintf(stderr, "on_exit\n");
   Isolate *isolate = Isolate::GetCurrent();
   Process *obj = (Process *)req->data;
   v8::HandleScope handleScope(isolate);
@@ -240,8 +257,8 @@ void Process::CPUUsage(const FunctionCallbackInfo<Value> &args) {
   Local<Float64Array> array = args[0].As<Float64Array>();
   Local<ArrayBuffer> ab = array->Buffer();
   double *fields = static_cast<double *>(ab->GetContents().Data());
-  fields[0] = MICROS_PER_SEC * rusage.ru_utime.tv_sec + rusage.ru_utime.tv_usec;
-  fields[1] = MICROS_PER_SEC * rusage.ru_stime.tv_sec + rusage.ru_stime.tv_usec;
+  fields[0] = (MICROS_PER_SEC * rusage.ru_utime.tv_sec) + rusage.ru_utime.tv_usec;
+  fields[1] = (MICROS_PER_SEC * rusage.ru_stime.tv_sec) + rusage.ru_stime.tv_usec;
 }
 
 void Process::HRTime(const FunctionCallbackInfo<Value> &args) {

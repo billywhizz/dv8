@@ -48,6 +48,9 @@ class Thread : public dv8::ObjectWrap
 	v8::Persistent<v8::Function> onComplete;
 	thread_handle *handle;
 
+protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
   private:
 	Thread()
 	{

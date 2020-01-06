@@ -4,6 +4,5 @@ RUN echo http://dl-cdn.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositor
 RUN apk add --update --no-cache libstdc++ lldb valgrind htop wrk curl tmux unbound
 WORKDIR /app
 COPY --from=dv8-sdk /out/bin/dv8 /usr/local/bin/dv8
-COPY --from=dv8-sdk /out/lib/*.so /usr/local/lib/
 COPY build/unbound.conf /etc/unbound/unbound.conf
 CMD [ "/usr/local/bin/dv8" ]

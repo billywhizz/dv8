@@ -173,6 +173,9 @@ void HTTPParser::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   v8::HandleScope handleScope(isolate);
   ObjectWrap *wrap = data.GetParameter();
   HTTPParser* obj = static_cast<HTTPParser *>(wrap);
+	#if TRACE
+	fprintf(stderr, "HTTPParser::Destroy\n");
+	#endif
 }
 
 void HTTPParser::Setup(const FunctionCallbackInfo<Value> &args) {

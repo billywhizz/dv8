@@ -18,6 +18,7 @@ using dv8::socket::socket_plugin;
 			SecureContext::Init(exports);
 			SecureSocket::Init(exports);
 			if (loads == 1) {
+				fprintf(stderr, "initialize ssl\n");
 				SSL_library_init();
 				BIO* bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 				SSL_load_error_strings();
@@ -52,6 +53,9 @@ using dv8::socket::socket_plugin;
 		free(obj->in);
 		free(obj->out);
 		free(obj->context);
+		#if TRACE
+		fprintf(stderr, "Hmac::Destroy\n");
+		#endif
 	}
 
 	void Hmac::New(const FunctionCallbackInfo<Value>& args) {
@@ -158,6 +162,9 @@ using dv8::socket::socket_plugin;
 		free(obj->out);
 		free(obj->context);
 		//EVP_cleanup();
+		#if TRACE
+		fprintf(stderr, "Hash::Destroy\n");
+		#endif
 	}
 
 	void Hash::New(const FunctionCallbackInfo<Value>& args) {

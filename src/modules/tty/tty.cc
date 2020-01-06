@@ -238,6 +238,16 @@ void TTY::New(const FunctionCallbackInfo<Value> &args)
     }
 }
 
+void TTY::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+  Isolate *isolate = data.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  ObjectWrap *wrap = data.GetParameter();
+  TTY* tty = static_cast<TTY *>(wrap);
+    #if TRACE
+    fprintf(stderr, "TTY::Destroy\n");
+    #endif
+}
+
 void TTY::Setup(const FunctionCallbackInfo<Value> &args)
 {
     Isolate *isolate = args.GetIsolate();

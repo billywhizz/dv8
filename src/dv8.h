@@ -21,9 +21,16 @@
 #include <modules/fs/fs.h>
 #include <modules/socket/socket.h>
 #include <modules/udp/udp.h>
+#include <modules/libz/libz.h>
+#include <modules/openssl/openssl.h>
+#include <modules/httpParser/httpParser.h>
+#include <modules/picoHttpParser/picoHttpParser.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
+#ifndef DV8_DLOPEN
+  #define DV8_DLOPEN 1
+#endif
 
 extern char **environ;
 namespace dv8 {
@@ -214,9 +221,11 @@ void CollectGarbage(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void RunScript(const FunctionCallbackInfo<Value> &args);
+void CompileScript(const FunctionCallbackInfo<Value> &args);
 void OnExit(const FunctionCallbackInfo<Value> &args);
 void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args);
 void Require(const FunctionCallbackInfo<Value> &args);
+void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
   v8::HandleScope handle_scope(isolate);

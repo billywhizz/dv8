@@ -101,6 +101,16 @@ namespace udp {
 		}
 	}
 
+	void UDP::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		UDP* udp = static_cast<UDP *>(wrap);
+		#if TRACE
+		fprintf(stderr, "UDP::Destroy\n");
+		#endif
+	}
+
 	void UDP::Open(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();

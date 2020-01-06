@@ -66,7 +66,9 @@ void Buffer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   Buffer* b = static_cast<Buffer *>(wrap);
   isolate->AdjustAmountOfExternalAllocatedMemory((int64_t)b->_length * -1);
   free(b->_data);
-  //fprintf(stderr, "Buffer::Destroy\n");
+  #if TRACE
+  fprintf(stderr, "Buffer::Destroy\n");
+  #endif
 }
 
 void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)

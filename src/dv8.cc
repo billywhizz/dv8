@@ -39,6 +39,60 @@ void shutdown(uv_loop_t *loop) {
   }, NULL);
 }
 
+void CompileScript(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  // Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+  v8::TryCatch try_catch(isolate);
+  v8::Local<v8::String> source = args[0].As<v8::String>();
+  v8::Local<v8::String> path = args[1].As<v8::String>();
+  v8::Local<v8::Array> params_buf;
+  params_buf = args[2].As<v8::Array>();
+  v8::Local<v8::Array> context_extensions_buf;
+  context_extensions_buf = args[3].As<v8::Array>();
+  std::vector<v8::Local<v8::String>> params;
+  if (!params_buf.IsEmpty()) {
+    for (uint32_t n = 0; n < params_buf->Length(); n++) {
+      v8::Local<v8::Value> val;
+      if (!params_buf->Get(context, n).ToLocal(&val)) return;
+      params.push_back(val.As<v8::String>());
+    }
+  }
+  std::vector<v8::Local<v8::Object>> context_extensions;
+  if (!context_extensions_buf.IsEmpty()) {
+    for (uint32_t n = 0; n < context_extensions_buf->Length(); n++) {
+      v8::Local<v8::Value> val;
+      if (!context_extensions_buf->Get(context, n).ToLocal(&val)) return;
+      context_extensions.push_back(val.As<v8::Object>());
+    }
+  }
+  v8::ScriptOrigin baseorigin(path, // resource name
+    v8::Integer::New(isolate, 0), // line offset
+    v8::Integer::New(isolate, 0),  // column offset
+    v8::False(isolate), // is shared cross-origin
+    v8::Local<v8::Integer>(),  // script id
+    v8::Local<v8::Value>(), // source map url
+    v8::False(isolate), // is opaque
+    v8::False(isolate), // is wasm
+    v8::False(isolate)); // is module
+  v8::Context::Scope scope(context);
+  v8::ScriptCompiler::Source basescript(source, baseorigin);
+  v8::Local<v8::ScriptOrModule> script;
+  v8::MaybeLocal<v8::Function> maybe_fn = ScriptCompiler::CompileFunctionInContext(
+      context, &basescript, params.size(), params.data(),
+      context_extensions.size(), context_extensions.data(), v8::ScriptCompiler::kNoCompileOptions,
+      v8::ScriptCompiler::NoCacheReason::kNoCacheNoReason, &script);
+  if (maybe_fn.IsEmpty()) {
+    if (try_catch.HasCaught() && !try_catch.HasTerminated()) {
+      try_catch.ReThrow();
+    }
+    return;
+  }
+  v8::Local<v8::Function> fn = maybe_fn.ToLocalChecked();
+  args.GetReturnValue().Set(fn);
+}
+
 void RunScript(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
@@ -59,15 +113,18 @@ void RunScript(const FunctionCallbackInfo<Value> &args) {
   v8::Local<v8::Script> script;
   v8::ScriptCompiler::Source basescript(source, baseorigin);
   if (!v8::ScriptCompiler::Compile(context, &basescript).ToLocal(&script)) {
+    fprintf(stderr, "Error Compiling Script\n");
     dv8::ReportException(isolate, &try_catch);
     return;
   }
   if (try_catch.HasCaught()) {
+    fprintf(stderr, "Error Instantiating Script\n");
     dv8::ReportException(isolate, &try_catch);
     return;
   }
   MaybeLocal<Value> result = script->Run(context);
   if (try_catch.HasCaught()) {
+    fprintf(stderr, "Error Running Script\n");
     dv8::ReportException(isolate, &try_catch);
     return;
   }
@@ -86,6 +143,53 @@ void Shutdown(const FunctionCallbackInfo<Value> &args) {
   Local<Value> argv[0] = { };
   onExit->Call(context, globalInstance, 0, argv);
   shutdown(env->loop);
+}
+
+void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch) {
+  v8::Local<v8::Value> exception = try_catch.Exception();
+  v8::Local<v8::Message> message = try_catch.Message();
+  v8::Local<v8::StackTrace> stack = message->GetStackTrace();
+  v8::String::Utf8Value ex(isolate, exception);
+  v8::Local<v8::Value> scriptName = message->GetScriptResourceName();
+  v8::String::Utf8Value scriptname(isolate, scriptName);
+  v8::Local<v8::Context> context = isolate->GetCurrentContext();
+  int linenum = message->GetLineNumber(context).FromJust();
+  fprintf(stderr, "%s in %s on line %i\n", *ex, *scriptname, linenum);
+  fprintf(stderr, "frames: %i\n", stack->GetFrameCount());
+  for (int i = 0; i < stack->GetFrameCount(); i++) {
+    v8::Local<v8::StackFrame> stack_frame = stack->GetFrame(isolate, i);
+    v8::Local<v8::String> functionName = stack_frame->GetFunctionName();
+    v8::Local<v8::String> scriptName = stack_frame->GetScriptName();
+    
+    v8::String::Utf8Value fn_name_s(isolate, functionName);
+    v8::String::Utf8Value script_name(isolate, scriptName);
+
+    const int line_number = stack_frame->GetLineNumber();
+    const int column = stack_frame->GetColumn();
+    if (stack_frame->IsEval()) {
+      if (stack_frame->GetScriptId() == v8::Message::kNoScriptIdInfo) {
+        fprintf(stderr, "    at [eval]:%i:%i\n", line_number, column);
+      } else {
+        fprintf(stderr,
+                "    at [eval] (%s:%i:%i)\n",
+                *script_name,
+                line_number,
+                column);
+      }
+      break;
+    }
+    if (fn_name_s.length() == 0) {
+      fprintf(stderr, "    at %s:%i:%i\n", *script_name, line_number, column);
+    } else {
+      fprintf(stderr,
+              "    at %s (%s:%i:%i)\n",
+              *fn_name_s,
+              *script_name,
+              line_number,
+              column);
+    }
+  }
+  fflush(stderr);
 }
 
 void ReportException(Isolate *isolate, TryCatch *try_catch) {
@@ -188,30 +292,26 @@ void Print(const FunctionCallbackInfo<Value> &args) {
 
 void Require(const FunctionCallbackInfo<Value> &args)
 {
+  fprintf(stderr, "hello\n");
   Isolate *isolate = args.GetIsolate();
-  HandleScope handleScope(isolate);
+  v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  String::Utf8Value str(isolate, args[0]);
-  const char *cstr = *str;
-  Local<String> source_text = args[1].As<String>();
-  Local<String> fname = String::NewFromUtf8(isolate, cstr, NewStringType::kNormal).ToLocalChecked();
-  TryCatch try_catch(isolate);
-  Local<Integer> line_offset;
-  Local<Integer> column_offset;
-  line_offset = Integer::New(isolate, 0);
-  column_offset = Integer::New(isolate, 0);
-  ScriptOrigin origin(fname,
-                      line_offset,              // line offset
-                      column_offset,            // column offset
-                      False(isolate), // is cross origin
-                      Local<Integer>(),         // script id
-                      Local<Value>(),           // source map URL
-                      False(isolate), // is opaque (?)
-                      False(isolate), // is WASM
-                      True(isolate)); // is ES6 module
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+  v8::TryCatch try_catch(isolate);
+  Local<String> source = args[0].As<String>();
+  Local<String> path = args[1].As<String>();
+  v8::ScriptOrigin baseorigin(path, // resource name
+    v8::Integer::New(isolate, 0), // line offset
+    v8::Integer::New(isolate, 0),  // column offset
+    v8::False(isolate), // is shared cross-origin
+    v8::Local<v8::Integer>(),  // script id
+    v8::Local<v8::Value>(), // source map url
+    v8::False(isolate), // is opaque
+    v8::False(isolate), // is wasm
+    v8::True(isolate)); // is module
   Local<Module> module;
-  ScriptCompiler::Source source(source_text, origin);
-  if (!v8::ScriptCompiler::CompileModule(isolate, &source).ToLocal(&module)) {
+  v8::ScriptCompiler::Source basescript(source, baseorigin);
+  if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
     dv8::ReportException(isolate, &try_catch);
     return;
   }
@@ -234,58 +334,62 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);
   const char *module_name = *str;
-  char lib_name[128];
   Local<Object> exports;
   bool ok = args[1]->ToObject(context).ToLocal(&exports);
   if (!ok) {
     args.GetReturnValue().Set(Null(isolate));
     return;
   }
-#ifdef DLOPEN
+  args.GetReturnValue().Set(exports);
+#if DV8_DLOPEN
   const char *module_path = "/usr/local/lib/dv8/";
+  char lib_name[1024];
   if (args.Length() > 2) {
     String::Utf8Value str(args.GetIsolate(), args[2]);
     module_path = *str;
-    snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
+    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
   } else {
     if (strcmp("loop", module_name) == 0) {
       dv8::loop::InitAll(exports);
-      args.GetReturnValue().Set(exports);
       return;
     } else if (strcmp("socket", module_name) == 0) {
       dv8::socket::InitAll(exports);
-      args.GetReturnValue().Set(exports);
       return;
     } else if (strcmp("timer", module_name) == 0) {
       dv8::timer::InitAll(exports);
-      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("zlib", module_name) == 0) {
+      dv8::libz::InitAll(exports);
       return;
     } else if (strcmp("thread", module_name) == 0) {
       dv8::thread::InitAll(exports);
-      args.GetReturnValue().Set(exports);
       return;
     } else if (strcmp("fs", module_name) == 0) {
       dv8::fs::InitAll(exports);
-      args.GetReturnValue().Set(exports);
       return;
     } else if (strcmp("udp", module_name) == 0) {
       dv8::udp::InitAll(exports);
-      args.GetReturnValue().Set(exports);
       return;
     } else if (strcmp("process", module_name) == 0) {
       dv8::process::InitAll(exports);
-      args.GetReturnValue().Set(exports);
       return;
     } else if (strcmp("tty", module_name) == 0) {
       dv8::tty::InitAll(exports);
-      args.GetReturnValue().Set(exports);
+      return;
+    } else if (strcmp("openssl", module_name) == 0) {
+      dv8::openssl::InitAll(exports);
+      return;
+    } else if (strcmp("httpParser", module_name) == 0) {
+      dv8::httpParser::InitAll(exports);
+      return;
+    } else if (strcmp("picoHttpParser", module_name) == 0) {
+      dv8::picoHttpParser::InitAll(exports);
       return;
     } else if (strcmp("os", module_name) == 0) {
       dv8::os::InitAll(exports);
-      args.GetReturnValue().Set(exports);
       return;
     }
-    snprintf(lib_name, 128, "%s%s.so", module_path, module_name);
+    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
   }
   uv_lib_t lib;
   args.GetReturnValue().Set(exports);
@@ -305,47 +409,48 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   register_plugin _init = reinterpret_cast<register_plugin>(address);
   auto _register = reinterpret_cast<InitializerCallback>(_init());
   _register(exports);
-  //uv_dlclose(&lib);
 #else
   if (strcmp("loop", module_name) == 0) {
     dv8::loop::InitAll(exports);
-    args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("socket", module_name) == 0) {
     dv8::socket::InitAll(exports);
-    args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("timer", module_name) == 0) {
     dv8::timer::InitAll(exports);
-    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("zlib", module_name) == 0) {
+    dv8::libz::InitAll(exports);
     return;
   } else if (strcmp("thread", module_name) == 0) {
     dv8::thread::InitAll(exports);
-    args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("fs", module_name) == 0) {
     dv8::fs::InitAll(exports);
-    args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("udp", module_name) == 0) {
     dv8::udp::InitAll(exports);
-    args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("process", module_name) == 0) {
     dv8::process::InitAll(exports);
-    args.GetReturnValue().Set(exports);
     return;
   } else if (strcmp("tty", module_name) == 0) {
     dv8::tty::InitAll(exports);
-    args.GetReturnValue().Set(exports);
+    return;
+  } else if (strcmp("openssl", module_name) == 0) {
+    dv8::openssl::InitAll(exports);
+    return;
+  } else if (strcmp("httpParser", module_name) == 0) {
+    dv8::httpParser::InitAll(exports);
+    return;
+  } else if (strcmp("picoHttpParser", module_name) == 0) {
+    dv8::picoHttpParser::InitAll(exports);
     return;
   } else if (strcmp("os", module_name) == 0) {
     dv8::os::InitAll(exports);
-    args.GetReturnValue().Set(exports);
     return;
   }
-  // we do not have dlopen available (defined or static build) so we cannot load anything other than builtins
-  isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "Library Not Found").ToLocalChecked()));
+  isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "Module Not Found").ToLocalChecked()));
 #endif
 }
 
@@ -440,8 +545,11 @@ Local<Context> CreateContext(Isolate *isolate) {
   global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
   global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
   global->Set(String::NewFromUtf8(isolate, "runScript", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunScript));
+  global->Set(String::NewFromUtf8(isolate, "compile", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CompileScript));
   global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
-  return Context::New(isolate, NULL, global);
+  Local<Context> context = Context::New(isolate, NULL, global);
+  context->AllowCodeGenerationFromStrings(false);
+  return context;
 }
 
 } // namespace dv8
