@@ -1,7 +1,7 @@
 const ENV = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
 if (ENV.DV8_MODULES) {
   const _library = global.library
-  global.library = (name, exports) => _library(name, exports, ENV.DV8_MODULES)
+  global.library = (n, e) => _library(n, e, ENV.DV8_MODULES)
 }
 const { Process } = library('process', {})
 const { Timer } = library('timer', {})
@@ -19,7 +19,7 @@ const process = {}
 const cache = {}
 const mem = new Float64Array(16)
 const cpu = new Float64Array(2)
-const time = new BigInt64Array(1)
+const time = new BigUint64Array(1)
 const heap = Array.from(new Array(16)).map(v => new Float64Array(4))
 const GlobalBuffer = global.Buffer
 Error.stackTraceLimit = 1000 // Infinity
@@ -105,7 +105,7 @@ class Parser {
     const { wb, view } = this
     const { send } = view
     if (opCode === 1) { // JSON
-      const message = JSON.stringify(o)
+      const message = JSON.stringify(o, replacer)
       const len = message.length
       send.setUint8(off, process.TID || process.PID)
       send.setUint8(off + 1, opCode)
@@ -250,6 +250,13 @@ function pathModule () {
 
 const { join, baseName } = pathModule()
 
+function replacer (k, v) {
+  if (typeof v === 'bigint') {
+    return v.toString()
+  }
+  return v
+}
+
 function repl () {
   const BUFFER_SIZE = 64 * 1024
   const MAX_BUFFER = 4 * BUFFER_SIZE
@@ -260,11 +267,9 @@ function repl () {
     const source = buf.read(0, len)
     try {
       const result = runScript(source, 'repl')
-      if (result && result !== undefined) {
-        let payload = `${JSON.stringify(result, null, 2)}\n`
-        const r = stdout.write(buf.write(payload, 0))
-        if (r < 0) return stdout.close()
-      }
+      let payload = `${JSON.stringify(result, replacer, 2)}\n`
+      const r = stdout.write(buf.write(payload, 0))
+      if (r < 0) return stdout.close()
     } catch (err) {
       print(err.stack)
     }
@@ -323,67 +328,81 @@ Error.prepareStackTrace = (err, stack) => {
     const isConstructor = callsite.isConstructor()
     result.push({ typeName, functionName, methodName, scriptName, line, column, isToplevel, isEval, isNative, isConstructor, isWasm, isUserJavascript })
   }
-  if (Object.getOwnPropertyDescriptor(err, 'frames')) {
-    err.frames = result
-  } else {
-    Object.defineProperty(err, 'frames', {
-      value: result,
-      writable: true,
-      enumerable: true
-    });
-  }
-  if (Object.getOwnPropertyDescriptor(err, 'fileName')) {
-    err.fileName = result[0].scriptName
-  } else {
-    Object.defineProperty(err, 'fileName', {
-      value: result[0].scriptName,
-      writable: true,
-      enumerable: true
-    });
-  }
-  if (Object.getOwnPropertyDescriptor(err, 'lineNumber')) {
-    err.lineNumber = result[0].line
-  } else {
-    Object.defineProperty(err, 'lineNumber', {
-      value: result[0].line,
-      writable: true,
-      enumerable: true
-    });
-  }
-  if (Object.getOwnPropertyDescriptor(err, 'type')) {
-    err.type = 'GeneralException'
-  } else {
-    Object.defineProperty(err, 'type', {
-      value: 'GeneralException',
-      writable: true,
-      enumerable: true
-    });
-  }
+  try {
+    if (Object.getOwnPropertyDescriptor(err, 'frames')) {
+      err.frames = result
+    } else {
+      Object.defineProperty(err, 'frames', {
+        value: result,
+        writable: true,
+        enumerable: true
+      });
+    }
+    if (Object.getOwnPropertyDescriptor(err, 'fileName')) {
+      err.fileName = result[0].scriptName
+    } else {
+      Object.defineProperty(err, 'fileName', {
+        value: result[0].scriptName,
+        writable: true,
+        enumerable: true
+      });
+    }
+    if (Object.getOwnPropertyDescriptor(err, 'lineNumber')) {
+      err.lineNumber = result[0].line
+    } else {
+      Object.defineProperty(err, 'lineNumber', {
+        value: result[0].line,
+        writable: true,
+        enumerable: true
+      });
+    }
+    if (Object.getOwnPropertyDescriptor(err, 'type')) {
+      err.type = 'GeneralException'
+    } else {
+      Object.defineProperty(err, 'type', {
+        value: 'GeneralException',
+        writable: true,
+        enumerable: true
+      });
+    }
+  } catch (e) {}
   return err.stack
 }
 
 global.onUncaughtException = err => {
-  Object.defineProperty(err, 'type', {
-    value: 'UncaughtException',
-    writable: false,
-    enumerable: true
-  })
+  if (!err) {
+    print('onUncaughtException with no Error')
+    return
+  }
+  try {
+    Object.defineProperty(err, 'type', {
+      value: 'UncaughtException',
+      writable: false,
+      enumerable: true
+    })
+  } catch (e) {}
   const stack = err.stack
   if (process.onUncaughtException) return process.onUncaughtException(err) 
   print(`${err.type}\n${stack}`)
 }
 
 global.onUnhandledRejection = (err, promise) => {
-  Object.defineProperty(err, 'type', {
-    value: 'UnhandledRejection',
-    writable: false,
-    enumerable: true
-  })
-  Object.defineProperty(err, 'promise', {
-    value: promise,
-    writable: false,
-    enumerable: true
-  })
+  if (!err) {
+    print('onUnhandledRejection with no Error')
+    return
+  }
+  try {
+    Object.defineProperty(err, 'promise', {
+      value: promise,
+      writable: false,
+      enumerable: true
+    })
+    Object.defineProperty(err, 'type', {
+      value: 'UnhandledRejection',
+      writable: false,
+      enumerable: true
+    })
+  } catch (e) {}
   const stack = err.stack
   if (process.onUnhandledRejection) return process.onUnhandledRejection(err) 
   print(`${err.type}\n${stack}`)
@@ -410,22 +429,23 @@ function clearTimeout (t) {
 }
 
 global.Buffer = {
-  alloc: size => {
+  empty: () => new GlobalBuffer(),
+  alloc: (size, shared = false) => {
     const buf = new GlobalBuffer()
-    const ab = buf.alloc(size)
-    buf.size = size
+    const ab = shared ? buf.allocShared(size) : buf.alloc(size)
+    buf.size = buf.size()
     buf.bytes = ab
     return buf
   },
-  fromString: str => {
-    const buf = global.Buffer.alloc(str.length)
+  fromString: (str, shared = false) => {
+    const buf = global.Buffer.alloc(str.length, shared)
     buf.write(str)
     return buf
   },
-  fromArrayBuffer: ab => {
+  fromArrayBuffer: (ab, shared) => {
     const buf = new GlobalBuffer()
-    buf.load(ab)
-    buf.size = ab.byteLength
+    shared ? buf.loadShared(ab) : buf.load(ab)
+    buf.size = buf.size()
     buf.bytes = ab
     return buf
   }
@@ -524,7 +544,7 @@ function activeHandles () {
   return handles
 }
 
-function nextTick () {
+function nextTick (fn) {
   queue.push(fn)
   if (idleActive) return
   loop.onIdle(() => {
@@ -554,7 +574,9 @@ function runScriptFromFile (path) {
 function runLoop () {
   do {
     loop.run()
+    process.runMicroTasks()
   } while (loop.isAlive())
+  process.runMicroTasks()
   if (process.onExit) process.onExit()
 }
 
@@ -580,11 +602,11 @@ global.require = (path, parent) => {
 
 process.spawn = (fun, onComplete = () => {}, opts = { ipc: false, dirname: global.__dirname }) => {
   const thread = new Thread()
-  const envJSON = JSON.stringify(process.env)
-  const argsJSON = JSON.stringify(process.args)
+  const envJSON = JSON.stringify(process.env, replacer)
+  const argsJSON = JSON.stringify(process.args, replacer)
   opts.dirname = opts.dirname || global.__dirname
   const bufferSize = envJSON.length + argsJSON.length + opts.dirname.length + 21
-  thread.buffer = Buffer.alloc(bufferSize)
+  thread.buffer = Buffer.allocShared(bufferSize)
   const view = new DataView(thread.buffer.bytes)
   if (opts.ipc) {
     const bufSize = parseInt(opts.bufSize || process.env.THREAD_BUFFER_SIZE || 4096, 10)
@@ -649,7 +671,7 @@ process.runLoop = runLoop
 process.exec = (...args) => _process.spawn.apply(_process, args)
 
 if (global.workerData) {
-  global.workerData.bytes = global.workerData.alloc()
+  global.workerData.bytes = global.workerData.allocShared()
   const dv = new DataView(global.workerData.bytes)
   process.TID = dv.getUint8(0)
   process.PID = _process.pid()

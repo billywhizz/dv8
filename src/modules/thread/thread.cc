@@ -22,7 +22,6 @@ void start_context(void *data)
 	create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
 	v8::Isolate *isolate = v8::Isolate::New(create_params);
 	{
-		//v8::Locker lock(isolate);
 		v8::Isolate::Scope isolate_scope(isolate);
 		v8::HandleScope handle_scope(isolate);
 		isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
@@ -31,7 +30,6 @@ void start_context(void *data)
 		isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);
-    v8::Local<v8::Object> global = context->Global();
 		dv8::builtins::Environment *env = new dv8::builtins::Environment();
 		env->error = &th->error;
 		env->AssignToContext(context);

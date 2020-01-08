@@ -23,13 +23,14 @@
 #include <modules/udp/udp.h>
 #include <modules/libz/libz.h>
 #include <modules/openssl/openssl.h>
-#include <modules/httpParser/httpParser.h>
-#include <modules/picoHttpParser/picoHttpParser.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
-#ifndef DV8_DLOPEN
-  #define DV8_DLOPEN 1
+#ifndef V8_DLOPEN
+  #define V8_DLOPEN 1
+#endif
+#ifndef TRACE
+  #define TRACE 0
 #endif
 
 extern char **environ;

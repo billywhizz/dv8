@@ -341,7 +341,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     return;
   }
   args.GetReturnValue().Set(exports);
-#if DV8_DLOPEN
+#if V8_DLOPEN
   const char *module_path = "/usr/local/lib/dv8/";
   char lib_name[1024];
   if (args.Length() > 2) {
@@ -379,12 +379,6 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     } else if (strcmp("openssl", module_name) == 0) {
       dv8::openssl::InitAll(exports);
       return;
-    } else if (strcmp("httpParser", module_name) == 0) {
-      dv8::httpParser::InitAll(exports);
-      return;
-    } else if (strcmp("picoHttpParser", module_name) == 0) {
-      dv8::picoHttpParser::InitAll(exports);
-      return;
     } else if (strcmp("os", module_name) == 0) {
       dv8::os::InitAll(exports);
       return;
@@ -393,6 +387,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   }
   uv_lib_t lib;
   args.GetReturnValue().Set(exports);
+  fprintf(stderr, "%s\n", lib_name);
   int success = uv_dlopen(lib_name, &lib);
   if (success != 0) {
     isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlopen failed").ToLocalChecked()));
@@ -439,12 +434,6 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     return;
   } else if (strcmp("openssl", module_name) == 0) {
     dv8::openssl::InitAll(exports);
-    return;
-  } else if (strcmp("httpParser", module_name) == 0) {
-    dv8::httpParser::InitAll(exports);
-    return;
-  } else if (strcmp("picoHttpParser", module_name) == 0) {
-    dv8::picoHttpParser::InitAll(exports);
     return;
   } else if (strcmp("os", module_name) == 0) {
     dv8::os::InitAll(exports);

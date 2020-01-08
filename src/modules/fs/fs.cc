@@ -166,6 +166,7 @@ using dv8::builtins::Buffer;
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_WRONLY), "O_WRONLY", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_RDWR), "O_RDWR", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_APPEND), "O_APPEND", exports);
+		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_CLOEXEC), "O_CLOEXEC", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_CREAT), "O_CREAT", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_TRUNC), "O_TRUNC", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_EXCL), "O_EXCL", exports);

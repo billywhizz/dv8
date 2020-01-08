@@ -10,6 +10,7 @@ namespace dv8 {
 namespace process {
 using v8::Array;
 using v8::BigUint64Array;
+using v8::BigInt64Array;
 using v8::Context;
 using v8::Float64Array;
 using v8::Function;
