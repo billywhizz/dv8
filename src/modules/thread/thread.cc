@@ -37,7 +37,8 @@ void start_context(void *data)
 		v8::Local<v8::Object> globalInstance = context->Global();
 		v8::Context::Scope context_scope(context);
 		dv8::builtins::Buffer::Init(globalInstance);
-
+		v8::Local<v8::Value> obj = globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "dv8", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+    v8::Local<v8::Object> dv8 = v8::Local<v8::Object>::Cast(obj);
 		globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
 		if (th->length > 0) {
 			v8::Local<v8::Function> bufferObj = Local<Function>::Cast(globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "Buffer", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked());
@@ -45,12 +46,12 @@ void start_context(void *data)
 			Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
 			Buffer *obj = new Buffer((char*)th->data, th->length);
 			obj->Wrap(instance);
-			globalInstance->Set(context, String::NewFromUtf8(isolate, "workerData", v8::NewStringType::kNormal).ToLocalChecked(), instance);
+			dv8->Set(context, String::NewFromUtf8(isolate, "workerData", v8::NewStringType::kNormal).ToLocalChecked(), instance);
 		}
 		if (th->size > 0) {
-			globalInstance->Set(context, String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
+			dv8->Set(context, String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
 		}
-		globalInstance->Set(context, String::NewFromUtf8(isolate, "workerName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->name, v8::NewStringType::kNormal).ToLocalChecked());
+		dv8->Set(context, String::NewFromUtf8(isolate, "workerName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->name, v8::NewStringType::kNormal).ToLocalChecked());
 
 		uv_loop_t *loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 		env->loop = loop;
@@ -70,19 +71,19 @@ void start_context(void *data)
 		v8::TryCatch try_catch(isolate);
 		v8::ScriptCompiler::Source basescript(base.ToLocalChecked(), baseorigin);
 		if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
-      fprintf(stderr, "Error Compiling Module\n");
+      //fprintf(stderr, "Error Compiling Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
 			return;
 		}
 		v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
 		if (!ok.ToChecked()) {
-      fprintf(stderr, "Error Instantiating Module\n");
+      //fprintf(stderr, "Error Instantiating Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
 			return;
 		}
     v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
     if (try_catch.HasCaught()) {
-      fprintf(stderr, "Error Evaluating Module\n");
+      //fprintf(stderr, "Error Evaluating Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
       return;
     }

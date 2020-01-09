@@ -287,13 +287,14 @@ void Buffer::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "decode", Buffer::Decode);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "encode", Buffer::Encode);
 
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, ASCII), "ASCII", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UTF8), "UTF8", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, HEX), "HEX", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, BASE64), "BASE64", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, BINARYSTRING), "BINARYSTRING", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UCS2), "UCS2", exports);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, ASCII), "ASCII", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, UTF8), "UTF8", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, HEX), "HEX", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, BASE64), "BASE64", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, BINARYSTRING), "BINARYSTRING", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, UCS2), "UCS2", tpl);
 
+  DV8_SET_METHOD(isolate, tpl, "create", Buffer::Create);
   DV8_SET_EXPORT(isolate, tpl, "Buffer", exports);
 }
 
@@ -322,6 +323,38 @@ void Buffer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   #if TRACE
   fprintf(stderr, "Buffer::Destroy\n");
   #endif
+}
+
+void Buffer::Create(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  EscapableHandleScope scope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> globalInstance = context->Global();
+  Local<Function> bufferObj = Local<Function>::Cast(globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "Buffer", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked());
+  Local<Function> cons = Local<Function>::New(isolate, bufferObj);
+  Local<Object> instance = cons->NewInstance(context, 0, NULL).ToLocalChecked();
+  Buffer *b = new Buffer();
+  int argc = args.Length();
+  uint32_t length = 0;
+  if (argc > 0) {
+    length = args[0]->Uint32Value(context).ToChecked();
+  }
+  b->_length = 0;
+  b->Wrap(instance);
+  if (length > 0)
+  {
+    b->_data = (char *)calloc(length, 1);
+    if (b->_data == nullptr)
+    {
+      fprintf(stderr, "oh dear\n");
+      return;
+    }
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kExternalized);
+    b->_length = length;
+    b->_free = false;
+  }
+  args.GetReturnValue().Set(scope.Escape(instance));
 }
 
 void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)

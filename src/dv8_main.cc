@@ -1,10 +1,7 @@
 #include <dv8.h>
 #include "builtins.h"
 
-uint64_t start;
-
 int main(int argc, char *argv[]) {
-  start = uv_hrtime();
   std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
   v8::V8::InitializePlatform(platform.get());
   v8::V8::Initialize();
@@ -35,14 +32,15 @@ int main(int argc, char *argv[]) {
       arguments->Set(context, i, v8::String::NewFromUtf8(isolate, argv[i], v8::NewStringType::kNormal, strlen(argv[i])).ToLocalChecked());
     }
     v8::Local<v8::Object> globalInstance = context->Global();
+		v8::Local<v8::Value> obj = globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "dv8", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+    v8::Local<v8::Object> dv8 = v8::Local<v8::Object>::Cast(obj);
     globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
-    globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
+    dv8->Set(context, v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
     dv8::builtins::Buffer::Init(globalInstance);
     dv8::InspectorClient inspector_client(context, true);
     v8::TryCatch try_catch(isolate);
     const char* base_name = "main.js";
     v8::Local<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len)).ToLocalChecked();
-   // https://v8docs.nodesource.com/node-10.6/db/d84/classv8_1_1_script_origin.html
     v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, base_name, v8::NewStringType::kNormal).ToLocalChecked(), // resource name
       v8::Integer::New(isolate, 0), // line offset
       v8::Integer::New(isolate, 0),  // column offset
@@ -56,32 +54,28 @@ int main(int argc, char *argv[]) {
     v8::ScriptCompiler::Source basescript(base, baseorigin);
 
     if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
-      fprintf(stderr, "Error Compiling Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
       return 1;
     }
     v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
     if (!ok.ToChecked()) {
-      fprintf(stderr, "Error Instantiating Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
       return 1;
     }
     v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
     if (try_catch.HasCaught()) {
-      fprintf(stderr, "Error Evaluating Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
       return 2;
     }
     v8::platform::PumpMessageLoop(platform.get(), isolate);
-    dv8::shutdown(uv_default_loop());
+    //dv8::shutdown(uv_default_loop());
     uv_tty_reset_mode();
     int r = uv_loop_close(uv_default_loop());
     if (r != 0) {
       //fprintf(stderr, "uv_loop_close: %i\n", r);
     }
   }
-  // cleanup
-  //isolate->Dispose();
+  isolate->Dispose();
   delete create_params.array_buffer_allocator;
   v8::V8::Dispose();
   v8::V8::ShutdownPlatform();

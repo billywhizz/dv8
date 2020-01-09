@@ -1,4 +1,6 @@
-const ENV = global.env().map(entry => entry.split('=')).reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+const ENV = global.env()
+  .map(entry => entry.split('='))
+  .reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
 if (ENV.DV8_MODULES) {
   const _library = global.library
   global.library = (n, e) => _library(n, e, ENV.DV8_MODULES)
@@ -31,7 +33,9 @@ process.cwd = (...args) => _process.cwd.apply(_process, args)
 process.sleep = (...args) => _process.sleep.apply(_process, args)
 process.usleep = (...args) => _process.usleep.apply(_process, args)
 process.nanosleep = (...args) => _process.nanosleep.apply(_process, args)
-process.runMicroTasks = (...args) => _process.runMicroTasks.apply(_process, args)
+process.runMicroTasks = (...args) => {
+  return _process.runMicroTasks.apply(_process, args)
+}
 global.process = process
 process.ticks = 0
 global.__dirname = process.cwd()
@@ -213,17 +217,14 @@ function pathModule () {
 
   function normalize (path) {
     if (path.length === 0) return '.'
-
     const isAbsolute = path.charCodeAt(0) === CHAR_FORWARD_SLASH
-    const trailingSeparator = path.charCodeAt(path.length - 1) === CHAR_FORWARD_SLASH
+    const sep = path.charCodeAt(path.length - 1) === CHAR_FORWARD_SLASH
     path = normalizeString(path, !isAbsolute, '/', isPosixPathSeparator)
-
     if (path.length === 0) {
       if (isAbsolute) return '/'
-      return trailingSeparator ? './' : '.'
+      return sep ? './' : '.'
     }
-    if (trailingSeparator) path += '/'
-
+    if (sep) path += '/'
     return isAbsolute ? `/${path}` : path
   }
 
@@ -267,7 +268,7 @@ function repl () {
     const source = buf.read(0, len)
     try {
       const result = runScript(source, 'repl')
-      let payload = `${JSON.stringify(result, replacer, 2)}\n`
+      const payload = `${JSON.stringify(result, replacer, 2)}\n`
       const r = stdout.write(buf.write(payload, 0))
       if (r < 0) return stdout.close()
     } catch (err) {
@@ -297,7 +298,9 @@ function readFile (path) {
   const parts = []
   file.setup(buf, buf)
   file.fd = file.open(path, O_RDONLY)
-  if (file.fd < 0) throw new Error(`Error opening ${path}: ${loop.error(file.fd)}`)
+  if (file.fd < 0) {
+    throw new Error(`Error opening ${path}: ${loop.error(file.fd)}`)
+  }
   file.size = 0
   let len = file.read(BUFSIZE, file.size)
   while (len > 0) {
@@ -305,7 +308,9 @@ function readFile (path) {
     parts.push(buf.read(0, len))
     len = file.read(BUFSIZE, file.size)
   }
-  if (len < 0) throw new Error(`Error reading ${path}: ${loop.error(len)}`)
+  if (len < 0) {
+    throw new Error(`Error reading ${path}: ${loop.error(len)}`)
+  }
   file.close()
   file.text = parts.join('')
   return file
@@ -326,7 +331,20 @@ Error.prepareStackTrace = (err, stack) => {
     const isNative = callsite.isNative()
     const isUserJavascript = true
     const isConstructor = callsite.isConstructor()
-    result.push({ typeName, functionName, methodName, scriptName, line, column, isToplevel, isEval, isNative, isConstructor, isWasm, isUserJavascript })
+    result.push({
+      typeName,
+      functionName,
+      methodName,
+      scriptName,
+      line,
+      column,
+      isToplevel,
+      isEval,
+      isNative,
+      isConstructor,
+      isWasm,
+      isUserJavascript
+    })
   }
   try {
     if (Object.getOwnPropertyDescriptor(err, 'frames')) {
@@ -336,7 +354,7 @@ Error.prepareStackTrace = (err, stack) => {
         value: result,
         writable: true,
         enumerable: true
-      });
+      })
     }
     if (Object.getOwnPropertyDescriptor(err, 'fileName')) {
       err.fileName = result[0].scriptName
@@ -345,7 +363,7 @@ Error.prepareStackTrace = (err, stack) => {
         value: result[0].scriptName,
         writable: true,
         enumerable: true
-      });
+      })
     }
     if (Object.getOwnPropertyDescriptor(err, 'lineNumber')) {
       err.lineNumber = result[0].line
@@ -354,7 +372,7 @@ Error.prepareStackTrace = (err, stack) => {
         value: result[0].line,
         writable: true,
         enumerable: true
-      });
+      })
     }
     if (Object.getOwnPropertyDescriptor(err, 'type')) {
       err.type = 'GeneralException'
@@ -363,7 +381,7 @@ Error.prepareStackTrace = (err, stack) => {
         value: 'GeneralException',
         writable: true,
         enumerable: true
-      });
+      })
     }
   } catch (e) {}
   return err.stack
@@ -382,7 +400,7 @@ global.onUncaughtException = err => {
     })
   } catch (e) {}
   const stack = err.stack
-  if (process.onUncaughtException) return process.onUncaughtException(err) 
+  if (process.onUncaughtException) return process.onUncaughtException(err)
   print(`${err.type}\n${stack}`)
 }
 
@@ -404,7 +422,7 @@ global.onUnhandledRejection = (err, promise) => {
     })
   } catch (e) {}
   const stack = err.stack
-  if (process.onUnhandledRejection) return process.onUnhandledRejection(err) 
+  if (process.onUnhandledRejection) return process.onUnhandledRejection(err)
   print(`${err.type}\n${stack}`)
 }
 
@@ -518,8 +536,15 @@ process.stats = () => {
   const cpu = process.cpuUsage()
   const heap = process.heapUsage()
   return {
-    threads: Object.keys(threads).length, ticks: process.ticks, queue: queue.length, cpu,
-    mem, handles, active, summary, heap
+    threads: Object.keys(threads).length,
+    ticks: process.ticks,
+    queue: queue.length,
+    cpu,
+    mem,
+    handles,
+    active,
+    summary,
+    heap
   }
 }
 
@@ -586,32 +611,40 @@ global.require = (path, parent) => {
   dirName = baseName(fileName)
   let module = cache[fileName]
   if (module) return module.exports
-  const params = ['exports', 'require', 'module', 'process']
+  const params = ['exports', 'require', 'module', 'spawn']
   module = { exports: {}, dirName, fileName }
+  const { exports } = module
   module.text = (readFile(fileName)).text
-  module.function = compile(module.text, fileName, params, [])
-  const p = Object.create(global.process)
-  p.spawn = (fn, cb, opts) => {
-    opts.dirname = module.dirName
+  const fun = compile(module.text, fileName, params, [])
+  module.function = fun
+  const spawn = (fn, cb = () => {}, opts = { dirName: module.dirName }) => {
+    opts.dirName = module.dirName
     return process.spawn(fn, cb, opts)
   }
-  module.function.call(module.exports, module.exports, p => global.require(p, module), module, p)
+  fun.call(exports, exports, p => global.require(p, module), module, spawn)
   cache[fileName] = module
   return module.exports
 }
 
-process.spawn = (fun, onComplete = () => {}, opts = { ipc: false, dirname: global.__dirname }) => {
+global.spawn = (fun, onComplete = () => {}, opts = { ipc: false }) => {
+  const { dirName = global.__dirname, ipc, bufSize } = opts
   const thread = new Thread()
   const envJSON = JSON.stringify(process.env, replacer)
   const argsJSON = JSON.stringify(process.args, replacer)
-  opts.dirname = opts.dirname || global.__dirname
-  const bufferSize = envJSON.length + argsJSON.length + opts.dirname.length + 21
-  thread.buffer = Buffer.allocShared(bufferSize)
+  const envLen = envJSON.length
+  const argsLen = argsJSON.length
+  const dirNameLen = dirName.length
+  const bufferSize = 1 + 4 + 4 + envLen + 4 + argsLen + 4 + dirNameLen + 4
+  thread.buffer = Buffer.alloc(bufferSize, true)
   const view = new DataView(thread.buffer.bytes)
-  if (opts.ipc) {
-    const bufSize = parseInt(opts.bufSize || process.env.THREAD_BUFFER_SIZE || 4096, 10)
-    view.setUint32(envJSON.length + argsJSON.length + 17 + opts.dirname.length, bufSize)
-    const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
+  let ipcSize = 0
+  thread.view = view
+  thread.id = next++
+  let fd = 0
+  if (ipc) {
+    const size = bufSize || process.env.THREAD_BUFFER_SIZE || 4096
+    ipcSize = parseInt(size, 10)
+    const [rb, wb] = [Buffer.alloc(ipcSize), Buffer.alloc(ipcSize)]
     const sock = new Socket(UNIX)
     const parser = new Parser(rb, wb)
     sock.buffers = { rb, wb }
@@ -631,38 +664,29 @@ process.spawn = (fun, onComplete = () => {}, opts = { ipc: false, dirname: globa
       sock.write(parser.write(s, 2))
     }
     thread.sendBuffer = len => sock.write(parser.write(null, 3, 0, len))
-    const fd = sock.open()
+    fd = sock.open()
     if (fd < 0) {
       throw new Error(`Error: ${fd}: ${sock.error(fd)}`)
     }
-    view.setUint32(1, fd)
     thread.sock = sock
-  } else {
-    view.setUint32(1, 0)
   }
-  thread.view = view
-  thread.id = next++
   view.setUint8(0, thread.id)
-  view.setUint32(5, envJSON.length)
+  view.setUint32(1, fd)
+  view.setUint32(5, envLen)
   thread.buffer.write(envJSON, 9)
-  view.setUint32(envJSON.length + 9, argsJSON.length)
-  thread.buffer.write(argsJSON, envJSON.length + 13)
-  view.setUint32(envJSON.length + argsJSON.length + 13, opts.dirname.length)
-  thread.buffer.write(opts.dirname, envJSON.length + argsJSON.length + 17)
+  view.setUint32(envLen + 9, argsLen)
+  thread.buffer.write(argsJSON, envLen + 13)
+  view.setUint32(envLen + argsLen + 13, dirNameLen)
+  thread.buffer.write(dirName, envLen + argsLen + 17)
+  view.setUint32(envLen + argsLen + dirNameLen + 17, ipcSize)
   threads[thread.id] = thread
   const r = thread.start(fun, err => {
     delete threads[thread.id]
     onComplete({ err, thread })
   }, thread.buffer)
-  if (r !== 0) onComplete({ err: new Error(`Bad Status: ${r} (${loop.error(r)})`, thread, 0) })
+  if (r !== 0) throw new Error(`Bad Status: ${r} (${loop.error(r)})`)
   return thread
 }
-
-global.onExit(() => {
-  process.runMicroTasks()
-  loop.reset()
-  loop.run(2)
-})
 
 global.dv8 = { repl, readFile, join, baseName, cache }
 process.activeHandles = activeHandles
@@ -676,18 +700,18 @@ if (global.workerData) {
   process.TID = dv.getUint8(0)
   process.PID = _process.pid()
   process.fd = dv.getUint32(1)
-  const envLength = dv.getUint32(5)
-  const envJSON = global.workerData.read(9, envLength)
+  const envLen = dv.getUint32(5)
+  const envJSON = global.workerData.read(9, envLen)
   process.env = JSON.parse(envJSON)
-  const argsLength = dv.getUint32(9 + envLength)
-  const argsJSON = global.workerData.read(13 + envLength, argsLength)
+  const argsLen = dv.getUint32(9 + envLen)
+  const argsJSON = global.workerData.read(13 + envLen, argsLen)
   process.args = JSON.parse(argsJSON)
-  const dirNameLength = dv.getUint32(13 + envLength + argsLength)
-  if (dirNameLength > 0) {
-    global.__dirname = global.workerData.read(17 + envLength + argsLength, dirNameLength)
+  const dirNameLen = dv.getUint32(13 + envLen + argsLen)
+  if (dirNameLen > 0) {
+    global.__dirname = global.workerData.read(17 + envLen + argsLen, dirNameLen)
   }
   if (process.fd !== 0) {
-    const bufSize = dv.getUint32(17 + envLength + argsLength + dirNameLength)
+    const bufSize = dv.getUint32(17 + envLen + argsLen + dirNameLen)
     const [rb, wb] = [Buffer.alloc(bufSize), Buffer.alloc(bufSize)]
     const sock = new Socket(UNIX)
     sock.buffers = { wb, rb }
@@ -716,7 +740,9 @@ if (global.workerData) {
   delete global.workerData
   const newPath = join(global.__dirname, process.args[1])
   const threadName = `${newPath}.#${process.TID}.${workerName || 'anonymous'}`
-  runScript(workerSource.slice(workerSource.indexOf('{') + 1, workerSource.lastIndexOf('}')), threadName)
+  const start = workerSource.indexOf('{') + 1
+  const end = workerSource.lastIndexOf('}')
+  runScript(workerSource.slice(start, end), threadName)
 } else {
   process.env = ENV
   process.PID = _process.pid()

@@ -7,6 +7,10 @@ namespace loop {
 using dv8::builtins::Environment;
 using dv8::builtins::Buffer;
 
+	void on_handle_close(uv_handle_t *h) {
+		free(h);
+	}
+
 	void InitAll(Local<Object> exports) {
 		EventLoop::Init(exports);
 	}
@@ -30,6 +34,7 @@ using dv8::builtins::Buffer;
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", EventLoop::UnRef);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ref", EventLoop::Ref);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listHandles", EventLoop::ListHandles);
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "shutdown", EventLoop::Shutdown);
 
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_RUN_DEFAULT), "UV_RUN_DEFAULT", exports);
 		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_RUN_ONCE), "UV_RUN_ONCE", exports);
@@ -109,6 +114,20 @@ using dv8::builtins::Buffer;
 		int mode = args[0]->IntegerValue(context).ToChecked();
 		int status = uv_run(env->loop, (uv_run_mode)mode);
 		args.GetReturnValue().Set(Integer::New(isolate, status));
+	}
+	
+	void EventLoop::Shutdown(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
+		uv_walk(env->loop, [](uv_handle_t *handle, void *arg) {
+			const char* typeName = uv_handle_type_name(handle->type);
+			fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
+			uv_close(handle, on_handle_close);
+		}, NULL);
 	}
 	
 	void EventLoop::Ref(const FunctionCallbackInfo<Value> &args)

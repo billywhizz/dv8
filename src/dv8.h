@@ -218,15 +218,12 @@ void LoadModule(const FunctionCallbackInfo<Value> &args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
 void shutdown(uv_loop_t *loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
-void CollectGarbage(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void RunScript(const FunctionCallbackInfo<Value> &args);
 void CompileScript(const FunctionCallbackInfo<Value> &args);
-void OnExit(const FunctionCallbackInfo<Value> &args);
-void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args);
-void Require(const FunctionCallbackInfo<Value> &args);
 void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch);
+void shutdown(uv_loop_t *loop, int rc);
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
   v8::HandleScope handle_scope(isolate);
@@ -255,6 +252,12 @@ inline void DV8_SET_EXPORT_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> o
   v8::Local<v8::String> constant_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
   Local<Context> context = isolate->GetCurrentContext();
   exports->Set(context, constant_name, obj);
+}
+
+inline void DV8_SET_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> obj, const char *name, v8::Local<v8::Template> recv) {
+  v8::Local<v8::String> constant_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
+  Local<Context> context = isolate->GetCurrentContext();
+  recv->Set(constant_name, obj);
 }
 
 inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate) {

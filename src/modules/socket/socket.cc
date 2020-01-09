@@ -291,10 +291,11 @@ void on_connection(uv_stream_t *server, int status)
       Socket *s = ObjectWrap::Unwrap<Socket>(sock);
       _context *ctx = context_init(stream, s);
   }
-  status = uv_read_start(stream, alloc_chunk, after_read);
-  if (status != 0) {
-      fprintf(stderr, "uv_read_start: %i, %s\n", status, uv_strerror(status));
-  }
+  // we should not start reading. let consumer call resume()
+  //status = uv_read_start(stream, alloc_chunk, after_read);
+  //if (status != 0) {
+  //    fprintf(stderr, "uv_read_start: %i, %s\n", status, uv_strerror(status));
+  //}
   assert(status == 0);
 }
 

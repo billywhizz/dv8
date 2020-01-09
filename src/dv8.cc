@@ -9,41 +9,25 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
   Local<Context> context = isolate->GetCurrentContext();
   PromiseRejectEvent event = message.GetEvent();
   Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-  //if (!env->onUnhandledRejection.IsEmpty() && event == v8::kPromiseRejectWithNoHandler) {
-    Local<Object> globalInstance = context->Global();
-    Local<Value> value = message.GetValue();
-    if (value.IsEmpty()) value = Undefined(isolate);
-    Local<Value> argv[2] = { value, promise };
-
-    Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+  Local<Object> globalInstance = context->Global();
+  Local<Value> value = message.GetValue();
+  if (value.IsEmpty()) value = Undefined(isolate);
+  Local<Value> argv[2] = { value, promise };
+  Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+  if (func->IsFunction()) {
     Local<Function> onUnhandledRejection = Local<Function>::Cast(func);
-
-    //Local<Function> onUnhandledRejection = Local<Function>::New(isolate, env->onUnhandledRejection);
     TryCatch try_catch(isolate);
     onUnhandledRejection->Call(context, globalInstance, 2, argv);
     if (try_catch.HasCaught()) {
       dv8::ReportException(isolate, &try_catch);
     }
-  //}
-}
-
-void on_handle_close(uv_handle_t *h) {
-  free(h);
-}
-
-void shutdown(uv_loop_t *loop) {
-  uv_walk(loop, [](uv_handle_t *handle, void *arg) {
-    const char* typeName = uv_handle_type_name(handle->type);
-    //fprintf(stderr, "closing [%p] %s in state: %i\n", handle, uv_handle_type_name(handle->type), uv_is_active(handle));
-    uv_close(handle, on_handle_close);
-  }, NULL);
+  }
 }
 
 void CompileScript(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  // Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
   v8::TryCatch try_catch(isolate);
   v8::Local<v8::String> source = args[0].As<v8::String>();
   v8::Local<v8::String> path = args[1].As<v8::String>();
@@ -113,36 +97,19 @@ void RunScript(const FunctionCallbackInfo<Value> &args) {
   v8::Local<v8::Script> script;
   v8::ScriptCompiler::Source basescript(source, baseorigin);
   if (!v8::ScriptCompiler::Compile(context, &basescript).ToLocal(&script)) {
-    fprintf(stderr, "Error Compiling Script\n");
-    dv8::ReportException(isolate, &try_catch);
+    dv8::PrintStackTrace(isolate, try_catch);
     return;
   }
   if (try_catch.HasCaught()) {
-    fprintf(stderr, "Error Instantiating Script\n");
-    dv8::ReportException(isolate, &try_catch);
+    dv8::PrintStackTrace(isolate, try_catch);
     return;
   }
   MaybeLocal<Value> result = script->Run(context);
   if (try_catch.HasCaught()) {
-    fprintf(stderr, "Error Running Script\n");
-    dv8::ReportException(isolate, &try_catch);
+    dv8::PrintStackTrace(isolate, try_catch);
     return;
   }
   args.GetReturnValue().Set(result.ToLocalChecked());
-}
-
-void Shutdown(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
-  HandleScope handle_scope(isolate);
-  Local<Context> context(isolate->GetCurrentContext());
-  Local<Object> globalInstance = context->Global();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-  Local<Function> onExit = Local<Function>::New(isolate, env->onExit);
-  //Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
-  //Local<Function> onExit = Local<Function>::Cast(func);
-  Local<Value> argv[0] = { };
-  onExit->Call(context, globalInstance, 0, argv);
-  shutdown(env->loop);
 }
 
 void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch) {
@@ -203,69 +170,71 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
     message = Exception::CreateMessage(isolate, er);
   }
   Local<Value> func = globalInstance->Get(context, String::NewFromUtf8(isolate, "onUncaughtException", NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
-  Local<Function> onUncaughtException = Local<Function>::Cast(func);
-  Local<Object> err_obj = er->ToObject(context).ToLocalChecked();
-/*
-  String::Utf8Value filename(isolate, message->GetScriptResourceName());
-  env->err.Reset(isolate, err_obj);
-  env->error->hasError = 1;
-  String::Utf8Value exception(isolate, er);
-  char *exception_string = *exception;
-  char *filename_string = *filename;
-  int linenum = message->GetLineNumber(context).FromJust();
-  env->error->linenum = linenum;
-  env->error->filename = (char*)calloc(strlen(filename_string), 1);
-  memcpy(env->error->filename, filename_string, strlen(filename_string));
-  env->error->exception = (char*)calloc(strlen(exception_string), 1);
-  memcpy(env->error->exception, exception_string, strlen(exception_string));
-  String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
-  char *sourceline_string = *sourceline;
-  env->error->sourceline = (char*)calloc(strlen(sourceline_string), 1);
-  memcpy(env->error->sourceline, sourceline_string, strlen(sourceline_string));
-  Local<v8::StackTrace> trace = message->GetStackTrace();
-  int frame_count = trace->GetFrameCount();
-  v8::Local<v8::Array> stack = v8::Array::New(isolate);
+  if (func->IsFunction()) {
+    Local<Function> onUncaughtException = Local<Function>::Cast(func);
+    Local<Object> err_obj = er->ToObject(context).ToLocalChecked();
+  /*
+    String::Utf8Value filename(isolate, message->GetScriptResourceName());
+    env->err.Reset(isolate, err_obj);
+    env->error->hasError = 1;
+    String::Utf8Value exception(isolate, er);
+    char *exception_string = *exception;
+    char *filename_string = *filename;
+    int linenum = message->GetLineNumber(context).FromJust();
+    env->error->linenum = linenum;
+    env->error->filename = (char*)calloc(strlen(filename_string), 1);
+    memcpy(env->error->filename, filename_string, strlen(filename_string));
+    env->error->exception = (char*)calloc(strlen(exception_string), 1);
+    memcpy(env->error->exception, exception_string, strlen(exception_string));
+    String::Utf8Value sourceline(isolate, message->GetSourceLine(context).ToLocalChecked());
+    char *sourceline_string = *sourceline;
+    env->error->sourceline = (char*)calloc(strlen(sourceline_string), 1);
+    memcpy(env->error->sourceline, sourceline_string, strlen(sourceline_string));
+    Local<v8::StackTrace> trace = message->GetStackTrace();
+    int frame_count = trace->GetFrameCount();
+    v8::Local<v8::Array> stack = v8::Array::New(isolate);
 
-  err_obj->Set(context, String::NewFromUtf8(isolate, "fileName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, filename_string, v8::NewStringType::kNormal).ToLocalChecked());
-  err_obj->Set(context, String::NewFromUtf8(isolate, "lineNumber", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, linenum));
-  //err_obj->Set(context, String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
-  //err_obj->Set(context, String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
-  //err_obj->Set(context, String::NewFromUtf8(isolate, "frames", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, frame_count));
-  for (int i = 0; i < frame_count; i++) {
-    Local<Object> frame = Object::New(isolate);
-    frame->Set(context, String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, trace->GetFrame(isolate, i)->GetLineNumber()));
-    frame->Set(context, String::NewFromUtf8(isolate, "column", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, trace->GetFrame(isolate, i)->GetColumn()));
-    //frame->Set(context, String::NewFromUtf8(isolate, "scriptId", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, trace->GetFrame(isolate, i)->GetScriptId()));
-    frame->Set(context, String::NewFromUtf8(isolate, "isEval", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsEval()));
-    frame->Set(context, String::NewFromUtf8(isolate, "isConstructor", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsConstructor()));
-    frame->Set(context, String::NewFromUtf8(isolate, "isWasm", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsWasm()));
-    frame->Set(context, String::NewFromUtf8(isolate, "isUserJavascript", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsUserJavaScript()));
-    Local<String> functionName = trace->GetFrame(isolate, i)->GetFunctionName();
-    if (!functionName.IsEmpty()) {
-      frame->Set(context, String::NewFromUtf8(isolate, "functionName", v8::NewStringType::kNormal).ToLocalChecked(), functionName);
+    err_obj->Set(context, String::NewFromUtf8(isolate, "fileName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, filename_string, v8::NewStringType::kNormal).ToLocalChecked());
+    err_obj->Set(context, String::NewFromUtf8(isolate, "lineNumber", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, linenum));
+    //err_obj->Set(context, String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, exception_string, v8::NewStringType::kNormal).ToLocalChecked());
+    //err_obj->Set(context, String::NewFromUtf8(isolate, "sourceLine", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, sourceline_string, v8::NewStringType::kNormal).ToLocalChecked());
+    //err_obj->Set(context, String::NewFromUtf8(isolate, "frames", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, frame_count));
+    for (int i = 0; i < frame_count; i++) {
+      Local<Object> frame = Object::New(isolate);
+      frame->Set(context, String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, trace->GetFrame(isolate, i)->GetLineNumber()));
+      frame->Set(context, String::NewFromUtf8(isolate, "column", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, trace->GetFrame(isolate, i)->GetColumn()));
+      //frame->Set(context, String::NewFromUtf8(isolate, "scriptId", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, trace->GetFrame(isolate, i)->GetScriptId()));
+      frame->Set(context, String::NewFromUtf8(isolate, "isEval", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsEval()));
+      frame->Set(context, String::NewFromUtf8(isolate, "isConstructor", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsConstructor()));
+      frame->Set(context, String::NewFromUtf8(isolate, "isWasm", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsWasm()));
+      frame->Set(context, String::NewFromUtf8(isolate, "isUserJavascript", v8::NewStringType::kNormal).ToLocalChecked(), v8::Boolean::New(isolate, trace->GetFrame(isolate, i)->IsUserJavaScript()));
+      Local<String> functionName = trace->GetFrame(isolate, i)->GetFunctionName();
+      if (!functionName.IsEmpty()) {
+        frame->Set(context, String::NewFromUtf8(isolate, "functionName", v8::NewStringType::kNormal).ToLocalChecked(), functionName);
+      }
+      Local<String> scriptName = trace->GetFrame(isolate, i)->GetScriptName();
+      if (!scriptName.IsEmpty()) {
+        frame->Set(context, String::NewFromUtf8(isolate, "scriptName", v8::NewStringType::kNormal).ToLocalChecked(), scriptName);
+      }
+      Local<String> scriptNameOrSourceUrl = trace->GetFrame(isolate, i)->GetScriptNameOrSourceURL();
+      if (!scriptNameOrSourceUrl.IsEmpty()) {
+        frame->Set(context, String::NewFromUtf8(isolate, "scriptNameOrSourceUrl", v8::NewStringType::kNormal).ToLocalChecked(), scriptNameOrSourceUrl);
+      }
+      stack->Set(context, i, frame);
     }
-    Local<String> scriptName = trace->GetFrame(isolate, i)->GetScriptName();
-    if (!scriptName.IsEmpty()) {
-      frame->Set(context, String::NewFromUtf8(isolate, "scriptName", v8::NewStringType::kNormal).ToLocalChecked(), scriptName);
+    err_obj->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), stack);
+  */
+    Local<Value> stack_trace_string;
+    if (try_catch->StackTrace(context).ToLocal(&stack_trace_string)) {
+      String::Utf8Value stack_trace(isolate, stack_trace_string);
+      char *stack_trace_string = *stack_trace;
+      env->error->stack = (char*)calloc(strlen(stack_trace_string), 1);
+      err_obj->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, stack_trace_string, v8::NewStringType::kNormal).ToLocalChecked());
+      memcpy(env->error->stack, stack_trace_string, strlen(stack_trace_string));
     }
-    Local<String> scriptNameOrSourceUrl = trace->GetFrame(isolate, i)->GetScriptNameOrSourceURL();
-    if (!scriptNameOrSourceUrl.IsEmpty()) {
-      frame->Set(context, String::NewFromUtf8(isolate, "scriptNameOrSourceUrl", v8::NewStringType::kNormal).ToLocalChecked(), scriptNameOrSourceUrl);
-    }
-    stack->Set(context, i, frame);
+    Local<Value> argv[1] = { err_obj };
+    onUncaughtException->Call(context, globalInstance, 1, argv);
   }
-  err_obj->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), stack);
-*/
-  Local<Value> stack_trace_string;
-  if (try_catch->StackTrace(context).ToLocal(&stack_trace_string)) {
-    String::Utf8Value stack_trace(isolate, stack_trace_string);
-    char *stack_trace_string = *stack_trace;
-    env->error->stack = (char*)calloc(strlen(stack_trace_string), 1);
-    err_obj->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, stack_trace_string, v8::NewStringType::kNormal).ToLocalChecked());
-    memcpy(env->error->stack, stack_trace_string, strlen(stack_trace_string));
-  }
-  Local<Value> argv[1] = { err_obj };
-  onUncaughtException->Call(context, globalInstance, 1, argv);
 }
 
 void Version(const FunctionCallbackInfo<Value> &args) {
@@ -275,57 +244,18 @@ void Version(const FunctionCallbackInfo<Value> &args) {
 void Print(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
-  bool first = true;
-  int len = args.Length();
-  for (int i = 0; i < len; i++) {
-    if (first) {
-      first = false;
-    } else {
-      printf(" ");
-    }
-    String::Utf8Value str(args.GetIsolate(), args[i]);
-    const char *cstr = *str;
+  String::Utf8Value str(args.GetIsolate(), args[0]);
+  int endline = 1;
+  if (args.Length() > 1) {
+    endline = static_cast<int>(args[1]->BooleanValue(isolate));
+  }
+  const char *cstr = *str;
+  if (endline == 1) {
     fprintf(stderr, "%s\n", cstr);
-    fflush(stderr);
+  } else {
+    fprintf(stderr, "%s", cstr);
   }
-}
-
-void Require(const FunctionCallbackInfo<Value> &args)
-{
-  fprintf(stderr, "hello\n");
-  Isolate *isolate = args.GetIsolate();
-  v8::HandleScope handleScope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-  v8::TryCatch try_catch(isolate);
-  Local<String> source = args[0].As<String>();
-  Local<String> path = args[1].As<String>();
-  v8::ScriptOrigin baseorigin(path, // resource name
-    v8::Integer::New(isolate, 0), // line offset
-    v8::Integer::New(isolate, 0),  // column offset
-    v8::False(isolate), // is shared cross-origin
-    v8::Local<v8::Integer>(),  // script id
-    v8::Local<v8::Value>(), // source map url
-    v8::False(isolate), // is opaque
-    v8::False(isolate), // is wasm
-    v8::True(isolate)); // is module
-  Local<Module> module;
-  v8::ScriptCompiler::Source basescript(source, baseorigin);
-  if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
-    dv8::ReportException(isolate, &try_catch);
-    return;
-  }
-  v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
-  if (!ok.ToChecked()) {
-    dv8::ReportException(isolate, &try_catch);
-    return;
-  }
-  MaybeLocal<Value> result = module->Evaluate(context);
-  if (try_catch.HasCaught()) {
-    dv8::ReportException(isolate, &try_catch);
-    return;
-  }
-  args.GetReturnValue().Set(result.ToLocalChecked());
+  fflush(stderr);
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {
@@ -448,15 +378,6 @@ MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> spe
   return MaybeLocal<Module>();
 }
 
-void CollectGarbage(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
-  //isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
-  bool stop = false;
-  while(!stop) {
-    stop = isolate->IdleNotificationDeadline(1);  
-  }
-}
-
 void EnvVars(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
@@ -469,17 +390,6 @@ void EnvVars(const FunctionCallbackInfo<Value> &args) {
     envarr->Set(context, i, String::NewFromUtf8(isolate, var, v8::NewStringType::kNormal, strlen(var)).ToLocalChecked());
   }
   args.GetReturnValue().Set(envarr);
-}
-
-void OnExit(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
-  HandleScope handleScope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-  if (args[0]->IsFunction()) {
-    Local<Function> onExit = Local<Function>::Cast(args[0]);
-    env->onExit.Reset(isolate, onExit);
-  }
 }
 
 void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
@@ -509,33 +419,20 @@ void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   fields[11] = v8_heap_stats.total_heap_size_executable();
   fields[12] = v8_heap_stats.total_physical_size();
   fields[13] = isolate->AdjustAmountOfExternalAllocatedMemory(0);
-}
-
-void OnUnhandledRejection(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
-  HandleScope handleScope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
-  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-  if (args[0]->IsFunction()) {
-    Local<Function> onUnhandledRejection = Local<Function>::Cast(args[0]);
-    env->onUnhandledRejection.Reset(isolate, onUnhandledRejection);
-  }
+  args.GetReturnValue().Set(array);
 }
 
 Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
-  global->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
-  global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
-  global->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
-  global->Set(String::NewFromUtf8(isolate, "library", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
-  global->Set(String::NewFromUtf8(isolate, "shutdown", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Shutdown));
-  global->Set(String::NewFromUtf8(isolate, "gc", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CollectGarbage));
-  global->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
-  global->Set(String::NewFromUtf8(isolate, "onExit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnExit));
-  global->Set(String::NewFromUtf8(isolate, "require", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Require));
-  global->Set(String::NewFromUtf8(isolate, "runScript", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunScript));
-  global->Set(String::NewFromUtf8(isolate, "compile", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CompileScript));
-  global->Set(String::NewFromUtf8(isolate, "onUnhandledRejection", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, OnUnhandledRejection));
+  Local<ObjectTemplate> dv8 = ObjectTemplate::New(isolate);
+  dv8->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Version));
+  dv8->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
+  dv8->Set(String::NewFromUtf8(isolate, "memoryUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, MemoryUsage));
+  dv8->Set(String::NewFromUtf8(isolate, "library", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
+  dv8->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
+  dv8->Set(String::NewFromUtf8(isolate, "runScript", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunScript));
+  dv8->Set(String::NewFromUtf8(isolate, "compile", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CompileScript));
+  global->Set(String::NewFromUtf8(isolate, "dv8", NewStringType::kNormal).ToLocalChecked(), dv8);
   Local<Context> context = Context::New(isolate, NULL, global);
   context->AllowCodeGenerationFromStrings(false);
   return context;
