@@ -36,9 +36,9 @@ using dv8::builtins::Buffer;
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listHandles", EventLoop::ListHandles);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "shutdown", EventLoop::Shutdown);
 
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_RUN_DEFAULT), "UV_RUN_DEFAULT", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_RUN_ONCE), "UV_RUN_ONCE", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_RUN_NOWAIT), "UV_RUN_NOWAIT", exports);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_RUN_DEFAULT), "UV_RUN_DEFAULT", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_RUN_ONCE), "UV_RUN_ONCE", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_RUN_NOWAIT), "UV_RUN_NOWAIT", tpl);
 
 		DV8_SET_EXPORT(isolate, tpl, "EventLoop", exports);
 	}

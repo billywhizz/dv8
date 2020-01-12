@@ -143,8 +143,8 @@ void HTTPParser::Init(Local<Object> exports) {
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRequest", HTTPParser::onRequest);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onResponse", HTTPParser::onResponse);
 	DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", HTTPParser::onError);
-	DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 0), "REQUEST", exports);
-	DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 1), "RESPONSE", exports);
+	DV8_SET_CONSTANT(isolate, Integer::New(isolate, 0), "REQUEST", tpl);
+	DV8_SET_CONSTANT(isolate, Integer::New(isolate, 1), "RESPONSE", tpl);
 	DV8_SET_EXPORT(isolate, tpl, "HTTPParser", exports);
 }
 

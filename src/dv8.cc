@@ -234,6 +234,8 @@ void ReportException(Isolate *isolate, TryCatch *try_catch) {
     }
     Local<Value> argv[1] = { err_obj };
     onUncaughtException->Call(context, globalInstance, 1, argv);
+  } else {
+    dv8::PrintStackTrace(isolate, *try_catch);
   }
 }
 

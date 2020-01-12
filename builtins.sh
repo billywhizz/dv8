@@ -4,8 +4,6 @@ if [[ "$MAIN" == "override" ]]; then
   echo "building overridden main with $OVERRIDE"
   cp src/main.js src/backup.js
   cp $OVERRIDE src/main.js
-  squash -o src/main.min.js src/main.js
-  cp src/main.min.js src/main.js
 fi
 xxd -i src/main.js > src/builtins.h
 sed -i 's/unsigned char/static const char/g' src/builtins.h

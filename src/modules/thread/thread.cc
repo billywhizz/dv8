@@ -29,6 +29,10 @@ void start_context(void *data)
 		isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
 		isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
+    isolate->AddGCPrologueCallback(dv8::beforeGCCallback);
+    isolate->AddGCEpilogueCallback(dv8::afterGCCallback);
+    isolate->AddMicrotasksCompletedCallback(dv8::microTasksCallback);
+    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kAuto);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);
 		dv8::builtins::Environment *env = new dv8::builtins::Environment();
 		env->error = &th->error;
@@ -52,11 +56,10 @@ void start_context(void *data)
 			dv8->Set(context, String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
 		}
 		dv8->Set(context, String::NewFromUtf8(isolate, "workerName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->name, v8::NewStringType::kNormal).ToLocalChecked());
-
+		dv8->Set(context, String::NewFromUtf8(isolate, "tid", v8::NewStringType::kNormal).ToLocalChecked(), Number::New(isolate, th->tid));
 		uv_loop_t *loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 		env->loop = loop;
 		uv_loop_init(loop);
-
 		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len));
 		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "main.js", v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
@@ -235,7 +238,6 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	uv_async_init(env->loop, th->async, on_context_complete);
 	strncpy(th->source, *source, len + 1);
 	int r = uv_thread_create(&th->tid, start_context, (void*)th);
-	//int r = pthread_create(&th->tid, NULL, start_context, (void*)th);
 	args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 

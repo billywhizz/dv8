@@ -188,6 +188,7 @@ private:
   static void Error(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the uv error string for an error code
   static void QueueSize(const v8::FunctionCallbackInfo<v8::Value> &args); // size in bytes of the write queue
   static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
+  static void Ref(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
   static void UnRef(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
   static void Open(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the stats for the socket
   static void PortNumber(const v8::FunctionCallbackInfo<v8::Value> &args);     // get the port number

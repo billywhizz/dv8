@@ -16,6 +16,10 @@ int main(int argc, char *argv[]) {
     isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
     isolate->SetFatalErrorHandler(dv8::OnFatalError);
     isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
+    isolate->AddGCPrologueCallback(dv8::beforeGCCallback);
+    isolate->AddGCEpilogueCallback(dv8::afterGCCallback);
+    isolate->AddMicrotasksCompletedCallback(dv8::microTasksCallback);
+    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kAuto);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);

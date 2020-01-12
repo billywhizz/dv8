@@ -176,12 +176,12 @@ void TTY::Init(Local<Object> exports)
 
     DV8_SET_EXPORT(isolate, tpl, "TTY", exports);
 
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 0), "UV_TTY_MODE_NORMAL", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 1), "UV_TTY_MODE_RAW", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, 2), "UV_TTY_MODE_IO", exports);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, 0), "UV_TTY_MODE_NORMAL", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, 1), "UV_TTY_MODE_RAW", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, 2), "UV_TTY_MODE_IO", tpl);
 
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_EOF), "UV_EOF", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UV_EAGAIN), "UV_EAGAIN", exports);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_EOF), "UV_EOF", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_EAGAIN), "UV_EAGAIN", tpl);
 }
 
 void TTY::New(const FunctionCallbackInfo<Value> &args)

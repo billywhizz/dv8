@@ -50,7 +50,7 @@ function wrapLibrary (library) {
     return dv8[name]
   }
 }
-/*
+
 function wrapHrtime (hrtime) {
   const time = new BigUint64Array(1)
   return () => {
@@ -88,7 +88,7 @@ function wrapHeapUsage (heapUsage) {
     return usage
   }
 }
-*/
+
 function wrapMemoryUsage (memoryUsage) {
   const mem = new Float64Array(16)
   return () => {
@@ -344,25 +344,26 @@ function replModule () {
 // main entrypoint
 function main (args) {
   dv8.library = wrapLibrary(dv8.library)
-  const { workerSource, runScript, library } = dv8
+  const { workerSource, workerName, runScript } = dv8
   const { require } = requireModule()
   const { repl } = replModule()
-  //const process = new (library('process').Process)()
+  const { Process } = dv8.library('process')
+  const { pid, cpuUsage, hrtime, heapUsage, runMicroTasks } = Process
 
-  Error.stackTraceLimit = 1000 // Infinity
-
+  Error.stackTraceLimit = 1000
   Buffer.alloc = alloc
   Buffer.fromString = fromString
   Buffer.fromArrayBuffer = fromArrayBuffer
 
+  dv8.pid = () => pid()
   dv8.env = wrapEnv(dv8.env)
   dv8.memoryUsage = wrapMemoryUsage(dv8.memoryUsage)
-  //dv8.cpuUsage = wrapCpuUsage(process.cpuUsage)
-  //dv8.hrtime = wrapHrtime(process.hrtime)
-  //dv8.heapUsage = wrapHeapUsage(process.heapUsage)
-  //dv8.heapUsage = process.heapUsage
+  dv8.cpuUsage = wrapCpuUsage(cpuUsage)
+  dv8.hrtime = wrapHrtime(hrtime)
+  dv8.heapUsage = wrapHeapUsage(heapUsage)
   dv8.require = require
   dv8.repl = repl
+  dv8.runMicroTasks = runMicroTasks
 
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout
@@ -373,13 +374,15 @@ function main (args) {
   delete global.send // todo - we need this for inspector
   delete global.console
 
-  if (global.workerSource) {
+  if (workerSource) {
     const start = workerSource.indexOf('{') + 1
     const end = workerSource.lastIndexOf('}')
-    return runScript(workerSource.slice(start, end))
+    delete global.workerSource
+    delete global.workerName
+    return runScript(workerSource.slice(start, end), workerName)
   }
   if (args.length > 1) {
-    if (args[1] === '-e' && args.length > 2) return runScript(args[2])
+    if (args[1] === '-e' && args.length > 2) return runScript(args[2], 'eval')
     return runScript(readFile(args[1]).text, args[1]) // todo: check valid path name - stat file first?
   }
   repl()

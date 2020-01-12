@@ -323,6 +323,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "queueSize", QueueSize);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", Stats);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", UnRef);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ref", Ref);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", Open);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "create", Create);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "portNumber", PortNumber);
@@ -337,9 +338,9 @@ void Socket::Init(Local<Object> exports)
 
   DV8_SET_EXPORT(isolate, tpl, "Socket", exports);
 
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, TCP), "TCP", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "UNIX", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "PIPE", exports);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, TCP), "TCP", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, UNIX), "UNIX", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, UNIX), "PIPE", tpl);
 }
 
 void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
@@ -550,6 +551,14 @@ void Socket::UnRef(const FunctionCallbackInfo<Value> &args)
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
   uv_unref((uv_handle_t*)ctx->handle);
+}
+
+void Socket::Ref(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
+  uv_ref((uv_handle_t*)ctx->handle);
 }
 
 void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)

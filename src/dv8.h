@@ -224,6 +224,21 @@ void RunScript(const FunctionCallbackInfo<Value> &args);
 void CompileScript(const FunctionCallbackInfo<Value> &args);
 void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch);
 void shutdown(uv_loop_t *loop, int rc);
+void beforeGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
+void afterGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
+void microTasksCallback(v8::Isolate* isolate);
+
+inline void beforeGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags) {
+  //fprintf(stderr, "before GC\n");
+}
+
+inline void afterGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags) {
+  //fprintf(stderr, "after GC\n");
+}
+
+inline void microTasksCallback(v8::Isolate* isolate) {
+  //fprintf(stderr, "on MicroTasks\n");
+}
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
   v8::HandleScope handle_scope(isolate);
