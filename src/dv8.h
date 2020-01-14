@@ -271,7 +271,6 @@ inline void DV8_SET_EXPORT_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> o
 
 inline void DV8_SET_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> obj, const char *name, v8::Local<v8::Template> recv) {
   v8::Local<v8::String> constant_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
-  Local<Context> context = isolate->GetCurrentContext();
   recv->Set(constant_name, obj);
 }
 

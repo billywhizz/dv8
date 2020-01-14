@@ -11,11 +11,14 @@ int main(int argc, char *argv[]) {
   uv_disable_stdio_inheritance();
   v8::Isolate::CreateParams create_params;
   create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+  dv8::builtins::Environment *env = new dv8::builtins::Environment();
   v8::Isolate *isolate = v8::Isolate::New(create_params);
   {
     isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
     isolate->SetFatalErrorHandler(dv8::OnFatalError);
     isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
+    isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
+    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
     isolate->AddGCPrologueCallback(dv8::beforeGCCallback);
     isolate->AddGCEpilogueCallback(dv8::afterGCCallback);
     isolate->AddMicrotasksCompletedCallback(dv8::microTasksCallback);
@@ -24,13 +27,9 @@ int main(int argc, char *argv[]) {
     v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);
     v8::Context::Scope context_scope(context);
-    isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
-    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
-    dv8::builtins::Environment *env = new dv8::builtins::Environment();
     env->AssignToContext(context);
-    env->loop = uv_default_loop();
-    env->error = (dv8::js_error*)calloc(sizeof(dv8::js_error), 1);
-    env->error->hasError = 0;
+    env->argc = argc;
+    env->argv = uv_setup_args(argc, argv);
     v8::Local<v8::Array> arguments = v8::Array::New(isolate);
     for (int i = 0; i < argc; i++) {
       arguments->Set(context, i, v8::String::NewFromUtf8(isolate, argv[i], v8::NewStringType::kNormal, strlen(argv[i])).ToLocalChecked());
@@ -43,9 +42,9 @@ int main(int argc, char *argv[]) {
     dv8::builtins::Buffer::Init(globalInstance);
     dv8::InspectorClient inspector_client(context, true);
     v8::TryCatch try_catch(isolate);
-    const char* base_name = "main.js";
+    env->loop = uv_default_loop();
     v8::Local<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len)).ToLocalChecked();
-    v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, base_name, v8::NewStringType::kNormal).ToLocalChecked(), // resource name
+    v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "main.js", v8::NewStringType::kNormal).ToLocalChecked(), // resource name
       v8::Integer::New(isolate, 0), // line offset
       v8::Integer::New(isolate, 0),  // column offset
       v8::False(isolate), // is shared cross-origin
@@ -56,7 +55,6 @@ int main(int argc, char *argv[]) {
       v8::True(isolate)); // is module
     v8::Local<v8::Module> module;
     v8::ScriptCompiler::Source basescript(base, baseorigin);
-
     if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
       dv8::PrintStackTrace(isolate, try_catch);
       return 1;
@@ -67,21 +65,29 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
-    if (try_catch.HasCaught()) {
-      dv8::PrintStackTrace(isolate, try_catch);
-      return 2;
+		if (result.IsEmpty()) {
+      if (try_catch.HasCaught()) {
+        dv8::PrintStackTrace(isolate, try_catch);
+        return 2;
+      }
     }
     v8::platform::PumpMessageLoop(platform.get(), isolate);
-    //dv8::shutdown(uv_default_loop());
     uv_tty_reset_mode();
     int r = uv_loop_close(uv_default_loop());
     if (r != 0) {
       //fprintf(stderr, "uv_loop_close: %i\n", r);
     }
+    const double kLongIdlePauseInSeconds = 1.0;
+    isolate->ContextDisposedNotification();
+    isolate->IdleNotificationDeadline(platform->MonotonicallyIncreasingTime() + kLongIdlePauseInSeconds);
+    isolate->LowMemoryNotification();
   }
   isolate->Dispose();
+  delete env;
   delete create_params.array_buffer_allocator;
+  isolate = nullptr;
   v8::V8::Dispose();
   v8::V8::ShutdownPlatform();
+  platform.reset();
   return 0;
 }

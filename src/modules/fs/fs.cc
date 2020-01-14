@@ -39,10 +39,7 @@ using dv8::builtins::Buffer;
 	}
 
 	void File::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-		Isolate *isolate = data.GetIsolate();
-		v8::HandleScope handleScope(isolate);
-		ObjectWrap *wrap = data.GetParameter();
-		File* sock = static_cast<File *>(wrap);
+		delete file;
 		#if TRACE
 		fprintf(stderr, "File::Destroy\n");
 		#endif

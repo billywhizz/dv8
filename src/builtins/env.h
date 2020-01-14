@@ -15,8 +15,8 @@ class Environment
 {
   public:
     uv_loop_t *loop;
-    v8::Persistent<v8::Object> err;
-    js_error *error;
+    int argc;
+    char** argv;
 
     inline void AssignToContext(v8::Local<v8::Context> context)
     {
@@ -25,8 +25,6 @@ class Environment
     Environment()
     {
     }
-
-  private:
     ~Environment()
     {
     }

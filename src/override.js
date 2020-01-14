@@ -272,7 +272,7 @@ function requireModule () {
     if (!process) process = new (library('process').Process)()
     if (!pathMod) pathMod = pathModule()
     const { join, baseName } = pathMod
-    let dirName = parent ? parent.dirName : process.cwd()
+    let dirName = parent ? parent.dirName : dv8.process.Process.cwd()
     const fileName = join(dirName, path)
     dirName = baseName(fileName)
     let module = cache[fileName]
@@ -281,6 +281,7 @@ function requireModule () {
     const exports = {}
     module = { exports, dirName, fileName }
     module.text = (readFile(fileName)).text
+    dv8.print(fileName)
     const fun = compile(module.text, fileName, params, [])
     module.function = fun
     const spawn = (fn, cb = () => {}, opts = { dirName: module.dirName }) => {
@@ -299,13 +300,11 @@ function requireModule () {
 function replModule () {
   let stdin
   let stdout
-  let loop
   const { runScript, print, library } = dv8
 
   function repl () {
     if (!stdin) stdin = new (library('tty').TTY)(0)
     if (!stdout) stdout = new (library('tty').TTY)(1)
-    if (!loop) loop = new (library('loop').EventLoop)()
     const { UV_TTY_MODE_NORMAL } = dv8.tty
     const BUFFER_SIZE = 64 * 1024
     const MAX_BUFFER = 4 * BUFFER_SIZE
@@ -335,7 +334,6 @@ function replModule () {
     } else {
       stdin.resume()
     }
-    loop.run()
   }
 
   return { repl }
@@ -348,6 +346,7 @@ function main (args) {
   const { require } = requireModule()
   const { repl } = replModule()
   const { Process } = dv8.library('process')
+  const { EventLoop } = dv8.library('loop')
   const { pid, cpuUsage, hrtime, heapUsage, runMicroTasks } = Process
 
   Error.stackTraceLimit = 1000
@@ -364,6 +363,7 @@ function main (args) {
   dv8.require = require
   dv8.repl = repl
   dv8.runMicroTasks = runMicroTasks
+  dv8.readFile = readFile
 
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout
@@ -377,15 +377,20 @@ function main (args) {
   if (workerSource) {
     const start = workerSource.indexOf('{') + 1
     const end = workerSource.lastIndexOf('}')
-    delete global.workerSource
-    delete global.workerName
-    return runScript(workerSource.slice(start, end), workerName)
+    delete dv8.workerSource
+    delete dv8.workerName
+    runScript(workerSource.slice(start, end), workerName)
+  } else if (args.length > 1) {
+    if (args[1] === '-e' && args.length > 2) {
+      runScript(args[2], 'eval')
+    } else {
+      runScript(readFile(args[1]).text, args[1]) // todo: check valid path name - stat file first?
+    }
+  } else {
+    repl()
   }
-  if (args.length > 1) {
-    if (args[1] === '-e' && args.length > 2) return runScript(args[2], 'eval')
-    return runScript(readFile(args[1]).text, args[1]) // todo: check valid path name - stat file first?
-  }
-  repl()
+  const loop = new EventLoop()
+  loop.run()
 }
 
 main(dv8.args)

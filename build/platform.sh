@@ -15,7 +15,7 @@ else
     export CCFLAGS="-DHTTP_PARSER_STRICT=0 -D$TRACE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 fi
 export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ./dv8main.o ./dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a $SSL_PREFIX/libssl.a $SSL_PREFIX/libcrypto.a -lz -ldl -Wl,--end-group"
-export CC="ccache clang++"
+export CC="ccache g++"
 
 # compile the builtins
 $CC $CCFLAGS -c -o buffer.o /src/builtins/buffer.cc

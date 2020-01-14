@@ -7,18 +7,6 @@
 namespace dv8
 {
 
-typedef struct
-{
-	uint8_t hasError;
-    int linenum;
-    char* filename;
-    char* exception;
-    char* sourceline;
-    char* stack;
-    uint8_t* bytes;
-    size_t len;
-} js_error;
-
 class ObjectWrap
 {
   public:
@@ -116,8 +104,10 @@ class ObjectWrap
         ObjectWrap *wrap = data.GetParameter();
         assert(wrap->refs_ == 0);
         wrap->Destroy(data);
-        wrap->handle_.Reset();
-        delete wrap;
+        if (!wrap->handle_.IsEmpty()) {
+            wrap->handle_.Reset();
+            delete wrap;
+        }
     }
 
     v8::Persistent<v8::Object> handle_;

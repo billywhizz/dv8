@@ -350,11 +350,11 @@ void Buffer::Create(const FunctionCallbackInfo<Value> &args)
       fprintf(stderr, "oh dear\n");
       return;
     }
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kExternalized);
+    //Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kExternalized);
     b->_length = length;
     b->_free = false;
   }
-  args.GetReturnValue().Set(scope.Escape(instance));
+  args.GetReturnValue().Set(instance);
 }
 
 void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)
@@ -378,12 +378,12 @@ void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)
       Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kExternalized);
       b->_length = length;
       b->_free = false;
-      args.GetReturnValue().Set(scope.Escape(ab));
+      args.GetReturnValue().Set(ab);
     }
   } else {
     Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
     Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, b->_length, ArrayBufferCreationMode::kExternalized);
-    args.GetReturnValue().Set(scope.Escape(ab));
+    args.GetReturnValue().Set(ab);
     b->_free = false;
   }
 }
@@ -410,12 +410,12 @@ void Buffer::AllocShared(const FunctionCallbackInfo<Value> &args)
       b->_length = length;
       b->_free = false;
       isolate->AdjustAmountOfExternalAllocatedMemory(length);
-      args.GetReturnValue().Set(scope.Escape(ab));
+      args.GetReturnValue().Set(ab);
     }
   } else {
     Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
     Local<SharedArrayBuffer> ab = SharedArrayBuffer::New(isolate, b->_data, b->_length, ArrayBufferCreationMode::kExternalized);
-    args.GetReturnValue().Set(scope.Escape(ab));
+    args.GetReturnValue().Set(ab);
     b->_free = false;
   }
 }
@@ -434,7 +434,7 @@ void Buffer::Load(const FunctionCallbackInfo<Value> &args)
   b->_data = (char*)foo.Data();
   b->_length = foo.ByteLength();
   b->_free = false;
-  args.GetReturnValue().Set(scope.Escape(ab));
+  args.GetReturnValue().Set(ab);
 }
 
 void Buffer::LoadShared(const FunctionCallbackInfo<Value> &args)
@@ -451,7 +451,7 @@ void Buffer::LoadShared(const FunctionCallbackInfo<Value> &args)
   b->_data = (char*)foo.Data();
   b->_length = foo.ByteLength();
   b->_free = false;
-  args.GetReturnValue().Set(scope.Escape(ab));
+  args.GetReturnValue().Set(ab);
 }
 
 void Buffer::Copy(const FunctionCallbackInfo<Value> &args)
