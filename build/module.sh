@@ -23,7 +23,7 @@ else
 fi
 if [[ "$MODULE_NAME" == "httpParser" ]]; then
     export LDFLAGS="-shared -pthread -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group ./http_parser.o ./$MODULE_NAME.o -lz -Wl,--end-group"
-    $CC $CCFLAGS -c -o http_parser.o $MODULE_DIR/http_parser.c
+    $CC -DHTTP_PARSER_STRICT=0 $CCFLAGS -c -o http_parser.o $MODULE_DIR/http_parser.c
 else
     export LDFLAGS="-shared -pthread -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group ./$MODULE_NAME.o -lz -Wl,--end-group"
 fi

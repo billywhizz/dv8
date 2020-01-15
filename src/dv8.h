@@ -69,6 +69,7 @@ using v8::Exception;
 using v8::Promise;
 using v8::Global;
 using v8::Array;
+using v8::BigUint64Array;
 using v8_inspector::V8InspectorClient;
 using v8_inspector::V8Inspector;
 using v8_inspector::StringBuffer;

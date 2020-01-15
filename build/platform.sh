@@ -10,9 +10,9 @@ export SSL_PREFIX=/usr/lib/x86_64-linux-gnu
 export TRACE="TRACE=0"
 
 if [[ "$CONFIG" == "release" ]]; then
-    export CCFLAGS="-DV8_DLOPEN=0 -DHTTP_PARSER_STRICT=0 -D$TRACE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
+    export CCFLAGS="-D$TRACE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
 else
-    export CCFLAGS="-DHTTP_PARSER_STRICT=0 -D$TRACE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
+    export CCFLAGS="-D$TRACE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I/src -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
 fi
 export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ./dv8main.o ./dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a $SSL_PREFIX/libssl.a $SSL_PREFIX/libcrypto.a -lz -ldl -Wl,--end-group"
 export CC="ccache g++"
@@ -38,18 +38,22 @@ $CC $CCFLAGS -I/src/modules/openssl -c -o openssl.o /src/modules/openssl/openssl
 $CC $CCFLAGS -c -o dv8main.o /src/dv8_main.cc
 
 # compile the dv8 core
-$CC $CCFLAGS -c -o dv8.o /src/dv8.cc
+$CC -DV8_DLOPEN=0 $CCFLAGS -c -o dv8.o /src/dv8.cc
+$CC -DV8_DLOPEN=1 $CCFLAGS -c -o dv8-dynamic.o /src/dv8.cc
 
 # create the lib
 rm -f dv8.a
-ar crsT dv8.a buffer.o env.o dv8.o libz.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o openssl.o
 
 # link
 if [[ "$CONFIG" == "release" ]]; then
+    ar crsT dv8.a buffer.o env.o dv8.o libz.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o openssl.o
     $CC -static $LDFLAGS -s -o ./dv8-static
+    ar crsT dv8.a buffer.o env.o dv8-dynamic.o libz.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o openssl.o
     $CC -rdynamic $LDFLAGS -s -o ./dv8
 else
+    ar crsT dv8.a buffer.o env.o dv8.o libz.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o openssl.o
     $CC -static $LDFLAGS -o ./dv8-static
+    ar crsT dv8.a buffer.o env.o dv8-dynamic.o libz.o loop.o process.o timer.o thread.o tty.o os.o fs.o socket.o udp.o openssl.o
     $CC -rdynamic $LDFLAGS -o ./dv8
 fi
 

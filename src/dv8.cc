@@ -402,6 +402,41 @@ void HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(o);
 }
 
+
+void PID(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  args.GetReturnValue().Set(Integer::New(isolate, uv_os_getpid()));
+}
+
+void CPUUsage(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  uv_rusage_t rusage;
+  int err = uv_getrusage(&rusage);
+  if (err) {
+    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::NewStringType::kNormal).ToLocalChecked());
+  }
+  Local<Float64Array> array = args[0].As<Float64Array>();
+  Local<ArrayBuffer> ab = array->Buffer();
+  double *fields = static_cast<double *>(ab->GetContents().Data());
+  fields[0] = (MICROS_PER_SEC * rusage.ru_utime.tv_sec) + rusage.ru_utime.tv_usec;
+  fields[1] = (MICROS_PER_SEC * rusage.ru_stime.tv_sec) + rusage.ru_stime.tv_usec;
+}
+
+void HRTime(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<ArrayBuffer> ab = args[0].As<BigUint64Array>()->Buffer();
+  uint64_t *fields = static_cast<uint64_t *>(ab->GetContents().Data());
+  fields[0] = uv_hrtime();
+}
+
+void RunMicroTasks(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  isolate->RunMicrotasks();
+}
+
 Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
   Local<ObjectTemplate> dv8 = ObjectTemplate::New(isolate);
@@ -412,6 +447,11 @@ Local<Context> CreateContext(Isolate *isolate) {
   dv8->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
   dv8->Set(String::NewFromUtf8(isolate, "runScript", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunScript));
   dv8->Set(String::NewFromUtf8(isolate, "compile", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CompileScript));
+  dv8->Set(String::NewFromUtf8(isolate, "pid", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, PID));
+  dv8->Set(String::NewFromUtf8(isolate, "cpuUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CPUUsage));
+  dv8->Set(String::NewFromUtf8(isolate, "hrtime", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, HRTime));
+  dv8->Set(String::NewFromUtf8(isolate, "heapUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, HeapSpaceUsage));
+  dv8->Set(String::NewFromUtf8(isolate, "runMicroTasks", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunMicroTasks));
   global->Set(String::NewFromUtf8(isolate, "dv8", NewStringType::kNormal).ToLocalChecked(), dv8);
   Local<Context> context = Context::New(isolate, NULL, global);
   context->AllowCodeGenerationFromStrings(false);
