@@ -371,6 +371,37 @@ void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(array);
 }
 
+void HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  HeapSpaceStatistics s;
+  size_t number_of_heap_spaces = isolate->NumberOfHeapSpaces();
+  Local<Array> spaces = args[0].As<Array>();
+  Local<Object> o = Object::New(isolate);
+  HeapStatistics v8_heap_stats;
+  isolate->GetHeapStatistics(&v8_heap_stats);
+  Local<Object> heaps = Object::New(isolate);
+  o->Set(context, String::NewFromUtf8(isolate, "totalMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.total_heap_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "totalCommittedMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.total_physical_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "usedMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.used_heap_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "availableMemory", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.total_available_size()));
+  o->Set(context, String::NewFromUtf8(isolate, "memoryLimit", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, v8_heap_stats.heap_size_limit()));
+  o->Set(context, String::NewFromUtf8(isolate, "heapSpaces", v8::NewStringType::kNormal).ToLocalChecked(), heaps);
+  for (size_t i = 0; i < number_of_heap_spaces; i++) {
+    isolate->GetHeapSpaceStatistics(&s, i);
+    Local<Float64Array> array = spaces->Get(context, i).ToLocalChecked().As<Float64Array>();
+    Local<ArrayBuffer> ab = array->Buffer();
+    double *fields = static_cast<double *>(ab->GetContents().Data());
+    fields[0] = s.physical_space_size();
+    fields[1] = s.space_available_size();
+    fields[2] = s.space_size();
+    fields[3] = s.space_used_size();
+    heaps->Set(context, String::NewFromUtf8(isolate, s.space_name(), v8::NewStringType::kNormal).ToLocalChecked(), array);
+  }
+  args.GetReturnValue().Set(o);
+}
+
 Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
   Local<ObjectTemplate> dv8 = ObjectTemplate::New(isolate);

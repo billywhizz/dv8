@@ -68,6 +68,7 @@ using v8::HeapSpaceStatistics;
 using v8::Exception;
 using v8::Promise;
 using v8::Global;
+using v8::Array;
 using v8_inspector::V8InspectorClient;
 using v8_inspector::V8Inspector;
 using v8_inspector::StringBuffer;
@@ -219,6 +220,7 @@ MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> spe
 void shutdown(uv_loop_t *loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value> &args);
+void HeapSpaceUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void RunScript(const FunctionCallbackInfo<Value> &args);
 void CompileScript(const FunctionCallbackInfo<Value> &args);

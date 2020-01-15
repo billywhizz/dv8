@@ -33,7 +33,7 @@ using dv8::builtins::Buffer;
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onCheck", EventLoop::OnCheck);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", EventLoop::UnRef);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ref", EventLoop::Ref);
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listHandles", EventLoop::ListHandles);
+    DV8_SET_METHOD(isolate, tpl, "listHandles", EventLoop::ListHandles);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "shutdown", EventLoop::Shutdown);
 
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_RUN_DEFAULT), "UV_RUN_DEFAULT", tpl);
@@ -147,7 +147,7 @@ using dv8::builtins::Buffer;
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
+		//EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
 		size_t len = b->_length;
 		uint8_t *work = (uint8_t *)b->_data;

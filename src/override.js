@@ -1,6 +1,6 @@
-// functions
+const dv8 = global.dv8
 
-// Buffer methods
+// Buffer static methods
 function alloc (size, shared) {
   const buf = Buffer.create()
   buf.bytes = shared ? buf.allocShared(size) : buf.alloc(size)
@@ -111,6 +111,29 @@ function wrapEnv (env) {
     return env()
       .map(entry => entry.split('='))
       .reduce((e, pair) => { e[pair[0]] = pair[1]; return e }, {})
+  }
+}
+
+function wrapListHandles (listHandles) {
+  const buf = Buffer.alloc(16384)
+  return () => {
+    listHandles(buf)
+    const bytes = new Uint8Array(buf.bytes)
+    let off = 0
+    const handles = []
+    while (1) {
+      const active = bytes[off]
+      if (active === 255) break
+      const len = bytes[off + 1]
+      if (len > 0) {
+        const type = buf.read(off + 2, len)
+        handles.push({ active, type })
+      } else {
+        handles.push({ active, type: 'unknown' })
+      }
+      off += (2 + len)
+    }
+    return handles
   }
 }
 
@@ -281,7 +304,6 @@ function requireModule () {
     const exports = {}
     module = { exports, dirName, fileName }
     module.text = (readFile(fileName)).text
-    dv8.print(fileName)
     const fun = compile(module.text, fileName, params, [])
     module.function = fun
     const spawn = (fn, cb = () => {}, opts = { dirName: module.dirName }) => {
@@ -300,12 +322,12 @@ function requireModule () {
 function replModule () {
   let stdin
   let stdout
-  const { runScript, print, library } = dv8
+  const { runScript, print, library, tty } = dv8
 
   function repl () {
     if (!stdin) stdin = new (library('tty').TTY)(0)
     if (!stdout) stdout = new (library('tty').TTY)(1)
-    const { UV_TTY_MODE_NORMAL } = dv8.tty
+    const { UV_TTY_MODE_NORMAL } = tty
     const BUFFER_SIZE = 64 * 1024
     const MAX_BUFFER = 4 * BUFFER_SIZE
     const buf = Buffer.alloc(BUFFER_SIZE)
@@ -342,21 +364,26 @@ function replModule () {
 // main entrypoint
 function main (args) {
   dv8.library = wrapLibrary(dv8.library)
-  const { workerSource, workerName, runScript } = dv8
+  const { workerSource, workerName, runScript, memoryUsage, env, library } = dv8
+  // load JS modules
   const { require } = requireModule()
   const { repl } = replModule()
-  const { Process } = dv8.library('process')
-  const { EventLoop } = dv8.library('loop')
+  // load required native libs
+  const { Process } = library('process')
+  const { EventLoop } = library('loop')
+  // static methods on Process class
   const { pid, cpuUsage, hrtime, heapUsage, runMicroTasks } = Process
 
   Error.stackTraceLimit = 1000
+
   Buffer.alloc = alloc
   Buffer.fromString = fromString
   Buffer.fromArrayBuffer = fromArrayBuffer
 
+  // wrap native functions
   dv8.pid = () => pid()
-  dv8.env = wrapEnv(dv8.env)
-  dv8.memoryUsage = wrapMemoryUsage(dv8.memoryUsage)
+  dv8.env = wrapEnv(env)
+  dv8.memoryUsage = wrapMemoryUsage(memoryUsage)
   dv8.cpuUsage = wrapCpuUsage(cpuUsage)
   dv8.hrtime = wrapHrtime(hrtime)
   dv8.heapUsage = wrapHeapUsage(heapUsage)
@@ -364,16 +391,19 @@ function main (args) {
   dv8.repl = repl
   dv8.runMicroTasks = runMicroTasks
   dv8.readFile = readFile
+  dv8.listHandles = wrapListHandles(EventLoop.listHandles)
 
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout
   global.setInterval = setInterval
 
+  // remove things we don't want in the global namespace
   delete global.eval // eslint-disable-line
   delete global.WebAssembly
   delete global.send // todo - we need this for inspector
   delete global.console
 
+  // if workerSource is set we are in a thread
   if (workerSource) {
     const start = workerSource.indexOf('{') + 1
     const end = workerSource.lastIndexOf('}')

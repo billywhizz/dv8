@@ -39,7 +39,6 @@ using dv8::builtins::Buffer;
 	}
 
 	void File::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-		delete file;
 		#if TRACE
 		fprintf(stderr, "File::Destroy\n");
 		#endif
