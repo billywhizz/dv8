@@ -31,6 +31,8 @@ using dv8::builtins::Buffer;
     DV8_SET_METHOD(isolate, tpl, "shutdown", EventLoop::Shutdown);
 
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "reset", EventLoop::Reset);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ref", EventLoop::Ref);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", EventLoop::UnRef);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onIdle", EventLoop::OnIdle);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onPrepare", EventLoop::OnPrepare);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onCheck", EventLoop::OnCheck);
@@ -197,7 +199,29 @@ using dv8::builtins::Buffer;
 		int ok = uv_loop_close(env->loop);
 		args.GetReturnValue().Set(Integer::New(isolate, ok));
 	}
-	
+
+	void EventLoop::Ref(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
+		uv_ref((uv_handle_t*)obj->idle_handle);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void EventLoop::UnRef(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		EventLoop* obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
+		uv_unref((uv_handle_t*)obj->idle_handle);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
 	void EventLoop::Reset(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();

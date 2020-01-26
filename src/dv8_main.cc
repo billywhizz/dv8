@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     isolate->AddGCPrologueCallback(dv8::beforeGCCallback);
     isolate->AddGCEpilogueCallback(dv8::afterGCCallback);
     isolate->AddMicrotasksCompletedCallback(dv8::microTasksCallback);
-    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kAuto);
+    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kExplicit);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);
@@ -72,15 +72,26 @@ int main(int argc, char *argv[]) {
       }
     }
     v8::platform::PumpMessageLoop(platform.get(), isolate);
-    uv_tty_reset_mode();
-    int r = uv_loop_close(uv_default_loop());
-    if (r != 0) {
-      //fprintf(stderr, "uv_loop_close: %i\n", r);
+    v8::Local<v8::Value> func = globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "onExit", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+    if (func->IsFunction()) {
+      v8::Local<v8::Function> onExit = v8::Local<v8::Function>::Cast(func);
+      v8::Local<v8::Value> argv[0] = { };
+      v8::TryCatch try_catch(isolate);
+      onExit->Call(context, globalInstance, 0, argv);
+      if (try_catch.HasCaught()) {
+        dv8::ReportException(isolate, &try_catch);
+      }
+      v8::platform::PumpMessageLoop(platform.get(), isolate);
     }
     const double kLongIdlePauseInSeconds = 1.0;
     isolate->ContextDisposedNotification();
     isolate->IdleNotificationDeadline(platform->MonotonicallyIncreasingTime() + kLongIdlePauseInSeconds);
     isolate->LowMemoryNotification();
+    uv_tty_reset_mode();
+    //int r = uv_loop_close(uv_default_loop());
+    //if (r != 0) {
+      //fprintf(stderr, "uv_loop_close: (%i) %s\n", r, uv_strerror(r));
+    //}
   }
   isolate->Dispose();
   delete env;

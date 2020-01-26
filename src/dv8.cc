@@ -77,6 +77,46 @@ void CompileScript(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(fn);
 }
 
+void RunModule(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+  v8::TryCatch try_catch(isolate);
+  Local<String> source = args[0].As<String>();
+  Local<String> path = args[1].As<String>();
+  v8::ScriptOrigin baseorigin(path, // resource name
+    v8::Integer::New(isolate, 0), // line offset
+    v8::Integer::New(isolate, 0),  // column offset
+    v8::False(isolate), // is shared cross-origin
+    v8::Local<v8::Integer>(),  // script id
+    v8::Local<v8::Value>(), // source map url
+    v8::False(isolate), // is opaque
+    v8::False(isolate), // is wasm
+    v8::True(isolate)); // is module
+  v8::Local<v8::Module> module;
+  v8::ScriptCompiler::Source basescript(source, baseorigin);
+  if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
+    dv8::PrintStackTrace(isolate, try_catch);
+    return;
+  }
+  v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
+  if (!ok.ToChecked()) {
+    if (try_catch.HasCaught()) {
+      dv8::PrintStackTrace(isolate, try_catch);
+    }
+    return;
+  }
+  v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
+  if (result.IsEmpty()) {
+    if (try_catch.HasCaught()) {
+      dv8::PrintStackTrace(isolate, try_catch);
+      return;
+    }
+  }
+  args.GetReturnValue().Set(result.ToLocalChecked());
+}
+
 void RunScript(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
@@ -122,7 +162,7 @@ void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch) {
   v8::Local<v8::Context> context = isolate->GetCurrentContext();
   int linenum = message->GetLineNumber(context).FromJust();
   fprintf(stderr, "%s in %s on line %i\n", *ex, *scriptname, linenum);
-  fprintf(stderr, "frames: %i\n", stack->GetFrameCount());
+  //fprintf(stderr, "frames: %i\n", stack->GetFrameCount());
   for (int i = 0; i < stack->GetFrameCount(); i++) {
     v8::Local<v8::StackFrame> stack_frame = stack->GetFrame(isolate, i);
     v8::Local<v8::String> functionName = stack_frame->GetFunctionName();
@@ -434,7 +474,28 @@ void HRTime(const FunctionCallbackInfo<Value> &args) {
 
 void RunMicroTasks(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
-  isolate->RunMicrotasks();
+  v8::MicrotasksScope::PerformCheckpoint(isolate);
+  //isolate->RunMicrotasks();
+}
+
+void EnqueueMicrotask(const FunctionCallbackInfo<Value>& args) {
+  Isolate *isolate = args.GetIsolate();
+  isolate->EnqueueMicrotask(args[0].As<Function>());
+}
+
+void Cwd(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  char* cwd = (char*)calloc(1, PATH_MAX);
+  size_t size;
+  int r = uv_cwd(cwd, &size);
+  if (r == UV_ENOBUFS) {
+    free(cwd);
+    cwd = (char*)calloc(1, size);
+    r = uv_cwd(cwd, &size);
+  }
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, cwd, NewStringType::kNormal).ToLocalChecked());
+  free(cwd);
 }
 
 Local<Context> CreateContext(Isolate *isolate) {
@@ -446,12 +507,15 @@ Local<Context> CreateContext(Isolate *isolate) {
   dv8->Set(String::NewFromUtf8(isolate, "library", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, LoadModule));
   dv8->Set(String::NewFromUtf8(isolate, "env", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnvVars));
   dv8->Set(String::NewFromUtf8(isolate, "runScript", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunScript));
+  dv8->Set(String::NewFromUtf8(isolate, "runModule", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunModule));
   dv8->Set(String::NewFromUtf8(isolate, "compile", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CompileScript));
   dv8->Set(String::NewFromUtf8(isolate, "pid", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, PID));
   dv8->Set(String::NewFromUtf8(isolate, "cpuUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, CPUUsage));
   dv8->Set(String::NewFromUtf8(isolate, "hrtime", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, HRTime));
   dv8->Set(String::NewFromUtf8(isolate, "heapUsage", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, HeapSpaceUsage));
+  dv8->Set(String::NewFromUtf8(isolate, "cwd", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Cwd));
   dv8->Set(String::NewFromUtf8(isolate, "runMicroTasks", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunMicroTasks));
+  dv8->Set(String::NewFromUtf8(isolate, "enqueueMicroTask", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnqueueMicrotask));
   global->Set(String::NewFromUtf8(isolate, "dv8", NewStringType::kNormal).ToLocalChecked(), dv8);
   Local<Context> context = Context::New(isolate, NULL, global);
   context->AllowCodeGenerationFromStrings(false);

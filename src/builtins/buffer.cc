@@ -317,7 +317,7 @@ void Buffer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   ObjectWrap *wrap = data.GetParameter();
   Buffer* b = static_cast<Buffer *>(wrap);
   if (!b->_free) {
-    free(b->_data);
+    //free(b->_data);
     b->_free = true;
   }
   #if TRACE

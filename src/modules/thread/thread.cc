@@ -29,7 +29,7 @@ void start_context(void *data)
     isolate->AddGCPrologueCallback(dv8::beforeGCCallback);
     isolate->AddGCEpilogueCallback(dv8::afterGCCallback);
     isolate->AddMicrotasksCompletedCallback(dv8::microTasksCallback);
-    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kAuto);
+    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kExplicit);
 		v8::Isolate::Scope isolate_scope(isolate);
 		v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);
@@ -96,6 +96,16 @@ void start_context(void *data)
 				return;
 			}
 		}
+    const double kLongIdlePauseInSeconds = 1.0;
+    isolate->ContextDisposedNotification();
+    isolate->LowMemoryNotification();
+    uv_tty_reset_mode();
+/*
+    int r = uv_loop_close(loop);
+    if (r != 0) {
+      fprintf(stderr, "thread uv_loop_close: %i\n", r);
+    }
+*/
 	}
 	isolate->Dispose();
 	delete create_params.array_buffer_allocator;
@@ -190,8 +200,11 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
 	obj->handle = th;
 	th->length = 0;
+	th->fd = 0;
 	if (argc > 2) {
-		th->fd = args[2]->Uint32Value(context).ToChecked();
+		if (!args[2].IsEmpty()) {
+			th->fd = args[2]->Uint32Value(context).ToChecked();
+		}
 	}
 	if (argc > 3) {
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[3].As<v8::Object>());

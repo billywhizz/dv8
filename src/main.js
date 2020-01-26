@@ -31,7 +31,10 @@ function setInterval (fn, repeat) {
 
 function setTimeout (fn, repeat) {
   const timer = new (dv8.library('timer').Timer)()
-  timer.start(fn, repeat)
+  timer.start(() => {
+    timer.close()
+    fn()
+  }, repeat)
   return timer
 }
 
@@ -144,12 +147,9 @@ function readFile (path) {
   const BUFSIZE = 4096
   const buf = Buffer.alloc(BUFSIZE)
   const parts = []
-
   file.setup(buf, buf)
   file.fd = file.open(path, O_RDONLY)
-  if (file.fd < 0) {
-    throw new Error(`Error opening ${path}: ${file.fd}`)
-  }
+  if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
   file.size = 0
   let len = file.read(BUFSIZE, file.size)
   while (len > 0) {
@@ -157,13 +157,31 @@ function readFile (path) {
     parts.push(buf.read(0, len))
     len = file.read(BUFSIZE, file.size)
   }
-  if (len < 0) {
-    throw new Error(`Error reading ${path}: ${len}`)
-  }
+  if (len < 0) throw new Error(`Error reading ${path}: ${len}`)
   file.close()
   file.text = parts.join('')
-
   return file
+}
+
+function wrapNextTick (loop) {
+  const queue = []
+  let ticks = 0
+  let idleActive = false
+  return (fn) => {
+    queue.push(fn)
+    if (idleActive) return
+    loop.onIdle(() => {
+      ticks++
+      let len = queue.length
+      while (len--) queue.shift()()
+      if (!queue.length) {
+        idleActive = false
+        loop.onIdle()
+      }
+    })
+    loop.ref() // ensure we run
+    idleActive = true
+  }
 }
 
 // Local Modules
@@ -322,11 +340,12 @@ function requireModule () {
 function replModule () {
   let stdin
   let stdout
-  const { runScript, print, library, tty } = dv8
+  const { runScript, print, library } = dv8
+  const tty = library('tty')
 
   function repl () {
-    if (!stdin) stdin = new (library('tty').TTY)(0)
-    if (!stdout) stdout = new (library('tty').TTY)(1)
+    if (!stdin) stdin = new tty.TTY(0)
+    if (!stdout) stdout = new tty.TTY(1)
     const { UV_TTY_MODE_NORMAL } = tty
     const BUFFER_SIZE = 64 * 1024
     const MAX_BUFFER = 4 * BUFFER_SIZE
@@ -364,7 +383,7 @@ function replModule () {
 // main entrypoint
 function main (args) {
   dv8.library = wrapLibrary(dv8.library)
-  const { workerSource, workerName, runScript, memoryUsage, env, library, hrtime, cpuUsage, heapUsage, runMicroTasks } = dv8
+  const { workerSource, workerName, runModule, memoryUsage, env, library, hrtime, cpuUsage, heapUsage, runMicroTasks } = dv8
   // load JS modules
   const { require } = requireModule()
   const { repl } = replModule()
@@ -388,6 +407,7 @@ function main (args) {
   dv8.runMicroTasks = runMicroTasks
   dv8.readFile = readFile
   dv8.listHandles = wrapListHandles(EventLoop.listHandles)
+  dv8.nextTick = wrapNextTick(new EventLoop())
 
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout
@@ -395,9 +415,9 @@ function main (args) {
 
   // remove things we don't want in the global namespace
   delete global.eval // eslint-disable-line
-  delete global.WebAssembly
-  delete global.send // todo - we need this for inspector
-  delete global.console
+  //delete global.WebAssembly
+  //delete global.send // todo - we need this for inspector
+  //delete global.console
 
   // if workerSource is set we are in a thread
   if (workerSource) {
@@ -405,17 +425,21 @@ function main (args) {
     const end = workerSource.lastIndexOf('}')
     delete dv8.workerSource
     delete dv8.workerName
-    runScript(workerSource.slice(start, end), workerName)
+    runModule(workerSource.slice(start, end), workerName)
   } else if (args.length > 1) {
     if (args[1] === '-e' && args.length > 2) {
-      runScript(args[2], 'eval')
+      runModule(args[2], 'eval')
     } else {
-      runScript(readFile(args[1]).text, args[1]) // todo: check valid path name - stat file first?
+      runModule(readFile(args[1]).text, args[1]) // todo: check valid path name - stat file first?
     }
   } else {
     repl()
   }
-  EventLoop.run()
+  while (EventLoop.isAlive()) {
+    EventLoop.run(1)
+    runMicroTasks()
+  }
+  runMicroTasks()
 }
 
 main(dv8.args)
