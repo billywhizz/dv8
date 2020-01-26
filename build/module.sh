@@ -14,6 +14,7 @@ export UV_DEPS=$DEPS/uv
 export BUILTINS=$SRC/builtins
 export MODULES=$SRC/modules
 export MODULE_DIR=$MODULES/$MODULE_NAME
+export SSL_PREFIX=/usr/lib/x86_64-linux-gnu
 export CC="ccache g++"
 
 if [[ "$CONFIG" == "release" ]]; then
@@ -24,6 +25,8 @@ fi
 if [[ "$MODULE_NAME" == "httpParser" ]]; then
     export LDFLAGS="-shared -pthread -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group ./http_parser.o ./$MODULE_NAME.o -lz -Wl,--end-group"
     $CC -DHTTP_PARSER_STRICT=0 $CCFLAGS -c -o http_parser.o $MODULE_DIR/http_parser.c
+elif [[ "$MODULE_NAME" == "openssl" ]]; then
+    export LDFLAGS="-shared -pthread -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group $SSL_PREFIX/libssl.a $SSL_PREFIX/libcrypto.a ./$MODULE_NAME.o -lz -Wl,--end-group"
 else
     export LDFLAGS="-shared -pthread -m64 -Wl,-soname=$MODULE_NAME.so -o ./$MODULE_NAME.so -Wl,--start-group ./$MODULE_NAME.o -lz -Wl,--end-group"
 fi
@@ -38,3 +41,8 @@ if [[ "$CONFIG" == "release" ]]; then
     strip ./$MODULE_NAME.so
 fi
 cp -f ./$MODULE_NAME.so $OUT/lib/$MODULE_NAME.so
+rm ./$MODULE_NAME.so
+rm ./$MODULE_NAME.o
+if [[ "$MODULE_NAME" == "httpParser" ]]; then
+    rm ./http_parser.o
+fi

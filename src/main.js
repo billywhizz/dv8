@@ -45,10 +45,14 @@ function clearTimeout (timer) {
 
 // Wrappers for C++ builtins
 function wrapLibrary (library) {
-  return name => {
+  return (name, override) => {
     if (!dv8[name]) {
       dv8[name] = {}
-      library(name, dv8[name])
+      if (override) {
+        library(name, dv8[name], override)
+      } else {
+        library(name, dv8[name])
+      }
     }
     return dv8[name]
   }
@@ -417,7 +421,7 @@ function main (args) {
   delete global.eval // eslint-disable-line
   //delete global.WebAssembly
   //delete global.send // todo - we need this for inspector
-  //delete global.console
+  delete global.console
 
   // if workerSource is set we are in a thread
   if (workerSource) {

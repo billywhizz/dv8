@@ -11,18 +11,7 @@
 #include <buffer.h>
 #include <env.h>
 #include <string.h>
-
-#include <modules/loop/loop.h>
-#include <modules/timer/timer.h>
-#include <modules/thread/thread.h>
-#include <modules/process/process.h>
-#include <modules/tty/tty.h>
-#include <modules/os/os.h>
-#include <modules/fs/fs.h>
-#include <modules/socket/socket.h>
-#include <modules/udp/udp.h>
-#include <modules/libz/libz.h>
-#include <modules/openssl/openssl.h>
+#include <modules.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
@@ -78,8 +67,6 @@ using v8_inspector::V8ContextInfo;
 using v8_inspector::V8InspectorSession;
 using v8_inspector::V8Inspector;
 using v8::Platform;
-
-using InitializerCallback = void (*)(Local<Object> exports);
 
 class InspectorFrontend final : public V8Inspector::Channel {
  public:
@@ -208,15 +195,12 @@ typedef struct {
   uint32_t fd;    // id of the context
 } write_req_t;
 
-typedef void *(*register_plugin)();
-
 void PromiseRejectCallback(PromiseRejectMessage message);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
 Local<Context> CreateContext(Isolate *isolate);
 // Global Functions
 void Print(const FunctionCallbackInfo<Value> &args);
 void Version(const FunctionCallbackInfo<Value> &args);
-void LoadModule(const FunctionCallbackInfo<Value> &args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
 void shutdown(uv_loop_t *loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
