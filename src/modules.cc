@@ -3,40 +3,26 @@
 namespace dv8 {
 
 inline void initLibrary(Local<Object> exports, const char* module_name) {
-  if (strcmp("loop", module_name) == 0) {
-    dv8::loop::InitAll(exports);
-    return;
-  } else if (strcmp("socket", module_name) == 0) {
-    dv8::socket::InitAll(exports);
-    return;
-  } else if (strcmp("timer", module_name) == 0) {
-    dv8::timer::InitAll(exports);
-    return;
-  } else if (strcmp("zlib", module_name) == 0) {
-    dv8::libz::InitAll(exports);
-    return;
-  } else if (strcmp("thread", module_name) == 0) {
-    dv8::thread::InitAll(exports);
-    return;
-  } else if (strcmp("fs", module_name) == 0) {
-    dv8::fs::InitAll(exports);
-    return;
-  } else if (strcmp("udp", module_name) == 0) {
-    dv8::udp::InitAll(exports);
-    return;
-  } else if (strcmp("process", module_name) == 0) {
-    dv8::process::InitAll(exports);
-    return;
-  } else if (strcmp("tty", module_name) == 0) {
-    dv8::tty::InitAll(exports);
-    return;
-  } else if (strcmp("openssl", module_name) == 0) {
-    dv8::openssl::InitAll(exports);
-    return;
-  } else if (strcmp("os", module_name) == 0) {
-    dv8::os::InitAll(exports);
-    return;
-  }
+  if (strcmp("fs", module_name) == 0) {
+dv8::fs::InitAll(exports);
+return;
+}
+if (strcmp("loop", module_name) == 0) {
+dv8::loop::InitAll(exports);
+return;
+}
+if (strcmp("timer", module_name) == 0) {
+dv8::timer::InitAll(exports);
+return;
+}
+if (strcmp("process", module_name) == 0) {
+dv8::process::InitAll(exports);
+return;
+}
+if (strcmp("tty", module_name) == 0) {
+dv8::tty::InitAll(exports);
+return;
+}
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {
@@ -71,7 +57,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     success = uv_dlopen(NULL, &lib);
   }
   if (success != 0) {
-    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlopen failed").ToLocalChecked()));
+    isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "uv_dlopen failed").ToLocalChecked()));
     return;
   }
   char register_name[128];
@@ -79,7 +65,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
   void *address;
   success = uv_dlsym(&lib, register_name, &address);
   if (success != 0) {
-    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlsym failed").ToLocalChecked()));
+    isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "uv_dlsym failed").ToLocalChecked()));
     return;
   }
   register_plugin _init = reinterpret_cast<register_plugin>(address);

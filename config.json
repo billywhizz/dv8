@@ -1,0 +1,13 @@
+{
+  "CC": "ccache g++",
+  "deps": "./deps",
+  "src": "./src",
+  "build": "./build",
+  "target": "release",
+  "sslPrefix": "/usr/lib/x86_64-linux-gnu",
+  "overrideOFF": {
+    "path": "src/min.js"
+  },
+  "modules": ["fs", "loop", "timer", "process", "tty"],
+  "all": ["loop", "timer", "fs", "process", "tty", "libz", "openssl", "os", "socket", "thread", "udp"]
+}

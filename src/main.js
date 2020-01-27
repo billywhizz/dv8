@@ -310,14 +310,12 @@ function pathModule () {
 function requireModule () {
   let pathMod
   const cache = {}
-  let process
-  const { compile, library } = dv8
+  const { compile } = dv8
 
   function require (path, parent) {
-    if (!process) process = new (library('process').Process)()
     if (!pathMod) pathMod = pathModule()
     const { join, baseName } = pathMod
-    let dirName = parent ? parent.dirName : dv8.process.Process.cwd()
+    let dirName = parent ? parent.dirName : dv8.cwd()
     const fileName = join(dirName, path)
     dirName = baseName(fileName)
     let module = cache[fileName]
