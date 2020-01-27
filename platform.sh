@@ -24,16 +24,22 @@ fi
 export CC="ccache g++"
 $CC $CCFLAGS -c -o $DV8_OUT/buffer.o $DV8_SRC/builtins/buffer.cc
 $CC $CCFLAGS -c -o $DV8_OUT/env.o $DV8_SRC/builtins/env.cc
-$CC $CCFLAGS -I$DV8_SRC/modules/fs -c -o $DV8_OUT/fs.o $DV8_SRC/modules/fs/fs.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/loop -c -o $DV8_OUT/loop.o $DV8_SRC/modules/loop/loop.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/timer -c -o $DV8_OUT/timer.o $DV8_SRC/modules/timer/timer.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/fs -c -o $DV8_OUT/fs.o $DV8_SRC/modules/fs/fs.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/process -c -o $DV8_OUT/process.o $DV8_SRC/modules/process/process.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/tty -c -o $DV8_OUT/tty.o $DV8_SRC/modules/tty/tty.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/libz -c -o $DV8_OUT/libz.o $DV8_SRC/modules/libz/libz.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/openssl -c -o $DV8_OUT/openssl.o $DV8_SRC/modules/openssl/openssl.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/os -c -o $DV8_OUT/os.o $DV8_SRC/modules/os/os.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/socket -c -o $DV8_OUT/socket.o $DV8_SRC/modules/socket/socket.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/thread -c -o $DV8_OUT/thread.o $DV8_SRC/modules/thread/thread.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/udp -c -o $DV8_OUT/udp.o $DV8_SRC/modules/udp/udp.cc
 $CC $CCFLAGS -c -o $DV8_OUT/modules.o $DV8_SRC/modules.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8main.o $DV8_SRC/dv8_main.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8.o $DV8_SRC/dv8.cc
 rm -f $DV8_OUT/dv8.a
-ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o $DV8_OUT/fs.o $DV8_OUT/loop.o $DV8_OUT/timer.o $DV8_OUT/process.o $DV8_OUT/tty.o
+ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o $DV8_OUT/loop.o $DV8_OUT/timer.o $DV8_OUT/fs.o $DV8_OUT/process.o $DV8_OUT/tty.o $DV8_OUT/libz.o $DV8_OUT/openssl.o $DV8_OUT/os.o $DV8_OUT/socket.o $DV8_OUT/thread.o $DV8_OUT/udp.o
 $CC -static $LDFLAGS -s -o out/bin/dv8
 rm -f $DV8_OUT/*.a
 rm -f $DV8_OUT/*.o

@@ -3,16 +3,16 @@
 namespace dv8 {
 
 inline void initLibrary(Local<Object> exports, const char* module_name) {
-  if (strcmp("fs", module_name) == 0) {
-dv8::fs::InitAll(exports);
-return;
-}
-if (strcmp("loop", module_name) == 0) {
+  if (strcmp("loop", module_name) == 0) {
 dv8::loop::InitAll(exports);
 return;
 }
 if (strcmp("timer", module_name) == 0) {
 dv8::timer::InitAll(exports);
+return;
+}
+if (strcmp("fs", module_name) == 0) {
+dv8::fs::InitAll(exports);
 return;
 }
 if (strcmp("process", module_name) == 0) {
@@ -21,6 +21,30 @@ return;
 }
 if (strcmp("tty", module_name) == 0) {
 dv8::tty::InitAll(exports);
+return;
+}
+if (strcmp("libz", module_name) == 0) {
+dv8::libz::InitAll(exports);
+return;
+}
+if (strcmp("openssl", module_name) == 0) {
+dv8::openssl::InitAll(exports);
+return;
+}
+if (strcmp("os", module_name) == 0) {
+dv8::os::InitAll(exports);
+return;
+}
+if (strcmp("socket", module_name) == 0) {
+dv8::socket::InitAll(exports);
+return;
+}
+if (strcmp("thread", module_name) == 0) {
+dv8::thread::InitAll(exports);
+return;
+}
+if (strcmp("udp", module_name) == 0) {
+dv8::udp::InitAll(exports);
 return;
 }
 }
