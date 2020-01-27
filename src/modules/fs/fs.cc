@@ -39,10 +39,6 @@ using dv8::builtins::Buffer;
 	}
 
 	void File::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-		Isolate *isolate = data.GetIsolate();
-		v8::HandleScope handleScope(isolate);
-		ObjectWrap *wrap = data.GetParameter();
-		File* sock = static_cast<File *>(wrap);
 		#if TRACE
 		fprintf(stderr, "File::Destroy\n");
 		#endif
@@ -153,33 +149,33 @@ using dv8::builtins::Buffer;
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		// Sync Methods
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unlink", FileSystem::Unlink);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "mkdir", FileSystem::Mkdir);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "fstat", FileSystem::FStat);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "rename", FileSystem::Rename);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "fsync", FileSystem::FSync);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ftruncate", FileSystem::FTruncate);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "copy", FileSystem::Copy);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "sendfile", FileSystem::SendFile);
+		DV8_SET_METHOD(isolate, tpl, "unlink", FileSystem::Unlink);
+		DV8_SET_METHOD(isolate, tpl, "mkdir", FileSystem::Mkdir);
+		DV8_SET_METHOD(isolate, tpl, "fstat", FileSystem::FStat);
+		DV8_SET_METHOD(isolate, tpl, "rename", FileSystem::Rename);
+		DV8_SET_METHOD(isolate, tpl, "fsync", FileSystem::FSync);
+		DV8_SET_METHOD(isolate, tpl, "ftruncate", FileSystem::FTruncate);
+		DV8_SET_METHOD(isolate, tpl, "copy", FileSystem::Copy);
+		DV8_SET_METHOD(isolate, tpl, "sendfile", FileSystem::SendFile);
 	
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_RDONLY), "O_RDONLY", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_WRONLY), "O_WRONLY", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_RDWR), "O_RDWR", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_APPEND), "O_APPEND", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_CLOEXEC), "O_CLOEXEC", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_CREAT), "O_CREAT", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_TRUNC), "O_TRUNC", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, O_EXCL), "O_EXCL", exports);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_RDONLY), "O_RDONLY", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_WRONLY), "O_WRONLY", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_RDWR), "O_RDWR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_APPEND), "O_APPEND", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_CLOEXEC), "O_CLOEXEC", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_CREAT), "O_CREAT", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_TRUNC), "O_TRUNC", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_EXCL), "O_EXCL", tpl);
 
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IRUSR), "S_IRUSR", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IWUSR), "S_IWUSR", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IXUSR), "S_IXUSR", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IRGRP), "S_IRGRP", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IWGRP), "S_IWGRP", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IXGRP), "S_IXGRP", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IROTH), "S_IROTH", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IWOTH), "S_IWOTH", exports);
-		DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, S_IXOTH), "S_IXOTH", exports);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRUSR), "S_IRUSR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWUSR), "S_IWUSR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXUSR), "S_IXUSR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRGRP), "S_IRGRP", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWGRP), "S_IWGRP", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXGRP), "S_IXGRP", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IROTH), "S_IROTH", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWOTH), "S_IWOTH", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXOTH), "S_IXOTH", tpl);
 
 /*
 
@@ -300,7 +296,6 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -310,7 +305,6 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -320,7 +314,6 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -330,7 +323,6 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -340,7 +332,6 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -350,7 +341,6 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -360,7 +350,6 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -370,10 +359,8 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		FileSystem* obj = ObjectWrap::Unwrap<FileSystem>(args.Holder());
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
-
 
 }
 }

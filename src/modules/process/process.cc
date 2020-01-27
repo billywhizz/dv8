@@ -16,19 +16,15 @@ void Process::Init(Local<Object> exports) {
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
   tpl->SetClassName(String::NewFromUtf8(isolate, "Process").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pid", Process::PID);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "memoryUsage", Process::MemoryUsage);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "heapUsage", Process::HeapSpaceUsage);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cpuUsage", Process::CPUUsage);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hrtime", Process::HRTime);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "sleep", Process::Sleep);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "cwd", Process::Cwd);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "usleep", Process::USleep);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "nanosleep", Process::NanoSleep);
-  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "runMicroTasks", Process::RunMicroTasks);
-
+  DV8_SET_METHOD(isolate, tpl, "pid", Process::PID);
+  DV8_SET_METHOD(isolate, tpl, "memoryUsage", Process::MemoryUsage);
+  DV8_SET_METHOD(isolate, tpl, "heapUsage", Process::HeapSpaceUsage);
+  DV8_SET_METHOD(isolate, tpl, "cpuUsage", Process::CPUUsage);
+  DV8_SET_METHOD(isolate, tpl, "hrtime", Process::HRTime);
+  DV8_SET_METHOD(isolate, tpl, "sleep", Process::Sleep);
   DV8_SET_METHOD(isolate, tpl, "cwd", Process::Cwd);
-
+  DV8_SET_METHOD(isolate, tpl, "usleep", Process::USleep);
+  DV8_SET_METHOD(isolate, tpl, "nanosleep", Process::NanoSleep);
   // spawn, kill, getTitle, setTitle, rss, uptime, rusage, ppid, interfaces, loadavg, exepath, cwd, chdir, homedir, tmpdir, passwd, memory, handles, hostname, getPriority, setPriority 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "spawn", Process::Spawn);
   DV8_SET_EXPORT(isolate, tpl, "Process", exports);
@@ -89,11 +85,6 @@ void Process::HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
     heaps->Set(context, String::NewFromUtf8(isolate, s.space_name(), v8::NewStringType::kNormal).ToLocalChecked(), array);
   }
   args.GetReturnValue().Set(o);
-}
-
-void Process::RunMicroTasks(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
-  isolate->RunMicrotasks();
 }
 
 void Process::Sleep(const FunctionCallbackInfo<Value> &args) {

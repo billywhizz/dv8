@@ -54,7 +54,6 @@ private:
   static void Cwd(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void USleep(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void NanoSleep(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static void RunMicroTasks(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Spawn(const v8::FunctionCallbackInfo<v8::Value> &args);
 };
 

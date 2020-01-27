@@ -32,7 +32,9 @@ typedef struct
 	size_t size;
 	char* source;
 	char* name;
-	js_error error;
+	int fd;
+	int argc;
+	char** argv;
 	uv_async_t *async;
 	uv_thread_t tid;
 } thread_handle;

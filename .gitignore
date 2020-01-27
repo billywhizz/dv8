@@ -1,13 +1,7 @@
 .vscode
-app/.ash_history
-app/core
-app/count
-app/*.sh
 *.o
 *.so
-build/dv8
 *.ods
-build/count
 *.gz
 *.a
 scratch
@@ -17,4 +11,3 @@ deps/v8/gen
 deps/v8/out.gn
 .ccache
 src/backup.js
-src/main.min.js

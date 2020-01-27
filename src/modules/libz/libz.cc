@@ -36,41 +36,41 @@ using dv8::builtins::Buffer;
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", ZLib::Write);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "end", ZLib::End);
 
-    DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, ZLIB_VERSION).ToLocalChecked(), "ZLIB_VERSION", exports);
+    DV8_SET_CONSTANT(isolate, String::NewFromUtf8(isolate, ZLIB_VERSION).ToLocalChecked(), "ZLIB_VERSION", tpl);
 		// mode
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, NONE), "ZLIB_MODE_NONE", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, DEFLATE), "ZLIB_MODE_DEFLATE", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, INFLATE), "ZLIB_MODE_INFLATE", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, GZIP), "ZLIB_MODE_GZIP", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, GUNZIP), "ZLIB_MODE_GUNZIP", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, DEFLATERAW), "ZLIB_MODE_DEFLATERAW", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, INFLATERAW), "ZLIB_MODE_INFLATERAW", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNZIP), "ZLIB_MODE_UNZIP", exports);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, NONE), "ZLIB_MODE_NONE", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, DEFLATE), "ZLIB_MODE_DEFLATE", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, INFLATE), "ZLIB_MODE_INFLATE", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, GZIP), "ZLIB_MODE_GZIP", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, GUNZIP), "ZLIB_MODE_GUNZIP", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, DEFLATERAW), "ZLIB_MODE_DEFLATERAW", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, INFLATERAW), "ZLIB_MODE_INFLATERAW", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, UNZIP), "ZLIB_MODE_UNZIP", tpl);
 	
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_NO_FLUSH), "Z_NO_FLUSH", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_PARTIAL_FLUSH), "Z_PARTIAL_FLUSH", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_SYNC_FLUSH), "Z_SYNC_FLUSH", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_FULL_FLUSH), "Z_FULL_FLUSH", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_FINISH), "Z_FINISH", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_BLOCK), "Z_BLOCK", exports);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_NO_FLUSH), "Z_NO_FLUSH", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_PARTIAL_FLUSH), "Z_PARTIAL_FLUSH", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_SYNC_FLUSH), "Z_SYNC_FLUSH", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_FULL_FLUSH), "Z_FULL_FLUSH", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_FINISH), "Z_FINISH", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_BLOCK), "Z_BLOCK", tpl);
 
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_DEFAULT_COMPRESSION), "Z_DEFAULT_COMPRESSION", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_BEST_COMPRESSION), "Z_BEST_COMPRESSION", exports);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_DEFAULT_COMPRESSION), "Z_DEFAULT_COMPRESSION", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_BEST_COMPRESSION), "Z_BEST_COMPRESSION", tpl);
 
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_BUF_ERROR), "Z_BUF_ERROR", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_OK), "Z_OK", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_STREAM_END), "Z_STREAM_END", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_NEED_DICT), "Z_NEED_DICT", exports);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_BUF_ERROR), "Z_BUF_ERROR", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_OK), "Z_OK", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_STREAM_END), "Z_STREAM_END", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_NEED_DICT), "Z_NEED_DICT", tpl);
 
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_MAX_WINDOWBITS), "Z_MAX_WINDOWBITS", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_MIN_WINDOWBITS), "Z_MIN_WINDOWBITS", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_MIN_MEMLEVEL), "Z_MIN_MEMLEVEL", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_MAX_MEMLEVEL), "Z_MAX_WINDOWBITS", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_FILTERED), "Z_FILTERED", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_RLE), "Z_RLE", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_HUFFMAN_ONLY), "Z_HUFFMAN_ONLY", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_FIXED), "Z_FIXED", exports);
-    DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, Z_DEFAULT_STRATEGY), "Z_DEFAULT_STRATEGY", exports);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_MAX_WINDOWBITS), "Z_MAX_WINDOWBITS", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_MIN_WINDOWBITS), "Z_MIN_WINDOWBITS", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_MIN_MEMLEVEL), "Z_MIN_MEMLEVEL", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_MAX_MEMLEVEL), "Z_MAX_WINDOWBITS", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_FILTERED), "Z_FILTERED", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_RLE), "Z_RLE", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_HUFFMAN_ONLY), "Z_HUFFMAN_ONLY", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_FIXED), "Z_FIXED", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, Z_DEFAULT_STRATEGY), "Z_DEFAULT_STRATEGY", tpl);
 
 		DV8_SET_EXPORT(isolate, tpl, "ZLib", exports);
 	}

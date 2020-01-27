@@ -17,29 +17,38 @@ void InitAll(Local<Object> exports)
 void start_context(void *data)
 {
 	thread_handle *th = (thread_handle *)data;
-
 	v8::Isolate::CreateParams create_params;
 	create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
 	v8::Isolate *isolate = v8::Isolate::New(create_params);
 	{
-		v8::Isolate::Scope isolate_scope(isolate);
-		v8::HandleScope handle_scope(isolate);
 		isolate->SetAbortOnUncaughtExceptionCallback(dv8::ShouldAbortOnUncaughtException);
 		isolate->SetFatalErrorHandler(dv8::OnFatalError);
 		isolate->SetOOMErrorHandler(dv8::OOMErrorHandler);
 		isolate->SetPromiseRejectCallback(dv8::PromiseRejectCallback);
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 1000, v8::StackTrace::kDetailed);
+    isolate->AddGCPrologueCallback(dv8::beforeGCCallback);
+    isolate->AddGCEpilogueCallback(dv8::afterGCCallback);
+    isolate->AddMicrotasksCompletedCallback(dv8::microTasksCallback);
+    isolate->SetMicrotasksPolicy(v8::MicrotasksPolicy::kExplicit);
+		v8::Isolate::Scope isolate_scope(isolate);
+		v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Context> context = dv8::CreateContext(isolate);
-		dv8::builtins::Environment *env = new dv8::builtins::Environment();
-		env->error = &th->error;
-		env->AssignToContext(context);
-		env->err.Reset();
-		v8::Local<v8::Object> globalInstance = context->Global();
 		v8::Context::Scope context_scope(context);
-		dv8::builtins::Buffer::Init(globalInstance);
+		dv8::builtins::Environment *env = new dv8::builtins::Environment();
+		env->AssignToContext(context);
+    env->argc = th->argc;
+    env->argv = th->argv;
+    v8::Local<v8::Array> arguments = v8::Array::New(isolate);
+    for (int i = 0; i < env->argc; i++) {
+      arguments->Set(context, i, v8::String::NewFromUtf8(isolate, env->argv[i], v8::NewStringType::kNormal, strlen(env->argv[i])).ToLocalChecked());
+    }
+		v8::Local<v8::Object> globalInstance = context->Global();
 		v8::Local<v8::Value> obj = globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "dv8", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
     v8::Local<v8::Object> dv8 = v8::Local<v8::Object>::Cast(obj);
 		globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "global", v8::NewStringType::kNormal).ToLocalChecked(), globalInstance);
+    dv8->Set(context, v8::String::NewFromUtf8(isolate, "args", v8::NewStringType::kNormal).ToLocalChecked(), arguments);
+		dv8::builtins::Buffer::Init(globalInstance);
+		v8::TryCatch try_catch(isolate);
 		if (th->length > 0) {
 			v8::Local<v8::Function> bufferObj = Local<Function>::Cast(globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "Buffer", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked());
 			Local<Function> cons = Local<Function>::New(isolate, bufferObj);
@@ -52,12 +61,14 @@ void start_context(void *data)
 			dv8->Set(context, String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
 		}
 		dv8->Set(context, String::NewFromUtf8(isolate, "workerName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->name, v8::NewStringType::kNormal).ToLocalChecked());
-
+		dv8->Set(context, String::NewFromUtf8(isolate, "tid", v8::NewStringType::kNormal).ToLocalChecked(), Number::New(isolate, th->tid));
+		if (th->fd > 0) {
+			dv8->Set(context, String::NewFromUtf8(isolate, "fd", v8::NewStringType::kNormal).ToLocalChecked(), Number::New(isolate, th->fd));
+		}
 		uv_loop_t *loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 		env->loop = loop;
 		uv_loop_init(loop);
-
-		v8::MaybeLocal<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len));
+    v8::Local<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len)).ToLocalChecked();
 		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "main.js", v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
 			v8::Integer::New(isolate, 0), 
@@ -68,25 +79,33 @@ void start_context(void *data)
 			v8::False(isolate), 
 			v8::True(isolate));
 		v8::Local<v8::Module> module;
-		v8::TryCatch try_catch(isolate);
-		v8::ScriptCompiler::Source basescript(base.ToLocalChecked(), baseorigin);
+		v8::ScriptCompiler::Source basescript(base, baseorigin);
 		if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
-      //fprintf(stderr, "Error Compiling Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
 			return;
 		}
 		v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
 		if (!ok.ToChecked()) {
-      //fprintf(stderr, "Error Instantiating Module\n");
       dv8::PrintStackTrace(isolate, try_catch);
 			return;
 		}
     v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
-    if (try_catch.HasCaught()) {
-      //fprintf(stderr, "Error Evaluating Module\n");
-      dv8::PrintStackTrace(isolate, try_catch);
-      return;
+		if (result.IsEmpty()) {
+			if (try_catch.HasCaught()) {
+				dv8::PrintStackTrace(isolate, try_catch);
+				return;
+			}
+		}
+    const double kLongIdlePauseInSeconds = 1.0;
+    isolate->ContextDisposedNotification();
+    isolate->LowMemoryNotification();
+    uv_tty_reset_mode();
+/*
+    int r = uv_loop_close(loop);
+    if (r != 0) {
+      fprintf(stderr, "thread uv_loop_close: %i\n", r);
     }
+*/
 	}
 	isolate->Dispose();
 	delete create_params.array_buffer_allocator;
@@ -102,55 +121,20 @@ void on_context_complete(uv_async_t *async)
 {
 	thread_handle *th = (thread_handle *)async->data;
 	uv_handle_t* handle = (uv_handle_t*)async;
-	uv_close(handle, on_thread_close);
 	Thread *t = (Thread *)th->object;
 	Isolate *isolate = Isolate::GetCurrent();
 	v8::HandleScope handleScope(isolate);
 	Local<Context> context = isolate->GetCurrentContext();
 	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 	Local<Function> foo = Local<Function>::New(isolate, t->onComplete);
-	Local<Value> errObj;
-	if (env->err.IsEmpty()) {
-		errObj = Null(isolate);
-	} else {
-		errObj = Local<Object>::New(isolate, env->err);
+	Local<Value> argv[1] = { v8::Null(isolate) };
+	v8::TryCatch try_catch(isolate);
+	foo->Call(context, context->Global(), 1, argv);
+	free(th);
+	if (try_catch.HasCaught()) {
+		dv8::ReportException(isolate, &try_catch);
 	}
-	js_error* jsError = &th->error;
-	if (jsError->hasError == 1) {
-		Local<Object> o = Object::New(isolate);
-		o->Set(context, String::NewFromUtf8(isolate, "line", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, jsError->linenum));
-		if (jsError->filename) {
-			o->Set(context, String::NewFromUtf8(isolate, "filename", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->filename, v8::NewStringType::kNormal).ToLocalChecked());
-			free(jsError->filename);
-		}
-		if (jsError->exception) {
-			o->Set(context, String::NewFromUtf8(isolate, "exception", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->exception, v8::NewStringType::kNormal).ToLocalChecked());
-			free(jsError->exception);
-		}
-		if (jsError->sourceline) {
-			o->Set(context, String::NewFromUtf8(isolate, "sourceline", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->sourceline, v8::NewStringType::kNormal).ToLocalChecked());
-			free(jsError->sourceline);
-		}
-		if (jsError->stack) {
-			o->Set(context, String::NewFromUtf8(isolate, "stack", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, jsError->stack, v8::NewStringType::kNormal).ToLocalChecked());
-			free(jsError->stack);
-		}
-		Local<Value> argv[1] = { o };
-		v8::TryCatch try_catch(isolate);
-		foo->Call(context, context->Global(), 1, argv);
-		free(th);
-		if (try_catch.HasCaught()) {
-			dv8::ReportException(isolate, &try_catch);
-		}
-	} else {
-		Local<Value> argv[1] = { v8::Null(isolate) };
-		v8::TryCatch try_catch(isolate);
-		foo->Call(context, context->Global(), 1, argv);
-		free(th);
-		if (try_catch.HasCaught()) {
-			dv8::ReportException(isolate, &try_catch);
-		}
-	}
+	uv_close(handle, on_thread_close);
 }
 
 void Thread::Init(Local<Object> exports)
@@ -215,27 +199,31 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	obj->onComplete.Reset(isolate, onComplete);
 	thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
 	obj->handle = th;
+	th->length = 0;
+	th->fd = 0;
 	if (argc > 2) {
-		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
+		if (!args[2].IsEmpty()) {
+			th->fd = args[2]->Uint32Value(context).ToChecked();
+		}
+	}
+	if (argc > 3) {
+		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[3].As<v8::Object>());
 		size_t len = b->_length;
 		th->data = b->_data;
 		th->length = b->_length;
 	}
-	else {
-		th->length = 0;
-	}
 	th->name = *function_name;
-	th->error.hasError = 0;
 	th->object = (void *)obj;
 	int len = strlen(*source);
 	th->size = len;
 	th->source = (char*)calloc(th->size, 1);
 	th->async = (uv_async_t*)calloc(1, sizeof(uv_async_t));
 	th->async->data = th;
+	th->argc = env->argc;
+	th->argv = uv_setup_args(env->argc, env->argv);
 	uv_async_init(env->loop, th->async, on_context_complete);
 	strncpy(th->source, *source, len + 1);
 	int r = uv_thread_create(&th->tid, start_context, (void*)th);
-	//int r = pthread_create(&th->tid, NULL, start_context, (void*)th);
 	args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 

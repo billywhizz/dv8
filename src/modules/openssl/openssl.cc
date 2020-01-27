@@ -49,10 +49,10 @@ using dv8::socket::socket_plugin;
 		v8::HandleScope handleScope(isolate);
 		ObjectWrap *wrap = data.GetParameter();
 		Hmac* obj = static_cast<Hmac *>(wrap);
-		HMAC_CTX_free(obj->context);
-		free(obj->in);
-		free(obj->out);
-		free(obj->context);
+		//HMAC_CTX_free(obj->context);
+		//free(obj->in);
+		//free(obj->out);
+		//free(obj->context);
 		#if TRACE
 		fprintf(stderr, "Hmac::Destroy\n");
 		#endif
@@ -157,10 +157,10 @@ using dv8::socket::socket_plugin;
 		v8::HandleScope handleScope(isolate);
 		ObjectWrap *wrap = data.GetParameter();
 		Hash* obj = static_cast<Hash *>(wrap);
-		EVP_MD_CTX_free(obj->context);
-		free(obj->in);
-		free(obj->out);
-		free(obj->context);
+		//EVP_MD_CTX_free(obj->context);
+		//free(obj->in);
+		//free(obj->out);
+		//free(obj->context);
 		//EVP_cleanup();
 		#if TRACE
 		fprintf(stderr, "Hash::Destroy\n");

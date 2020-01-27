@@ -278,25 +278,31 @@ void on_connection(uv_stream_t *server, int status)
       fprintf(stderr, "uv_accept: %i, %s\n", status, uv_strerror(status));
   }
   if (s->callbacks.onConnect == 1) {
-      Local<Value> argv[0] = {};
+      int fd;
+      status = uv_fileno((uv_handle_t*)stream, &fd);
+      Local<Value> argv[1] = { Integer::New(isolate, fd) };
       Local<Function> foo = Local<Function>::New(isolate, s->_onConnect);
       v8::TryCatch try_catch(isolate);
-      Local<Value> result = foo->Call(context, context->Global(), 0, argv).ToLocalChecked();
+      Local<Value> result = foo->Call(context, context->Global(), 1, argv).ToLocalChecked();
       if (try_catch.HasCaught()) {
         dv8::ReportException(isolate, &try_catch);
         return;
       }
       Local<Object> sock;
-      bool ok = result->ToObject(context).ToLocal(&sock);
-      Socket *s = ObjectWrap::Unwrap<Socket>(sock);
-      _context *ctx = context_init(stream, s);
+      MaybeLocal<Object> o = result->ToObject(context);
+      if (!o.IsEmpty()) {
+        bool ok = o.ToLocal(&sock);
+        Socket *s = ObjectWrap::Unwrap<Socket>(sock);
+        _context *ctx = context_init(stream, s);
+        ctx->paused = true;
+      }
   }
   // we should not start reading. let consumer call resume()
   //status = uv_read_start(stream, alloc_chunk, after_read);
   //if (status != 0) {
   //    fprintf(stderr, "uv_read_start: %i, %s\n", status, uv_strerror(status));
   //}
-  assert(status == 0);
+  //assert(status == 0);
 }
 
 void Socket::Init(Local<Object> exports)
@@ -323,6 +329,7 @@ void Socket::Init(Local<Object> exports)
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "queueSize", QueueSize);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stats", Stats);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", UnRef);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "ref", Ref);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", Open);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "create", Create);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "portNumber", PortNumber);
@@ -337,9 +344,9 @@ void Socket::Init(Local<Object> exports)
 
   DV8_SET_EXPORT(isolate, tpl, "Socket", exports);
 
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, TCP), "TCP", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "UNIX", exports);
-  DV8_SET_EXPORT_CONSTANT(isolate, Integer::New(isolate, UNIX), "PIPE", exports);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, TCP), "TCP", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, UNIX), "UNIX", tpl);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, UNIX), "PIPE", tpl);
 }
 
 void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
@@ -550,6 +557,14 @@ void Socket::UnRef(const FunctionCallbackInfo<Value> &args)
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   _context *ctx = s->context;
   uv_unref((uv_handle_t*)ctx->handle);
+}
+
+void Socket::Ref(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
+  _context *ctx = s->context;
+  uv_ref((uv_handle_t*)ctx->handle);
 }
 
 void Socket::SetNoDelay(const FunctionCallbackInfo<Value> &args)
@@ -995,7 +1010,7 @@ void Socket::Listen(const FunctionCallbackInfo<Value> &args)
     }
   }
   else if (s->socktype == TCP)
-  { // we are getting a port so must be TCP
+  {
     Local<Context> context = isolate->GetCurrentContext();
     Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
     uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
@@ -1113,24 +1128,46 @@ void Socket::Open(const FunctionCallbackInfo<Value> &args)
     onNewConnection(ctx);
     args.GetReturnValue().Set(Integer::New(isolate, fd[1]));
   } else {
-    uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
-    sock->data = s;
-    baton_t *baton = (baton_t *)malloc(sizeof(baton_t));
-    baton->callback = (void *)onNewConnection;
-    baton->object = sock->data;
-    sock->data = baton;
-    int status = uv_pipe_init(env->loop, sock, 0);
-    if (status)
-    {
+    if (s->socktype == UNIX) {
+      uv_pipe_t *sock = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+      sock->data = s;
+      baton_t *baton = (baton_t *)malloc(sizeof(baton_t));
+      baton->callback = (void *)onNewConnection;
+      baton->object = sock->data;
+      sock->data = baton;
+      int status = uv_pipe_init(env->loop, sock, 0);
+      if (status)
+      {
+        args.GetReturnValue().Set(Integer::New(isolate, status));
+        return;
+      }
+      int fd = args[0]->Int32Value(context).ToChecked();
+      status = uv_pipe_open(sock, fd);
+      _context *ctx = context_init((uv_stream_t*)sock, s);
+      ctx->paused = true;
+      onNewConnection(ctx);
       args.GetReturnValue().Set(Integer::New(isolate, status));
-      return;
+    } else {
+      uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
+      sock->data = s;
+      baton_t *baton = (baton_t *)malloc(sizeof(baton_t));
+      baton->callback = (void *)onNewConnection;
+      baton->object = sock->data;
+      sock->data = baton;
+      //int status = uv_tcp_init_ex(env->loop, sock, AF_INET);
+      int status = uv_tcp_init(env->loop, sock);
+      if (status)
+      {
+        args.GetReturnValue().Set(Integer::New(isolate, status));
+        return;
+      }
+      int fd = args[0]->Int32Value(context).ToChecked();
+      status = uv_tcp_open(sock, fd);
+      _context *ctx = context_init((uv_stream_t*)sock, s);
+      ctx->paused = true;
+      onNewConnection(ctx);
+      args.GetReturnValue().Set(Integer::New(isolate, status));
     }
-    int fd = args[0]->Int32Value(context).ToChecked();
-    status = uv_pipe_open(sock, fd);
-    _context *ctx = context_init((uv_stream_t*)sock, s);
-    ctx->paused = true;
-    onNewConnection(ctx);
-    args.GetReturnValue().Set(Integer::New(isolate, status));
   }
 }
 

@@ -11,18 +11,7 @@
 #include <buffer.h>
 #include <env.h>
 #include <string.h>
-
-#include <modules/loop/loop.h>
-#include <modules/timer/timer.h>
-#include <modules/thread/thread.h>
-#include <modules/process/process.h>
-#include <modules/tty/tty.h>
-#include <modules/os/os.h>
-#include <modules/fs/fs.h>
-#include <modules/socket/socket.h>
-#include <modules/udp/udp.h>
-#include <modules/libz/libz.h>
-#include <modules/openssl/openssl.h>
+#include <modules.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
@@ -68,6 +57,8 @@ using v8::HeapSpaceStatistics;
 using v8::Exception;
 using v8::Promise;
 using v8::Global;
+using v8::Array;
+using v8::BigUint64Array;
 using v8_inspector::V8InspectorClient;
 using v8_inspector::V8Inspector;
 using v8_inspector::StringBuffer;
@@ -76,8 +67,6 @@ using v8_inspector::V8ContextInfo;
 using v8_inspector::V8InspectorSession;
 using v8_inspector::V8Inspector;
 using v8::Platform;
-
-using InitializerCallback = void (*)(Local<Object> exports);
 
 class InspectorFrontend final : public V8Inspector::Channel {
  public:
@@ -206,24 +195,38 @@ typedef struct {
   uint32_t fd;    // id of the context
 } write_req_t;
 
-typedef void *(*register_plugin)();
-
 void PromiseRejectCallback(PromiseRejectMessage message);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
 Local<Context> CreateContext(Isolate *isolate);
 // Global Functions
 void Print(const FunctionCallbackInfo<Value> &args);
 void Version(const FunctionCallbackInfo<Value> &args);
-void LoadModule(const FunctionCallbackInfo<Value> &args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
 void shutdown(uv_loop_t *loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value> &args);
+void HeapSpaceUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void RunScript(const FunctionCallbackInfo<Value> &args);
 void CompileScript(const FunctionCallbackInfo<Value> &args);
+void RunModule(const FunctionCallbackInfo<Value> &args);
+void Cwd(const FunctionCallbackInfo<Value> &args);
 void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch);
 void shutdown(uv_loop_t *loop, int rc);
+void beforeGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
+void afterGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
+
+inline void beforeGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags) {
+  //fprintf(stderr, "before GC\n");
+}
+
+inline void afterGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags) {
+  //fprintf(stderr, "after GC\n");
+}
+
+inline void microTasksCallback(v8::Isolate* isolate) {
+  //fprintf(stderr, "on MicroTasks\n");
+}
 
 inline void DV8_SET_METHOD(v8::Isolate *isolate, v8::Local<v8::Template> recv, const char *name, v8::FunctionCallback callback) {
   v8::HandleScope handle_scope(isolate);
@@ -256,7 +259,6 @@ inline void DV8_SET_EXPORT_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> o
 
 inline void DV8_SET_CONSTANT(v8::Isolate *isolate, v8::Local<v8::Value> obj, const char *name, v8::Local<v8::Template> recv) {
   v8::Local<v8::String> constant_name = v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kInternalized).ToLocalChecked();
-  Local<Context> context = isolate->GetCurrentContext();
   recv->Set(constant_name, obj);
 }
 
