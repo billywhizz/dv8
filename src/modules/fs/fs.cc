@@ -178,6 +178,11 @@ using dv8::builtins::Buffer;
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWOTH), "S_IWOTH", tpl);
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXOTH), "S_IXOTH", tpl);
 
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXO), "S_IRWXO", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXG), "S_IRWXG", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXU), "S_IRWXU", tpl);
+
+
 /*
 
 https://linux.die.net/man/2/open
@@ -306,7 +311,15 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
+		uv_fs_t req;
+		String::Utf8Value path(isolate, args[0]);
+		int mode = S_IRWXO | S_IRWXG | S_IRWXU;
+		int argc = args.Length();
+		if (argc > 1) {
+			mode = args[1]->Int32Value(context).ToChecked();
+		}
+		int rc = uv_fs_mkdir(env->loop, &req, *path, mode, NULL);
+		args.GetReturnValue().Set(Integer::New(isolate, rc));
 	}
 
 	void FileSystem::FStat(const FunctionCallbackInfo<Value> &args)

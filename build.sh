@@ -1,3 +1,3 @@
 #!/bin/bash
-out/bin/dv8 -e "$(cat build.js)"
+build/dv8 -e "$(cat build.js)" local.json
 ./platform.sh

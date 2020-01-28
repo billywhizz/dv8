@@ -4,7 +4,6 @@
   "src": "/src",
   "build": "/build",
   "target": "release",
-  "sslPrefix": "/usr/lib/x86_64-linux-gnu",
   "override": false,
   "builtins": false,
   "output": {
@@ -12,7 +11,6 @@
     "modulesHeader": "./src/modules.h",
     "modulesSource": "./src/modules.cc"
   },
-  "modules": ["loop", "timer", "fs", "process", "tty", "libz", "openssl", "os", "socket", "thread", "udp"],
-  "min": ["fs", "loop", "timer", "process", "tty"],
-  "all": ["loop", "timer", "fs", "process", "tty", "libz", "openssl", "os", "socket", "thread", "udp"]
+  "libs": ["/usr/lib/x86_64-linux-gnu/libssl.a", "/usr/lib/x86_64-linux-gnu/libcrypto.a", "/deps/mbedtls/library/libmbedcrypto.a"],
+  "modules": ["loop", "timer", "fs", "process", "tty", "libz", "openssl", "os", "socket", "thread", "udp", "mbedtls", "httpParser"]
 }

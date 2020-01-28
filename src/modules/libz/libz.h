@@ -2,8 +2,7 @@
 #define DV8_ZLib_H
 
 #include <dv8.h>
-#include "zconf.h"
-#include "zlib.h"
+#include "miniz.h"
 
 namespace dv8 {
 

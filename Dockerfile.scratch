@@ -3,7 +3,7 @@ RUN apk update
 RUN adduser -D -g '' appuser
 FROM scratch
 COPY --from=builder /etc/passwd /etc/passwd
-COPY out/bin/dv8 /dv8
+COPY build/dv8 /dv8
 USER appuser
 WORKDIR /app
 ENTRYPOINT ["/dv8"]

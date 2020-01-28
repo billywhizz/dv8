@@ -1,4 +1,4 @@
 FROM gcr.io/distroless/static
-COPY out/bin/dv8 /dv8
+COPY build/dv8 /dv8
 WORKDIR /app
 CMD ["/dv8"]

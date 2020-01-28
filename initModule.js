@@ -30,6 +30,7 @@ namespace dv8 {
 
 namespace ${name} {
 	using dv8::builtins::Environment;
+	using dv8::builtins::Buffer;
 
 	void InitAll(Local<Object> exports)
 	{
@@ -44,6 +45,7 @@ namespace ${name} {
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "hello", ${className}::Hello);
+		DV8_SET_METHOD(isolate, tpl, "hello", ${className}::HelloStatic);
 	
 		DV8_SET_EXPORT(isolate, tpl, "${className}", exports);
 	}
@@ -59,11 +61,9 @@ namespace ${name} {
 	}
 
 	void ${className}::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-		Isolate *isolate = data.GetIsolate();
-		v8::HandleScope handleScope(isolate);
-		ObjectWrap *wrap = data.GetParameter();
-		${className}* obj = static_cast<${className} *>(wrap);
-		fprintf(stderr, "${className}::Destroy\n");
+		#if TRACE
+		fprintf(stderr, "${className}::Destroy\\n");
+		#endif
 	}
 
 	void ${className}::Hello(const FunctionCallbackInfo<Value> &args)
@@ -76,6 +76,15 @@ namespace ${name} {
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 	
+	void ${className}::HelloStatic(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
 }
 }	
 
@@ -117,6 +126,9 @@ class ${className} : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
 
+	protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
 	private:
 
 		${className}() {
@@ -127,6 +139,7 @@ class ${className} : public dv8::ObjectWrap {
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Hello(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void HelloStatic(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

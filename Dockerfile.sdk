@@ -1,14 +1,12 @@
 FROM debian:stretch-slim as dv8-sdk
 WORKDIR /build
-RUN apt update && apt upgrade -y && apt install -y g++ make libssl-dev ccache zlib1g-dev
-RUN mkdir -p /out/bin
-RUN mkdir -p /out/lib
-RUN apt install -y clang
+RUN apt update && apt upgrade -y && apt install -y g++ make libssl-dev ccache
+COPY deps/miniz /deps/miniz
+COPY deps/mbedtls /deps/mbedtls
 COPY deps/v8/include /deps/v8/include
 COPY deps/v8/libv8_monolith.a /deps/v8/libv8_monolith.a
 COPY deps/uv/include /deps/uv/include
 COPY deps/uv/libuv.a /deps/uv/libuv.a
 COPY src /src
 COPY build/platform.sh /build/platform.sh
-RUN ./platform.sh
 CMD ["/bin/sh"]

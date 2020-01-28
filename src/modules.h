@@ -14,6 +14,8 @@
 #include <modules/socket/socket.h>
 #include <modules/thread/thread.h>
 #include <modules/udp/udp.h>
+#include <modules/mbedtls/mbedtls.h>
+#include <modules/httpParser/httpParser.h>
 
 namespace dv8 {
 

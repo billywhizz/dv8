@@ -40,12 +40,26 @@ function writeFile (fileName, buf, flags = O_CREAT | O_TRUNC | O_WRONLY, mode = 
 }
 
 function getModuleCompiles (config) {
-  return config.modules.map(name => `$CC $CCFLAGS -I$DV8_SRC/modules/${name} -c -o $DV8_OUT/${name}.o $DV8_SRC/modules/${name}/${name}.cc`).join('\n')
+  let result = config.modules.map(name => `$CC $CCFLAGS -I$DV8_SRC/modules/${name} -c -o $DV8_OUT/${name}.o $DV8_SRC/modules/${name}/${name}.cc`).join('\n')
+  if (config.modules.some(v => v === 'libz')) {
+    result = `${result}\n$CC $CCFLAGS -c -o $DV8_OUT/miniz.o $MINIZ_INCLUDE/miniz.c`
+  }
+  if (config.modules.some(v => v === 'httpParser')) {
+    result = `${result}\n$CC -DHTTP_PARSER_STRICT=0 $CCFLAGS -c -o $DV8_OUT/http_parser.o $HTTPPARSER_INCLUDE/http_parser.c`
+  }
+  return result
 }
 
 function getLinkLine (config) {
   const libs = config.modules.map(name => `$DV8_OUT/${name}.o`).join(' ')
-  return `ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o ${libs}`
+  let result = `ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o ${libs}`
+  if (config.modules.some(v => v === 'libz')) {
+    result = `${result} $DV8_OUT/miniz.o`
+  }
+  if (config.modules.some(v => v === 'httpParser')) {
+    result = `${result} $DV8_OUT/http_parser.o`
+  }
+  return result
 }
 
 function getBuiltins (config) {
@@ -68,29 +82,36 @@ function getIncludes (config) {
   return config.modules.map(name => `#include <modules/${name}/${name}.h>`).join('\n')
 }
 
+function getLibs (config) {
+  return config.libs.join(' ')
+}
+
 function getBuildScript (config) {
   return `#!/bin/bash
 CONFIG=${config.target}
-echo "building dv8 platform ($CONFIG)"
 ${getBuiltins(config)}
 export DV8_DEPS=${config.deps}
 export DV8_SRC=${config.src}
 export DV8_OUT=${config.build}
+export HTTPPARSER_INCLUDE=$DV8_DEPS/http_parser
 export V8_INCLUDE=$DV8_DEPS/v8/include
 export UV_INCLUDE=$DV8_DEPS/uv/include
 export V8_DEPS=$DV8_DEPS/v8
 export UV_DEPS=$DV8_DEPS/uv
+export MINIZ_INCLUDE=$DV8_DEPS/miniz
+export MBEDTLS_INCLUDE=$DV8_DEPS/mbedtls/include
 export BUILTINS=$DV8_SRC/builtins
-export SSL_PREFIX=${config.sslPrefix || '/usr/lib/x86_64-linux-gnu'}
 export TRACE="TRACE=0"
-export STATIC="DV8STATIC=1"
 if [[ "$CONFIG" == "release" ]]; then
-    export CCFLAGS="-D$STATIC -D$TRACE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
-    export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group $SSL_PREFIX/libssl.a $SSL_PREFIX/libcrypto.a $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -lz -ldl -Wl,--end-group"
+    export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
+    export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -Wl,--end-group"
 else
-    export CCFLAGS="-D$STATIC -D$TRACE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
-    export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group $SSL_PREFIX/libssl.a $SSL_PREFIX/libcrypto.a $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -lz -ldl -Wl,--end-group"
+    export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
+    export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -Wl,--end-group"
 fi
+echo "building mbedtls"
+make -C $DV8_DEPS/mbedtls/ lib
+echo "building dv8 platform ($CONFIG)"
 export CC="${config.CC}"
 $CC $CCFLAGS -c -o $DV8_OUT/buffer.o $DV8_SRC/builtins/buffer.cc
 $CC $CCFLAGS -c -o $DV8_OUT/env.o $DV8_SRC/builtins/env.cc
@@ -101,9 +122,9 @@ $CC $CCFLAGS -c -o $DV8_OUT/dv8.o $DV8_SRC/dv8.cc
 rm -f $DV8_OUT/dv8.a
 ${getLinkLine(config)}
 if [[ "$CONFIG" == "release" ]]; then
-$CC -static $LDFLAGS -s -o $DV8_OUT/dv8
+$CC -static $LDFLAGS -s -o $DV8_OUT/${config.out || 'dv8'}
 else
-$CC -static $LDFLAGS -o $DV8_OUT/dv8
+$CC -static $LDFLAGS -o $DV8_OUT/${config.out || 'dv8'}
 fi
 rm -f $DV8_OUT/*.a
 rm -f $DV8_OUT/*.o`
@@ -161,47 +182,14 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
     return;
   }
   args.GetReturnValue().Set(exports);
-#if DV8STATIC
   initLibrary(exports, module_name);
-#else
-  const char *module_path = "/usr/local/lib/dv8/";
-  char lib_name[1024];
-  uv_lib_t lib;
-  int success = 0;
-  args.GetReturnValue().Set(exports);
-  if (args.Length() > 2) {
-    String::Utf8Value str(args.GetIsolate(), args[2]);
-    module_path = *str;
-    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
-    success = uv_dlopen(lib_name, &lib);
-  } else {
-    initLibrary(exports, module_name);
-    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
-    success = uv_dlopen(NULL, &lib);
-  }
-  if (success != 0) {
-    isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "uv_dlopen failed").ToLocalChecked()));
-    return;
-  }
-  char register_name[128];
-  snprintf(register_name, 128, "_register_%s", module_name);
-  void *address;
-  success = uv_dlsym(&lib, register_name, &address);
-  if (success != 0) {
-    isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "uv_dlsym failed").ToLocalChecked()));
-    return;
-  }
-  register_plugin _init = reinterpret_cast<register_plugin>(address);
-  auto _register = reinterpret_cast<InitializerCallback>(_init());
-  _register(exports);
-#endif
 }
 
 }
 `
 }
 
-const buf = readFile(args[3] || './docker.json')
+const buf = readFile((args.length > 3 ? args[3] : args[1]) || './docker.json')
 const config = JSON.parse(buf.read(0, buf.size))
 writeFile(config.output.build || './platform.sh', Buffer.fromString(getBuildScript(config)), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IXUSR)
 writeFile(config.output.modulesHeader || './src/modules.h', Buffer.fromString(getHeader(config)))
