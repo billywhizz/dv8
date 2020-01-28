@@ -32,8 +32,9 @@ function setInterval (fn, repeat) {
 function setTimeout (fn, repeat) {
   const timer = new (dv8.library('timer').Timer)()
   timer.start(() => {
-    timer.close()
     fn()
+    timer.stop()
+    timer.close()
   }, repeat)
   return timer
 }

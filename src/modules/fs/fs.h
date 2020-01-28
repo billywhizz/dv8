@@ -25,6 +25,8 @@ void InitAll(Local<Object> exports);
 class File : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
+		int fd;
+		uv_fs_t req;
 
 protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
@@ -36,10 +38,8 @@ protected:
 		~File() {
 		}
 
-		uv_fs_t req;
 		uv_buf_t in;
 		uv_buf_t out;
-
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);

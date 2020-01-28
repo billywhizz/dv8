@@ -1,4 +1,4 @@
-const { library } = dv8
+const { library, args } = dv8
 const { File, FileSystem } = library('fs', {})
 const { O_CREAT, O_TRUNC, O_RDONLY, O_WRONLY, S_IRUSR, S_IWUSR, S_IXUSR } = FileSystem
 
@@ -18,24 +18,25 @@ function fromString (str, shared) {
 Buffer.alloc = alloc
 Buffer.fromString = fromString
 
-function readFile (path) {
+function readFile (path, flags = O_RDONLY) {
   const file = new File()
-  const BUFSIZE = 4096
-  const buf = Buffer.alloc(BUFSIZE)
-  const parts = []
-  file.setup(buf, buf)
-  file.fd = file.open(path, O_RDONLY)
+  file.fd = file.open(path, flags)
   if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
-  file.size = 0
-  let len = file.read(BUFSIZE, file.size)
-  while (len > 0) {
-    file.size += len
-    parts.push(buf.read(0, len))
-    len = file.read(BUFSIZE, file.size)
-  }
+  file.size = FileSystem.fstat(file)
+  const buf = Buffer.alloc(file.size)
+  file.setup(buf, buf)
+  const len = file.read(file.size, 0)
   if (len < 0) throw new Error(`Error reading ${path}: ${len}`)
   file.close()
-  return parts.join('')
+  return buf
+}
+
+function writeFile (fileName, buf, flags = O_CREAT | O_TRUNC | O_WRONLY, mode = S_IRUSR | S_IWUSR) {
+  const file = new File()
+  file.setup(buf, buf)
+  file.fd = file.open(fileName, flags, mode)
+  file.write(buf.size, 0)
+  file.close()
 }
 
 function getModuleCompiles (config) {
@@ -48,6 +49,7 @@ function getLinkLine (config) {
 }
 
 function getBuiltins (config) {
+  if (!config.builtins) return ''
   let args = `${config.target}`
   if (config.override) {
     args = `${args} override`
@@ -55,7 +57,7 @@ function getBuiltins (config) {
       args = `${args} ${config.override.path}`
     }
   }
-  return args
+  return `./builtins.sh ${args}`
 }
 
 function getInitLibrary (config) {
@@ -69,9 +71,8 @@ function getIncludes (config) {
 function getBuildScript (config) {
   return `#!/bin/bash
 CONFIG=${config.target}
-echo "generating main.js"
-./builtins.sh ${getBuiltins(config)}
 echo "building dv8 platform ($CONFIG)"
+${getBuiltins(config)}
 export DV8_DEPS=${config.deps}
 export DV8_SRC=${config.src}
 export DV8_OUT=${config.build}
@@ -99,7 +100,11 @@ $CC $CCFLAGS -c -o $DV8_OUT/dv8main.o $DV8_SRC/dv8_main.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8.o $DV8_SRC/dv8.cc
 rm -f $DV8_OUT/dv8.a
 ${getLinkLine(config)}
-$CC -static $LDFLAGS -s -o out/bin/dv8
+if [[ "$CONFIG" == "release" ]]; then
+$CC -static $LDFLAGS -s -o $DV8_OUT/dv8
+else
+$CC -static $LDFLAGS -o $DV8_OUT/dv8
+fi
 rm -f $DV8_OUT/*.a
 rm -f $DV8_OUT/*.o`
 }
@@ -196,15 +201,8 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
 `
 }
 
-function writeFileSync (fileName, buf, flags = O_CREAT | O_TRUNC | O_WRONLY, mode = S_IRUSR | S_IWUSR) {
-  const file = new File()
-  file.setup(buf, buf)
-  file.fd = file.open(fileName, flags, mode)
-  file.write(buf.size, 0)
-  file.close()
-}
-
-const config = JSON.parse(readFile('./config.json'))
-writeFileSync('./platform.sh', Buffer.fromString(getBuildScript(config)), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IXUSR)
-writeFileSync('./src/modules.h', Buffer.fromString(getHeader(config)))
-writeFileSync('./src/modules.cc', Buffer.fromString(getSource(config)))
+const buf = readFile(args[3] || './docker.json')
+const config = JSON.parse(buf.read(0, buf.size))
+writeFile(config.output.build || './platform.sh', Buffer.fromString(getBuildScript(config)), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IXUSR)
+writeFile(config.output.modulesHeader || './src/modules.h', Buffer.fromString(getHeader(config)))
+writeFile(config.output.modulesSource || './src/modules.cc', Buffer.fromString(getSource(config)))

@@ -76,6 +76,7 @@ using dv8::builtins::Buffer;
 			mode = args[2]->Int32Value(context).ToChecked();
 		}
 		int fd = uv_fs_open(env->loop, &obj->req, *filename, flags, mode, NULL);
+		obj->fd = fd;
 		//uv_ref((uv_handle_t*)obj->req);
 		args.GetReturnValue().Set(Integer::New(isolate, fd));
 	}
@@ -314,6 +315,34 @@ EWOULDBLOCK
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
+		File* obj = ObjectWrap::Unwrap<File>(args[0].As<v8::Object>());
+		uv_fs_t req;
+		int rc = uv_fs_fstat(env->loop, &req, obj->fd, NULL);
+		if (rc == 0) {
+			const uv_stat_t* const s = static_cast<const uv_stat_t*>(req.ptr);
+			args.GetReturnValue().Set(Integer::New(isolate, s->st_size));
+			uv_fs_req_cleanup(&req);
+			return;
+/*
+  uint64_t st_dev;
+  uint64_t st_mode;
+  uint64_t st_nlink;
+  uint64_t st_uid;
+  uint64_t st_gid;
+  uint64_t st_rdev;
+  uint64_t st_ino;
+  uint64_t st_size;
+  uint64_t st_blksize;
+  uint64_t st_blocks;
+  uint64_t st_flags;
+  uint64_t st_gen;
+  uv_timespec_t st_atim;
+  uv_timespec_t st_mtim;
+  uv_timespec_t st_ctim;
+  uv_timespec_t st_birthtim;
+*/
+		}
+		uv_fs_req_cleanup(&req);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 

@@ -7,6 +7,7 @@
 scratch
 deploy.sh
 out
+build/dv8
 deps/v8/gen
 deps/v8/out.gn
 .ccache
