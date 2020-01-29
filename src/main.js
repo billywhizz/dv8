@@ -308,30 +308,26 @@ function pathModule () {
 }
 
 // require Module
-function requireModule () {
-  let pathMod
+function requireModule (pathMod) {
   const cache = {}
   const { compile } = dv8
 
   function require (path, parent) {
-    if (!pathMod) pathMod = pathModule()
     const { join, baseName } = pathMod
     let dirName = parent ? parent.dirName : dv8.cwd()
     const fileName = join(dirName, path)
     dirName = baseName(fileName)
     let module = cache[fileName]
     if (module) return module.exports
-    const params = ['exports', 'require', 'module', 'spawn']
+    const params = ['exports', 'dv8', 'module']
     const exports = {}
     module = { exports, dirName, fileName }
     module.text = (readFile(fileName)).text
     const fun = compile(module.text, fileName, params, [])
     module.function = fun
-    const spawn = (fn, cb = () => {}, opts = { dirName: module.dirName }) => {
-      opts.dirName = module.dirName
-      return process.spawn(fn, cb, opts)
-    }
-    fun.call(exports, exports, p => dv8.require(p, module), module, spawn)
+    const dv82 = Object.assign({}, dv8)
+    dv82.require = p => dv8.require(p, module)
+    fun.call(exports, exports, dv82, module)
     cache[fileName] = module
     return module.exports
   }
@@ -388,7 +384,8 @@ function main (args) {
   dv8.library = wrapLibrary(dv8.library)
   const { workerSource, workerName, runModule, memoryUsage, env, library, hrtime, cpuUsage, heapUsage, runMicroTasks } = dv8
   // load JS modules
-  const { require } = requireModule()
+  const pathMod = pathModule()
+  const { require, cache } = requireModule(pathMod)
   const { repl } = replModule()
   // load required native libs
   const { EventLoop } = library('loop')
@@ -406,11 +403,13 @@ function main (args) {
   dv8.hrtime = wrapHrtime(hrtime)
   dv8.heapUsage = wrapHeapUsage(heapUsage)
   dv8.require = require
+  dv8.require.cache = cache
   dv8.repl = repl
   dv8.runMicroTasks = runMicroTasks
   dv8.readFile = readFile
   dv8.listHandles = wrapListHandles(EventLoop.listHandles)
   dv8.nextTick = wrapNextTick(new EventLoop())
+  dv8.path = pathMod
 
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout

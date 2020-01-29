@@ -75,6 +75,7 @@ protected:
 		static void FTruncate(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Copy(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void SendFile(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Readdir(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

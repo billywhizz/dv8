@@ -45,6 +45,8 @@ using dv8::builtins::Buffer;
 		DV8_SET_METHOD(isolate, tpl, "ftruncate", FileSystem::FTruncate);
 		DV8_SET_METHOD(isolate, tpl, "copy", FileSystem::Copy);
 		DV8_SET_METHOD(isolate, tpl, "sendfile", FileSystem::SendFile);
+		DV8_SET_METHOD(isolate, tpl, "readdir", FileSystem::Readdir);
+
 	
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_RDONLY), "O_RDONLY", tpl);
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_WRONLY), "O_WRONLY", tpl);
@@ -77,6 +79,15 @@ using dv8::builtins::Buffer;
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFDIR), "S_IFDIR", tpl);
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFCHR), "S_IFCHR", tpl);
 		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFIFO), "S_IFIFO", tpl);
+
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_BLK), "DT_BLK", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_CHR), "DT_CHR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_DIR), "DT_DIR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_FIFO), "DT_FIFO", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_LNK), "DT_LNK", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_REG), "DT_REG", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_SOCK), "DT_SOCK", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, DT_UNKNOWN), "DT_UNKNOWN", tpl);
 
 		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
 	}
@@ -211,6 +222,33 @@ using dv8::builtins::Buffer;
 		#if TRACE
 		fprintf(stderr, "FileSystem::Destroy\n");
 		#endif
+	}
+
+	void FileSystem::Readdir(const FunctionCallbackInfo<Value> &args) {
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		String::Utf8Value path(isolate, args[0]);
+		v8::Local<v8::Array> answer = args[1].As<v8::Array>();
+		DIR* directory = opendir(*path);
+		args.GetReturnValue().Set(Integer::New(isolate, -1));
+		if (!directory) return;
+		dirent* entry = readdir(directory);
+		int i = 0;
+		while (entry) {
+			Local<Object> o = Object::New(isolate);
+			o->Set(context, String::NewFromUtf8(isolate, "name", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, entry->d_name).ToLocalChecked());
+			o->Set(context, String::NewFromUtf8(isolate, "type", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, entry->d_type));
+			o->Set(context, String::NewFromUtf8(isolate, "ino", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, entry->d_ino));
+			o->Set(context, String::NewFromUtf8(isolate, "off", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, entry->d_off));
+			o->Set(context, String::NewFromUtf8(isolate, "reclen", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, entry->d_reclen));
+      answer->Set(context, i++, o);
+			entry = readdir(directory);
+			if (i == 1023) break;
+		}
+		closedir(directory);
+		args.GetReturnValue().Set(Integer::New(isolate, i));
 	}
 
 	void FileSystem::Unlink(const FunctionCallbackInfo<Value> &args)

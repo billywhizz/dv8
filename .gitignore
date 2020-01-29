@@ -13,3 +13,4 @@ deps/v8/out.gn
 .ccache
 src/backup.js
 platform.sh
+dist
