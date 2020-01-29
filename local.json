@@ -13,5 +13,7 @@
     "modulesSource": "./src/modules.cc"
   },
   "libs": ["deps/mbedtls/library/libmbedcrypto.a"],
-  "modules": ["loop", "timer", "fs", "process", "tty", "socket", "httpParser", "mbedtls"]
+  "modules": ["loop", "timer", "fs", "process", "tty", "socket", "mbedtls", "thread", "udp"],
+  "libs2": ["deps/mbedtls/library/libmbedcrypto.a", "/usr/lib/x86_64-linux-gnu/libssl.a", "/usr/lib/x86_64-linux-gnu/libcrypto.a"],
+  "modules2": ["loop", "timer", "fs", "process", "tty", "socket", "openssl", "httpParser", "mbedtls"]
 }

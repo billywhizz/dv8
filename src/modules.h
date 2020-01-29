@@ -9,7 +9,6 @@
 #include <modules/process/process.h>
 #include <modules/tty/tty.h>
 #include <modules/libz/libz.h>
-#include <modules/openssl/openssl.h>
 #include <modules/os/os.h>
 #include <modules/socket/socket.h>
 #include <modules/thread/thread.h>

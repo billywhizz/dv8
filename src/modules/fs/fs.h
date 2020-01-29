@@ -68,6 +68,7 @@ protected:
 
 		static void Unlink(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Mkdir(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Rmdir(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void FStat(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Rename(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void FSync(const v8::FunctionCallbackInfo<v8::Value>& args);

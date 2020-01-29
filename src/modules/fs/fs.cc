@@ -28,6 +28,59 @@ using dv8::builtins::Buffer;
 		DV8_SET_EXPORT(isolate, tpl, "File", exports);
 	}
 
+	void FileSystem::Init(Local<Object> exports) {
+		Isolate* isolate = exports->GetIsolate();
+		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
+	
+		tpl->SetClassName(String::NewFromUtf8(isolate, "FileSystem").ToLocalChecked());
+		tpl->InstanceTemplate()->SetInternalFieldCount(1);
+	
+		// Sync Methods
+		DV8_SET_METHOD(isolate, tpl, "unlink", FileSystem::Unlink);
+		DV8_SET_METHOD(isolate, tpl, "mkdir", FileSystem::Mkdir);
+		DV8_SET_METHOD(isolate, tpl, "rmdir", FileSystem::Rmdir);
+		DV8_SET_METHOD(isolate, tpl, "fstat", FileSystem::FStat);
+		DV8_SET_METHOD(isolate, tpl, "rename", FileSystem::Rename);
+		DV8_SET_METHOD(isolate, tpl, "fsync", FileSystem::FSync);
+		DV8_SET_METHOD(isolate, tpl, "ftruncate", FileSystem::FTruncate);
+		DV8_SET_METHOD(isolate, tpl, "copy", FileSystem::Copy);
+		DV8_SET_METHOD(isolate, tpl, "sendfile", FileSystem::SendFile);
+	
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_RDONLY), "O_RDONLY", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_WRONLY), "O_WRONLY", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_RDWR), "O_RDWR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_APPEND), "O_APPEND", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_CLOEXEC), "O_CLOEXEC", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_CREAT), "O_CREAT", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_TRUNC), "O_TRUNC", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_EXCL), "O_EXCL", tpl);
+
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRUSR), "S_IRUSR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWUSR), "S_IWUSR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXUSR), "S_IXUSR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRGRP), "S_IRGRP", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWGRP), "S_IWGRP", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXGRP), "S_IXGRP", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IROTH), "S_IROTH", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWOTH), "S_IWOTH", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXOTH), "S_IXOTH", tpl);
+
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXO), "S_IRWXO", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXG), "S_IRWXG", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXU), "S_IRWXU", tpl);
+
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFMT), "S_IFMT", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFSOCK), "S_IFSOCK", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFLNK), "S_IFLNK", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFREG), "S_IFREG", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFBLK), "S_IFBLK", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFDIR), "S_IFDIR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFCHR), "S_IFCHR", tpl);
+		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IFIFO), "S_IFIFO", tpl);
+
+		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
+	}
+
 	void File::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
@@ -140,142 +193,6 @@ using dv8::builtins::Buffer;
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
-// TODO: setup with array of in and out buffers. can send multiple buffers in read/write calls
-
-	void FileSystem::Init(Local<Object> exports) {
-		Isolate* isolate = exports->GetIsolate();
-		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-	
-		tpl->SetClassName(String::NewFromUtf8(isolate, "FileSystem").ToLocalChecked());
-		tpl->InstanceTemplate()->SetInternalFieldCount(1);
-	
-		// Sync Methods
-		DV8_SET_METHOD(isolate, tpl, "unlink", FileSystem::Unlink);
-		DV8_SET_METHOD(isolate, tpl, "mkdir", FileSystem::Mkdir);
-		DV8_SET_METHOD(isolate, tpl, "fstat", FileSystem::FStat);
-		DV8_SET_METHOD(isolate, tpl, "rename", FileSystem::Rename);
-		DV8_SET_METHOD(isolate, tpl, "fsync", FileSystem::FSync);
-		DV8_SET_METHOD(isolate, tpl, "ftruncate", FileSystem::FTruncate);
-		DV8_SET_METHOD(isolate, tpl, "copy", FileSystem::Copy);
-		DV8_SET_METHOD(isolate, tpl, "sendfile", FileSystem::SendFile);
-	
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_RDONLY), "O_RDONLY", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_WRONLY), "O_WRONLY", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_RDWR), "O_RDWR", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_APPEND), "O_APPEND", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_CLOEXEC), "O_CLOEXEC", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_CREAT), "O_CREAT", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_TRUNC), "O_TRUNC", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, O_EXCL), "O_EXCL", tpl);
-
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRUSR), "S_IRUSR", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWUSR), "S_IWUSR", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXUSR), "S_IXUSR", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRGRP), "S_IRGRP", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWGRP), "S_IWGRP", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXGRP), "S_IXGRP", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IROTH), "S_IROTH", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IWOTH), "S_IWOTH", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IXOTH), "S_IXOTH", tpl);
-
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXO), "S_IRWXO", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXG), "S_IRWXG", tpl);
-		DV8_SET_CONSTANT(isolate, Integer::New(isolate, S_IRWXU), "S_IRWXU", tpl);
-
-
-/*
-
-https://linux.die.net/man/2/open
-
-flags
-
-access modes
-O_RDONLY
-O_WRONLY
-O_RDWR
-
-file creation flags
-O_CLOEXEC
-O_CREAT
-O_DIRECTORY
-O_EXCL
-O_NOCTTY
-O_NOFOLLOW
-O_TRUNC
-O_TTY_INIT
-
-file status flags
-
-O_APPEND
-O_ASYNC
-O_CLOEXEC
-O_CREAT
-
-mode - only when using O_CREAT
-effective permissions are mode & ~umask
-
-S_IRWXU
-00700 user (file owner) has read, write and execute permission
-S_IRUSR
-00400 user has read permission
-S_IWUSR
-00200 user has write permission
-S_IXUSR
-00100 user has execute permission
-S_IRWXG
-00070 group has read, write and execute permission
-S_IRGRP
-00040 group has read permission
-S_IWGRP
-00020 group has write permission
-S_IXGRP
-00010 group has execute permission
-S_IRWXO
-00007 others have read, write and execute permission
-S_IROTH
-00004 others have read permission
-S_IWOTH
-00002 others have write permission
-S_IXOTH
-00001 others have execute permission
-
-O_DIRECT
-O_LARGEFILE
-O_NOATIME
-O_NONBLOCK
-O_NDELAY
-O_SYNC
-
-errors
-
-EACCES
-EDQUOT
-EEXIST
-EFAULT
-EFBIG
-EINTR
-EISDIR
-ELOOP
-EMFILE
-ENAMETOOLONG
-ENFILE
-ENODEV
-ENOENT
-ENOMEM
-ENOSPC
-ENOTDIR
-ENXIO
-EOVERFLOW
-EPERM
-EROFS
-ETXTBSY
-EWOULDBLOCK
-
-*/
-
-		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
-	}
-
 	void FileSystem::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
@@ -297,12 +214,16 @@ EWOULDBLOCK
 	}
 
 	void FileSystem::Unlink(const FunctionCallbackInfo<Value> &args)
-	{
+	{		
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
+		uv_fs_t req;
+		String::Utf8Value path(isolate, args[0]);
+		int rc = uv_fs_unlink(env->loop, &req, *path, NULL);
+		args.GetReturnValue().Set(Integer::New(isolate, rc));
+		uv_fs_req_cleanup(&req);
 	}
 
 	void FileSystem::Mkdir(const FunctionCallbackInfo<Value> &args)
@@ -320,6 +241,20 @@ EWOULDBLOCK
 		}
 		int rc = uv_fs_mkdir(env->loop, &req, *path, mode, NULL);
 		args.GetReturnValue().Set(Integer::New(isolate, rc));
+		uv_fs_req_cleanup(&req);
+	}
+
+	void FileSystem::Rmdir(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		uv_fs_t req;
+		String::Utf8Value path(isolate, args[0]);
+		int rc = uv_fs_rmdir(env->loop, &req, *path, NULL);
+		args.GetReturnValue().Set(Integer::New(isolate, rc));
+		uv_fs_req_cleanup(&req);
 	}
 
 	void FileSystem::FStat(const FunctionCallbackInfo<Value> &args)
@@ -329,34 +264,29 @@ EWOULDBLOCK
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args[0].As<v8::Object>());
+		v8::Local<v8::BigUint64Array> answer = args[1].As<v8::BigUint64Array>();
+		Local<ArrayBuffer> ab = answer->Buffer();
+		uint64_t *fields = static_cast<uint64_t *>(ab->GetContents().Data());
 		uv_fs_t req;
 		int rc = uv_fs_fstat(env->loop, &req, obj->fd, NULL);
 		if (rc == 0) {
 			const uv_stat_t* const s = static_cast<const uv_stat_t*>(req.ptr);
-			args.GetReturnValue().Set(Integer::New(isolate, s->st_size));
-			uv_fs_req_cleanup(&req);
-			return;
-/*
-  uint64_t st_dev;
-  uint64_t st_mode;
-  uint64_t st_nlink;
-  uint64_t st_uid;
-  uint64_t st_gid;
-  uint64_t st_rdev;
-  uint64_t st_ino;
-  uint64_t st_size;
-  uint64_t st_blksize;
-  uint64_t st_blocks;
-  uint64_t st_flags;
-  uint64_t st_gen;
-  uv_timespec_t st_atim;
-  uv_timespec_t st_mtim;
-  uv_timespec_t st_ctim;
-  uv_timespec_t st_birthtim;
-*/
+			fields[0] = s->st_dev;
+			fields[1] = s->st_mode;
+			fields[2] = s->st_nlink;
+			fields[3] = s->st_uid;
+			fields[4] = s->st_gid;
+			fields[5] = s->st_rdev;
+			fields[6] = s->st_ino;
+			fields[7] = s->st_size;
+			fields[8] = s->st_blksize;
+			fields[9] = s->st_blocks;
+			fields[10] = s->st_flags;
+			fields[11] = s->st_gen;
+			args.GetReturnValue().Set(Integer::New(isolate, 0));
 		}
+		args.GetReturnValue().Set(Integer::New(isolate, rc));
 		uv_fs_req_cleanup(&req);
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
 	void FileSystem::Rename(const FunctionCallbackInfo<Value> &args)

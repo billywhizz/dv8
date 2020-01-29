@@ -1,6 +1,6 @@
-const { library, args } = dv8
-const { File, FileSystem } = library('fs', {})
-const { O_CREAT, O_TRUNC, O_RDONLY, O_WRONLY, S_IRUSR, S_IWUSR, S_IXUSR } = FileSystem
+const { args, require } = dv8
+const { readFile, writeFile, FileSystem } = require('./fs.js')
+const { O_CREAT, O_TRUNC, O_WRONLY, S_IRUSR, S_IWUSR, S_IXUSR } = FileSystem
 
 function alloc (size, shared) {
   const buf = Buffer.create()
@@ -11,33 +11,12 @@ function alloc (size, shared) {
 
 function fromString (str, shared) {
   const buf = Buffer.alloc(str.length, shared)
-  buf.write(str)
+  buf.write(str, 0)
   return buf
 }
 
 Buffer.alloc = alloc
 Buffer.fromString = fromString
-
-function readFile (path, flags = O_RDONLY) {
-  const file = new File()
-  file.fd = file.open(path, flags)
-  if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
-  file.size = FileSystem.fstat(file)
-  const buf = Buffer.alloc(file.size)
-  file.setup(buf, buf)
-  const len = file.read(file.size, 0)
-  if (len < 0) throw new Error(`Error reading ${path}: ${len}`)
-  file.close()
-  return buf
-}
-
-function writeFile (fileName, buf, flags = O_CREAT | O_TRUNC | O_WRONLY, mode = S_IRUSR | S_IWUSR) {
-  const file = new File()
-  file.setup(buf, buf)
-  file.fd = file.open(fileName, flags, mode)
-  file.write(buf.size, 0)
-  file.close()
-}
 
 function getModuleCompiles (config) {
   let result = config.modules.map(name => `$CC $CCFLAGS -I$DV8_SRC/modules/${name} -c -o $DV8_OUT/${name}.o $DV8_SRC/modules/${name}/${name}.cc`).join('\n')

@@ -482,9 +482,12 @@ void Buffer::Read(const FunctionCallbackInfo<Value> &args)
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  int32_t off = args[0]->Int32Value(context).ToChecked();
-  int32_t len = args[1]->Int32Value(context).ToChecked();
   Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+  int32_t off = 0;
+  int32_t len = b->_length;
+  int argc = args.Length();
+  if (argc > 0) off = args[0]->Int32Value(context).ToChecked();
+  if (argc > 1) len = args[1]->Int32Value(context).ToChecked();
   const char *data = b->_data + off;
   args.GetReturnValue().Set(String::NewFromUtf8(isolate, data, v8::NewStringType::kNormal, len).ToLocalChecked());
 }

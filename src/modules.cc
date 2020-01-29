@@ -27,10 +27,6 @@ if (strcmp("libz", module_name) == 0) {
 dv8::libz::InitAll(exports);
 return;
 }
-if (strcmp("openssl", module_name) == 0) {
-dv8::openssl::InitAll(exports);
-return;
-}
 if (strcmp("os", module_name) == 0) {
 dv8::os::InitAll(exports);
 return;
