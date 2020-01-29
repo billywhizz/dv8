@@ -2,6 +2,9 @@
 #include "builtins.h"
 
 int main(int argc, char *argv[]) {
+  //#include <unistd.h>
+  //int rc = chroot("./");
+  //fprintf(stderr, "chroot: %i\n", rc);
   std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
   v8::V8::InitializePlatform(platform.get());
   v8::V8::Initialize();

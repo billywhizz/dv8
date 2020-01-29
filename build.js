@@ -2,6 +2,73 @@ const { args, require } = dv8
 const { readFile, writeFile, FileSystem } = require('./src/util.js')
 const { O_CREAT, O_TRUNC, O_WRONLY, S_IRUSR, S_IWUSR, S_IXUSR } = FileSystem
 
+/*
+
+  const char *module_path = "/usr/local/lib/dv8/";
+  char lib_name[1024];
+  if (args.Length() > 2) {
+    String::Utf8Value str(args.GetIsolate(), args[2]);
+    module_path = *str;
+    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
+  } else {
+    if (strcmp("loop", module_name) == 0) {
+      dv8::loop::InitAll(exports);
+      return;
+    } else if (strcmp("socket", module_name) == 0) {
+      dv8::socket::InitAll(exports);
+      return;
+    } else if (strcmp("timer", module_name) == 0) {
+      dv8::timer::InitAll(exports);
+      return;
+    } else if (strcmp("zlib", module_name) == 0) {
+      dv8::libz::InitAll(exports);
+      return;
+    } else if (strcmp("thread", module_name) == 0) {
+      dv8::thread::InitAll(exports);
+      return;
+    } else if (strcmp("fs", module_name) == 0) {
+      dv8::fs::InitAll(exports);
+      return;
+    } else if (strcmp("udp", module_name) == 0) {
+      dv8::udp::InitAll(exports);
+      return;
+    } else if (strcmp("process", module_name) == 0) {
+      dv8::process::InitAll(exports);
+      return;
+    } else if (strcmp("tty", module_name) == 0) {
+      dv8::tty::InitAll(exports);
+      return;
+    } else if (strcmp("openssl", module_name) == 0) {
+      dv8::openssl::InitAll(exports);
+      return;
+    } else if (strcmp("os", module_name) == 0) {
+      dv8::os::InitAll(exports);
+      return;
+    }
+    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
+  }
+  uv_lib_t lib;
+  args.GetReturnValue().Set(exports);
+  fprintf(stderr, "%s\n", lib_name);
+  int success = uv_dlopen(lib_name, &lib);
+  if (success != 0) {
+    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlopen failed").ToLocalChecked()));
+    return;
+  }
+  char register_name[128];
+  snprintf(register_name, 128, "_register_%s", module_name);
+  void *address;
+  success = uv_dlsym(&lib, register_name, &address);
+  if (success != 0) {
+    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlsym failed").ToLocalChecked()));
+    return;
+  }
+  register_plugin _init = reinterpret_cast<register_plugin>(address);
+  auto _register = reinterpret_cast<InitializerCallback>(_init());
+  _register(exports);
+
+*/
+
 function alloc (size, shared) {
   const buf = Buffer.create()
   buf.bytes = shared ? buf.allocShared(size) : buf.alloc(size)
