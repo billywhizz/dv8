@@ -1,9 +1,9 @@
 {
+  "target": "release",
   "CC": "ccache g++",
   "deps": "./deps",
   "src": "./src",
   "build": "./build",
-  "target": "release",
   "override": false,
   "builtins": true,
   "out": "dv8",
@@ -12,8 +12,18 @@
     "modulesHeader": "./src/modules.h",
     "modulesSource": "./src/modules.cc"
   },
-  "libs": ["deps/mbedtls/library/libmbedcrypto.a"],
-  "modules": ["loop", "timer", "fs", "process", "tty", "socket", "mbedtls", "thread", "udp"],
-  "libs2": ["deps/mbedtls/library/libmbedcrypto.a", "/usr/lib/x86_64-linux-gnu/libssl.a", "/usr/lib/x86_64-linux-gnu/libcrypto.a"],
-  "modules2": ["loop", "timer", "fs", "process", "tty", "socket", "openssl", "httpParser", "mbedtls"]
+  "libs": [
+    "deps/mbedtls/library/libmbedcrypto.a",
+    "/usr/lib/x86_64-linux-gnu/libssl.a",
+    "/usr/lib/x86_64-linux-gnu/libcrypto.a"
+  ],
+  "modules": [
+    "loop",
+    "timer",
+    "fs",
+    "process",
+    "openssl",
+    "mbedtls",
+    "tty"
+  ]
 }
