@@ -51,6 +51,10 @@ if (strcmp("httpParser", module_name) == 0) {
 dv8::httpParser::InitAll(exports);
 return;
 }
+if (strcmp("openssl", module_name) == 0) {
+dv8::openssl::InitAll(exports);
+return;
+}
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {

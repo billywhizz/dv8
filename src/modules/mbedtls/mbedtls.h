@@ -1,8 +1,7 @@
-#ifndef DV8_Hash_H
-#define DV8_Hash_H
+#ifndef DV8_MBEDTLS_Hash_H
+#define DV8_MBEDTLS_Hash_H
 
 #include <dv8.h>
-#include <mbedtls/md2.h>
 #include <mbedtls/md4.h>
 #include <mbedtls/md5.h>
 #include <mbedtls/ripemd160.h>
@@ -60,6 +59,9 @@ class Hash : public dv8::ObjectWrap {
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 	private:
+		uv_buf_t* in;
+		uv_buf_t* out;
+		uint32_t algorithm;
 
 		Hash() {
 		}
@@ -70,6 +72,8 @@ class Hash : public dv8::ObjectWrap {
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void MD5(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void SHA256(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Digest(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

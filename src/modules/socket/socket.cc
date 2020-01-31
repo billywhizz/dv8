@@ -222,7 +222,11 @@ void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf)
   // it will not be overwritten until after after_read completes
   _context *ctx = (_context *)handle->data;
   buf->base = ctx->in.base;
-  buf->len = ctx->in.len;
+  if (size < ctx->in.len) {
+    buf->len = size;
+  } else {
+    buf->len = ctx->in.len;
+  }
 }
 
 void on_client_connection(uv_connect_t *client, int status)
@@ -443,13 +447,15 @@ void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
 {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
   Socket *s = ObjectWrap::Unwrap<Socket>(args.Holder());
   struct sockaddr_storage address;
   _context *ctx = s->context;
+  Local<Object> o = Object::New(isolate);
+  args.GetReturnValue().Set(o);
   int addrlen = sizeof(address);
   int r = uv_tcp_getpeername((uv_tcp_t *)ctx->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
-  if (r)
-  {
+  if (r) {
     return;
   }
   const sockaddr *addr = reinterpret_cast<const sockaddr *>(&address);
@@ -459,8 +465,8 @@ void Socket::RemoteAddress(const FunctionCallbackInfo<Value> &args)
   int len = sizeof ip;
   uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
   len = strlen(ip);
-  args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked());
-  return;
+  o->Set(context, String::NewFromUtf8(isolate, "address", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, ip).ToLocalChecked());
+  o->Set(context, String::NewFromUtf8(isolate, "port", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, a4->sin_port));
 }
 
 void Socket::Close(const FunctionCallbackInfo<Value> &args)

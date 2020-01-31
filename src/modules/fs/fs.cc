@@ -321,6 +321,12 @@ using dv8::builtins::Buffer;
 			fields[9] = s->st_blocks;
 			fields[10] = s->st_flags;
 			fields[11] = s->st_gen;
+			fields[12] = s->st_atim.tv_sec;
+			fields[13] = s->st_atim.tv_nsec;
+			fields[14] = s->st_mtim.tv_sec;
+			fields[15] = s->st_mtim.tv_nsec;
+			fields[16] = s->st_ctim.tv_sec;
+			fields[17] = s->st_ctim.tv_nsec;
 			args.GetReturnValue().Set(Integer::New(isolate, 0));
 		}
 		args.GetReturnValue().Set(Integer::New(isolate, rc));

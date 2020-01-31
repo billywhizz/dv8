@@ -83,8 +83,8 @@ endif
 
 clean:
 	$(MAKE) -C library clean
-#	$(MAKE) -C programs clean
-#	$(MAKE) -C tests clean
+	$(MAKE) -C programs clean
+	$(MAKE) -C tests clean
 ifndef WINDOWS
 	find . \( -name \*.gcno -o -name \*.gcda -o -name \*.info \) -exec rm {} +
 endif

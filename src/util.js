@@ -35,7 +35,7 @@ const {
 } = FileSystem
 
 const { fstat } = FileSystem
-const statArray = new BigUint64Array(16)
+const statArray = new BigUint64Array(32)
 const st = {}
 const MAX_DIR_SIZE = 1024
 const listing = new Array(MAX_DIR_SIZE)
@@ -97,6 +97,9 @@ function setStats (fileName) {
   st.blocks = statArray[9]
   st.flags = statArray[10]
   st.st_gen = statArray[11] // ?
+  st.accessed = { tv_sec: statArray[12], tv_usec: statArray[13] }
+  st.modified = { tv_sec: statArray[14], tv_usec: statArray[15] }
+  st.created = { tv_sec: statArray[16], tv_usec: statArray[17] }
   st.permissions = {
     user: { r: checkFlag(st.mode, S_IRUSR), w: checkFlag(st.mode, S_IWUSR), x: checkFlag(st.mode, S_IXUSR) },
     group: { r: checkFlag(st.mode, S_IRGRP), w: checkFlag(st.mode, S_IWGRP), x: checkFlag(st.mode, S_IXGRP) },
@@ -146,6 +149,135 @@ function writeFile (path, buf, flags = O_CREAT | O_TRUNC | O_WRONLY, mode = S_IR
   file.close()
 }
 
-const readdir = path => listing.slice(0, FileSystem.readdir(path, listing))
+const lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.split('')
 
-module.exports = { readFile, writeFile, stat, FileSystem, exec, readdir, fileType }
+const buf2b64 = (buf, len = buf.size) => {
+  const bytes = new Uint8Array(buf.bytes.slice(0, len))
+  let i = 0
+  const encoded = []
+  while (i < len) {
+    const a = i < len ? bytes[i++] : 0
+    const b = i < len ? bytes[i++] : 0
+    const c = i < len ? bytes[i++] : 0
+    const triple = (a << 0x10) + (b << 0x08) + c
+    encoded.push(lookup[(triple >> 3 * 6) & 0x3f])
+    encoded.push(lookup[(triple >> 2 * 6) & 0x3f])
+    encoded.push(lookup[(triple >> 1 * 6) & 0x3f])
+    encoded.push(lookup[(triple >> 0 * 6) & 0x3f])
+  }
+  const over = len % 3
+  if (over === 1) {
+    encoded[encoded.length - 1] = '='
+    encoded[encoded.length - 2] = '='
+  } else if (over === 2) {
+    encoded[encoded.length - 1] = '='
+  }
+  return encoded.join('')
+}
+
+const rx = /\B(?=(\d{3})+(?!\d))/g
+
+function formatRPS (count, ms) {
+  return (Math.floor((count / (ms / 1000)) * 100) / 100).toFixed(2).replace(rx, ',')
+}
+
+const readdir = path => listing.slice(0, FileSystem.readdir(path, listing))
+const stringify = (o, sp = '  ') => JSON.stringify(o, (k, v) => (typeof v === 'bigint') ? Number(v) : v, sp)
+
+const defaultIgnore = ['length', 'name', 'arguments', 'caller', 'constructor']
+
+const ANSI_RED = '\u001b[31m'
+const ANSI_MAGENTA = '\u001b[35m'
+const ANSI_DEFAULT = '\u001b[0m'
+const ANSI_CYAN = '\u001b[36m'
+const ANSI_GREEN = '\u001b[32m'
+const ANSI_WHITE = '\u001b[37m'
+const ANSI_YELLOW = '\u001b[33m'
+
+/* eslint-disable */
+String.prototype.magenta = function (pad) { return `${ANSI_MAGENTA}${this.padEnd(pad, ' ')}${ANSI_DEFAULT}` }
+String.prototype.red = function (pad) { return `${ANSI_RED}${this.padEnd(pad, ' ')}${ANSI_DEFAULT}` }
+String.prototype.green = function (pad) { return `${ANSI_GREEN}${this.padEnd(pad, ' ')}${ANSI_DEFAULT}` }
+String.prototype.cyan = function (pad) { return `${ANSI_CYAN}${this.padEnd(pad, ' ')}${ANSI_DEFAULT}` }
+String.prototype.white = function (pad) { return `${ANSI_WHITE}${this.padEnd(pad, ' ')}${ANSI_DEFAULT}` }
+String.prototype.yellow = function (pad) { return `${ANSI_YELLOW}${this.padEnd(pad, ' ')}${ANSI_DEFAULT}` }
+/* eslint-enable */
+
+function inspect (o, indent = 0, max = 100, ignore = defaultIgnore, lines = [], colors = 'off') {
+  if (indent === max) return lines
+  try {
+    if (typeof o === 'object') {
+      const props = Object.getOwnPropertyNames(o).filter(n => (ignore.indexOf(n) === -1))
+      const hasConstructor = o.hasOwnProperty('constructor') // eslint-disable-line
+      props.forEach(p => {
+        if (p === 'global' || p === 'globalThis') return
+        if (typeof o[p] === 'object') {
+          lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').cyan(0)}`, false)
+        } else if (typeof o[p] === 'function') {
+          if (hasConstructor) {
+            lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').yellow(0)}`, false)
+          } else {
+            lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').magenta(0)}`, false)
+          }
+        } else {
+          lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').green(0)}`, false)
+        }
+        inspect(o[p], indent + 1, max, ignore, lines)
+      })
+    } else if (typeof o === 'function') {
+      const props = Object.getOwnPropertyNames(o).filter(n => (ignore.indexOf(n) === -1))
+      const hasConstructor = o.hasOwnProperty('constructor') // eslint-disable-line
+      props.forEach(p => {
+        if (p === 'prototype') {
+          inspect(o[p], indent + 1, max, ignore, lines)
+        } else {
+          if (typeof o[p] === 'object') {
+            lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').cyan(0)}`, false)
+          } else if (typeof o[p] === 'function') {
+            if (hasConstructor) {
+              lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').yellow(0)}`, false)
+            } else {
+              lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').magenta(0)}`, false)
+            }
+          } else {
+            lines.push(`\n${p.padStart(p.length + (indent * 2), ' ').green(0)}`, false)
+          }
+          inspect(o[p], indent + 1, max, ignore, lines)
+        }
+      })
+    } else {
+      lines.push(`: ${o.toString()}`, false)
+    }
+  } catch (err) {}
+  return lines
+}
+
+const statCache = {}
+
+function watchFile (path, onChange, ms = 1000) {
+  const file = new File()
+  file.fd = file.open(path, O_RDONLY)
+  if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
+  file.timer = setInterval(() => {
+    FileSystem.fstat(file, statArray)
+    setStats(path)
+    const last = statCache[path]
+    if (!last) {
+      statCache[path] = Object.assign({}, st)
+      return
+    }
+    if (st.modified.tv_sec > last.modified.tv_sec) {
+      onChange(st)
+      statCache[path] = Object.assign({}, st)
+    }
+  }, ms)
+  return file
+}
+
+function buf2hex (ab, len) {
+  return Array.prototype.map.call((new Uint8Array(ab)).slice(0, len), x => ('00' + x.toString(16)).slice(-2)).join('')
+}
+
+const commas = str => str.toString().replace(rx, ',')
+
+module.exports = { readFile, writeFile, stat, FileSystem, exec, readdir, fileType, formatRPS, stringify, inspect, commas, watchFile, buf2b64, buf2hex }

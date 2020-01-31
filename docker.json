@@ -11,6 +11,24 @@
     "modulesHeader": "./src/modules.h",
     "modulesSource": "./src/modules.cc"
   },
-  "libs": ["/deps/mbedtls/library/libmbedcrypto.a"],
-  "modules": ["loop", "timer", "fs", "process", "tty", "libz", "os", "socket", "thread", "udp", "mbedtls", "httpParser"]
+  "libs": [
+    "/usr/lib/x86_64-linux-gnu/libssl.a",
+    "/usr/lib/x86_64-linux-gnu/libcrypto.a",
+    "/deps/mbedtls/library/libmbedcrypto.a"
+  ],
+  "modules": [
+    "loop",
+    "timer",
+    "fs",
+    "process",
+    "tty",
+    "libz",
+    "os",
+    "socket",
+    "thread",
+    "udp",
+    "mbedtls",
+    "httpParser",
+    "openssl"
+  ]
 }

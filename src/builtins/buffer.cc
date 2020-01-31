@@ -342,6 +342,7 @@ void Buffer::Create(const FunctionCallbackInfo<Value> &args)
   }
   b->_length = 0;
   b->Wrap(instance);
+  //b->_free = false;
   if (length > 0)
   {
     b->_data = (char *)calloc(length, 1);

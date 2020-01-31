@@ -15,6 +15,7 @@
 #include <modules/udp/udp.h>
 #include <modules/mbedtls/mbedtls.h>
 #include <modules/httpParser/httpParser.h>
+#include <modules/openssl/openssl.h>
 
 namespace dv8 {
 
