@@ -8,6 +8,8 @@ using dv8::builtins::Buffer;
 
 	void InitAll(Local<Object> exports) {
 		ZLib::Init(exports);
+		Isolate* isolate = exports->GetIsolate();
+		DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, mz_version()).ToLocalChecked(), "version", exports);
 	}
 
   static void* AllocForZlib(void* data, uInt items, uInt size) {

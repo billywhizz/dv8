@@ -9,6 +9,7 @@
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/md.h>
+#include <mbedtls/version.h>
 
 namespace dv8 {
 

@@ -10,7 +10,15 @@ using dv8::socket::Socket;
 using dv8::socket::socket_plugin;
 
 void InitAll(Local<Object> exports) {
+	Isolate* isolate = exports->GetIsolate();
 	HTTPParser::Init(exports);
+	unsigned long version = http_parser_version();
+	unsigned major = (version >> 16) & 255;
+	unsigned minor = (version >> 8) & 255;
+	unsigned patch = version & 255;
+	char version_str[14];
+	snprintf(version_str, 14, "%u.%u.%u", major, minor, patch);
+	DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, version_str).ToLocalChecked(), "version", exports);
 }
 
 int message_begin_cb(http_parser *parser) {

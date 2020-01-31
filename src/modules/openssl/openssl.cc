@@ -17,6 +17,10 @@ using dv8::socket::socket_plugin;
 			Hmac::Init(exports);
 			SecureContext::Init(exports);
 			SecureSocket::Init(exports);
+
+			Isolate* isolate = exports->GetIsolate();
+			DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, SSL_version_str).ToLocalChecked(), "version", exports);
+
 			if (loads == 1) {
 				//fprintf(stderr, "initialize ssl\n");
 				SSL_library_init();

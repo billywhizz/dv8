@@ -411,14 +411,23 @@ function main (args) {
   dv8.nextTick = wrapNextTick(new EventLoop())
   dv8.path = pathMod
 
+  dv8.versions = {
+    dv8: dv8.version,
+    javascript: `v8 ${dv8.v8}`,
+    loop: `libuv ${library('loop').version || 'n/a'}`,
+    libz: `miniz ${library('libz').version || 'n/a'}`,
+    mbedtls: library('mbedtls').version || 'n/a',
+    openssl: library('openssl').version || 'n/a',
+    httpParser: library('httpParser').version || 'n/a',
+    glibc: `glibc ${dv8.glibc}`
+  }
+
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout
   global.setInterval = setInterval
 
   // remove things we don't want in the global namespace
   delete global.eval // eslint-disable-line
-  //delete global.WebAssembly
-  //delete global.send // todo - we need this for inspector
   delete global.console
 
   // if workerSource is set we are in a thread

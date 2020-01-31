@@ -21,6 +21,8 @@ void OS::Init(Local<Object> exports)
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onSignal", OS::OnSignal);
+  
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, SIGPIPE), "SIGPIPE", tpl);
 
   DV8_SET_EXPORT(isolate, tpl, "OS", exports);
 }

@@ -122,6 +122,7 @@ function stat (path, flags = O_RDONLY) {
   if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
   FileSystem.fstat(file, statArray)
   setStats(path)
+  file.close()
   return st
 }
 

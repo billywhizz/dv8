@@ -12,6 +12,8 @@
 #include <env.h>
 #include <string.h>
 #include <modules.h>
+#include <sys/utsname.h>
+#include <gnu/libc-version.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
@@ -198,13 +200,14 @@ typedef struct {
 void PromiseRejectCallback(PromiseRejectMessage message);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
 Local<Context> CreateContext(Isolate *isolate);
-// Global Functions
+// DV8 Runtime Functions
 void Print(const FunctionCallbackInfo<Value> &args);
-void Version(const FunctionCallbackInfo<Value> &args);
+void Err(const FunctionCallbackInfo<Value> &args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
 void shutdown(uv_loop_t *loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value> &args);
+void Exit(const FunctionCallbackInfo<Value> &args);
 void HeapSpaceUsage(const FunctionCallbackInfo<Value> &args);
 void EnvVars(const FunctionCallbackInfo<Value> &args);
 void RunScript(const FunctionCallbackInfo<Value> &args);

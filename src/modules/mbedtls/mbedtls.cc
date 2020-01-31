@@ -6,6 +6,17 @@ namespace mbedtls {
 	using dv8::builtins::Environment;
 	using dv8::builtins::Buffer;
 
+	void InitAll(Local<Object> exports)
+	{
+		Isolate* isolate = exports->GetIsolate();
+		char version_string[256];
+		mbedtls_version_get_string_full(version_string);
+		DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, version_string).ToLocalChecked(), "version", exports);
+		Crypto::Init(exports);
+		Hash::Init(exports);
+		Hmac::Init(exports);
+	}
+
 	void Crypto::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
@@ -292,13 +303,6 @@ namespace mbedtls {
       answer->Set(context, i, v8::Number::New(isolate, digest[i]));
 		}
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
-	}
-
-	void InitAll(Local<Object> exports)
-	{
-		Crypto::Init(exports);
-		Hash::Init(exports);
-		Hmac::Init(exports);
 	}
 
 }

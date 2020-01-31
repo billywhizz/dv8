@@ -13,6 +13,8 @@ using dv8::builtins::Buffer;
 
 	void InitAll(Local<Object> exports) {
 		EventLoop::Init(exports);
+		Isolate* isolate = exports->GetIsolate();
+		DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, uv_version_string()).ToLocalChecked(), "version", exports);
 	}
 
 	void EventLoop::Init(Local<Object> exports) {
