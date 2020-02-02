@@ -51,5 +51,3 @@ $CC -static $LDFLAGS -s -o $DV8_OUT/dv8
 else
 $CC -static $LDFLAGS -o $DV8_OUT/dv8
 fi
-rm -f $DV8_OUT/*.a
-rm -f $DV8_OUT/*.o

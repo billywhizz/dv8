@@ -172,8 +172,7 @@ $CC -static $LDFLAGS -s -o $DV8_OUT/${config.out || 'dv8'}
 else
 $CC -static $LDFLAGS -o $DV8_OUT/${config.out || 'dv8'}
 fi
-rm -f $DV8_OUT/*.a
-rm -f $DV8_OUT/*.o`
+`
 }
 
 function getHeader (config) {
@@ -216,7 +215,7 @@ inline void initLibrary(Local<Object> exports, const char* module_name) {
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
+  v8::Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);

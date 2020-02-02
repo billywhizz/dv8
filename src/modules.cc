@@ -58,7 +58,7 @@ return;
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
+  v8::Isolate *isolate = args.GetIsolate();
   HandleScope handleScope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   String::Utf8Value str(args.GetIsolate(), args[0]);

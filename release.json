@@ -1,5 +1,5 @@
 {
-  "target": "release",
+  "target": "debug",
   "CC": "ccache g++",
   "deps": "./deps",
   "src": "./src",
@@ -13,12 +13,23 @@
     "modulesSource": "./src/modules.cc"
   },
   "libs": [
+    "deps/mbedtls/library/libmbedcrypto.a",
+    "/usr/lib/x86_64-linux-gnu/libssl.a",
+    "/usr/lib/x86_64-linux-gnu/libcrypto.a"
   ],
   "modules": [
     "loop",
     "timer",
     "fs",
     "process",
-    "tty"
+    "tty",
+    "libz",
+    "os",
+    "socket",
+    "thread",
+    "udp",
+    "mbedtls",
+    "httpParser",
+    "openssl"
   ]
 }

@@ -403,6 +403,7 @@ void Cwd(const FunctionCallbackInfo<Value> &args) {
   free(cwd);
 }
 
+// TODO: could autogenerate which of these are available on dv8 object in config
 Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
   Local<ObjectTemplate> dv8 = ObjectTemplate::New(isolate);
