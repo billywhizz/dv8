@@ -343,6 +343,9 @@ function replModule () {
   const tty = library('tty')
 
   function repl () {
+    // todo: i want to be able to pass a context in here and have the repl
+    // commands run inside a single, separate context, not on global scope as
+    // they currently do
     if (!stdin) stdin = new tty.TTY(0)
     if (!stdout) stdout = new tty.TTY(1)
     const { UV_TTY_MODE_NORMAL } = tty
@@ -350,6 +353,9 @@ function replModule () {
     const MAX_BUFFER = 4 * BUFFER_SIZE
     const buf = Buffer.alloc(BUFFER_SIZE)
     stdin.setup(buf, UV_TTY_MODE_NORMAL)
+    // todo: would be nice to have c++ await a promise returned from callbacks
+    // so we could do async inside the handler and block the reading of the
+    // stream until we resolve. don't think it would be possible
     stdin.onRead(len => {
       const source = buf.read(0, len)
       try {
