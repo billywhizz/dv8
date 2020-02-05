@@ -339,6 +339,7 @@ function requireModule (pathMod) {
 function replModule () {
   let stdin
   let stdout
+  // todo: we need a runscript that is awaitable
   const { runScript, print, library } = dv8
   const tty = library('tty')
 
@@ -360,9 +361,13 @@ function replModule () {
       const source = buf.read(0, len)
       try {
         const result = runScript(source, 'repl')
-        const payload = `${JSON.stringify(result, null, 2)}\n`
-        const r = stdout.write(buf.write(payload, 0))
-        if (r < 0) return stdout.close()
+        if (result) {
+          const payload = `${JSON.stringify(result, null, 2)}\n`
+          if (payload) {
+            const r = stdout.write(buf.write(payload, 0))
+            if (r < 0) return stdout.close()
+          }
+        }
       } catch (err) {
         print(err.stack)
       }

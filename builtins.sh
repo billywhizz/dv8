@@ -1,5 +1,5 @@
-MAIN=${2:-default}
-OVERRIDE=${3:-src/override.js}
+MAIN=${1:-default}
+OVERRIDE=${2:-src/override.js}
 if [[ "$MAIN" == "override" ]]; then
   echo "building overridden main with $OVERRIDE"
   cp src/main.js src/backup.js

@@ -182,6 +182,10 @@ void TTY::Init(Local<Object> exports)
 
     DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_EOF), "UV_EOF", tpl);
     DV8_SET_CONSTANT(isolate, Integer::New(isolate, UV_EAGAIN), "UV_EAGAIN", tpl);
+
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, 0), "STDIN", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, 1), "STDOUT", tpl);
+    DV8_SET_CONSTANT(isolate, Integer::New(isolate, 2), "STDERR", tpl);
 }
 
 void TTY::New(const FunctionCallbackInfo<Value> &args)

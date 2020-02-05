@@ -1,11 +1,13 @@
 {
   "target": "release",
-  "CC": "ccache g++",
+  "CC": "ccache clang++",
   "deps": "./deps",
   "src": "./src",
   "build": "./build",
   "override": false,
   "builtins": true,
+  "compilerOptions": "-O3",
+  "linkOptions": "-s -static",
   "out": "dv8",
   "output": {
     "build": "./platform.sh",
@@ -19,6 +21,9 @@
     "timer",
     "fs",
     "process",
-    "tty"
+    "tty",
+    "socket",
+    "httpParser",
+    "libz"
   ]
 }

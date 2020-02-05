@@ -376,6 +376,7 @@ void Buffer::Alloc(const FunctionCallbackInfo<Value> &args)
         fprintf(stderr, "oh dear\n");
         return;
       }
+      // todo: store a persistent handle on the buffer
       Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, b->_data, length, ArrayBufferCreationMode::kExternalized);
       b->_length = length;
       b->_free = false;

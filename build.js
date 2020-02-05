@@ -88,10 +88,10 @@ Buffer.fromString = fromString
 function getModuleCompiles (config) {
   let result = config.modules.map(name => `$CC $CCFLAGS -I$DV8_SRC/modules/${name} -c -o $DV8_OUT/${name}.o $DV8_SRC/modules/${name}/${name}.cc`).join('\n')
   if (config.modules.some(v => v === 'libz')) {
-    result = `${result}\n$CC $CCFLAGS -c -o $DV8_OUT/miniz.o $MINIZ_INCLUDE/miniz.c`
+    result = `${result}\n$C $CFLAGS -c -o $DV8_OUT/miniz.o $MINIZ_INCLUDE/miniz.c`
   }
   if (config.modules.some(v => v === 'httpParser')) {
-    result = `${result}\n$CC -DHTTP_PARSER_STRICT=0 $CCFLAGS -c -o $DV8_OUT/http_parser.o $HTTPPARSER_INCLUDE/http_parser.c`
+    result = `${result}\n$C -DHTTP_PARSER_STRICT=0 $CFLAGS -c -o $DV8_OUT/http_parser.o $HTTPPARSER_INCLUDE/http_parser.c`
   }
   return result
 }
@@ -110,7 +110,7 @@ function getLinkLine (config) {
 
 function getBuiltins (config) {
   if (!config.builtins) return ''
-  let args = `${config.target}`
+  let args = ''
   if (config.override) {
     args = `${args} override`
     if (config.override.path) {
@@ -132,9 +132,18 @@ function getLibs (config) {
   return config.libs.join(' ')
 }
 
+function compilerOptions (config) {
+  if (config.compilerOptions) return `${config.compilerOptions} `
+  return ''
+}
+
+function linkOptions (config) {
+  if (config.linkOptions) return `${config.linkOptions} `
+  return ''
+}
+
 function getBuildScript (config) {
   return `#!/bin/bash
-CONFIG=${config.target}
 ${getBuiltins(config)}
 export DV8_DEPS=${config.deps}
 export DV8_SRC=${config.src}
@@ -148,17 +157,14 @@ export MINIZ_INCLUDE=$DV8_DEPS/miniz
 export MBEDTLS_INCLUDE=$DV8_DEPS/mbedtls/include
 export BUILTINS=$DV8_SRC/builtins
 export TRACE="TRACE=0"
-if [[ "$CONFIG" == "release" ]]; then
-    export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
-    export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -Wl,--end-group"
-else
-    export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -g -fno-omit-frame-pointer -fno-rtti -fno-exceptions -std=gnu++1y"
-    export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -Wl,--end-group"
-fi
+export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 ${compilerOptions(config)}-fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
+export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -Wl,--end-group"
 echo "building mbedtls"
 make -C $DV8_DEPS/mbedtls/ lib
-echo "building dv8 platform ($CONFIG)"
-export CC="${config.CC}"
+echo "building dv8 platform (${config.target})"
+export CC="${config.CC || 'g++'}"
+export C="${config.C || 'gcc'}"
+export CFLAGS="-Wall -Wextra"
 $CC $CCFLAGS -c -o $DV8_OUT/buffer.o $DV8_SRC/builtins/buffer.cc
 $CC $CCFLAGS -c -o $DV8_OUT/env.o $DV8_SRC/builtins/env.cc
 ${getModuleCompiles(config)}
@@ -167,11 +173,7 @@ $CC $CCFLAGS -c -o $DV8_OUT/dv8main.o $DV8_SRC/dv8_main.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8.o $DV8_SRC/dv8.cc
 rm -f $DV8_OUT/dv8.a
 ${getLinkLine(config)}
-if [[ "$CONFIG" == "release" ]]; then
-$CC -static $LDFLAGS -s -o $DV8_OUT/${config.out || 'dv8'}
-else
-$CC -static $LDFLAGS -o $DV8_OUT/${config.out || 'dv8'}
-fi
+$CC $LDFLAGS ${linkOptions(config)}-o $DV8_OUT/${config.out || 'dv8'}
 `
 }
 
