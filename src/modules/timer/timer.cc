@@ -7,6 +7,23 @@ namespace timer
 {
 using dv8::builtins::Environment;
 
+int on_timer_event(jsys_descriptor *timer) {
+    jsys_timer_read(timer);
+    Timer *t = (Timer *)timer->data;
+    Isolate *isolate = Isolate::GetCurrent();
+    v8::HandleScope handleScope(isolate);
+    const unsigned int argc = 0;
+    Local<Value> argv[argc] = {};
+    v8::TryCatch try_catch(isolate);
+    Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
+    Local<Context> ctx = isolate->GetCurrentContext();
+    cb->Call(ctx, ctx->Global(), 0, argv);
+    if (try_catch.HasCaught()) {
+        dv8::ReportException(isolate, &try_catch);
+    }
+    return 0;
+}
+
 void InitAll(Local<Object> exports)
 {
   Timer::Init(exports);
@@ -23,8 +40,6 @@ void Timer::Init(Local<Object> exports)
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "start", Timer::Start);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "stop", Timer::Stop);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", Timer::Close);
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "again", Timer::Again);
-    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "unref", Timer::UnRef);
 
     DV8_SET_EXPORT(isolate, tpl, "Timer", exports);
 }
@@ -37,22 +52,19 @@ void Timer::New(const FunctionCallbackInfo<Value> &args)
         Local<Context> context = isolate->GetCurrentContext();
         Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
         Timer *obj = new Timer();
-        obj->handle = (uv_timer_t *)calloc(1, sizeof(uv_timer_t));
-        int r = uv_timer_init(env->loop, obj->handle);
-        obj->handle->data = obj;
         obj->Wrap(args.This());
         args.GetReturnValue().Set(args.This());
     }
 }
 
 void Timer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-  Isolate *isolate = data.GetIsolate();
-  v8::HandleScope handleScope(isolate);
-  ObjectWrap *wrap = data.GetParameter();
-  Timer* sock = static_cast<Timer *>(wrap);
-		#if TRACE
-		fprintf(stderr, "Timer::Destroy\n");
-		#endif
+    Isolate *isolate = data.GetIsolate();
+    v8::HandleScope handleScope(isolate);
+    ObjectWrap *wrap = data.GetParameter();
+    Timer* sock = static_cast<Timer *>(wrap);
+    #if TRACE
+    fprintf(stderr, "Timer::Destroy\n");
+    #endif
 }
 
 void Timer::Start(const FunctionCallbackInfo<Value> &args)
@@ -65,24 +77,11 @@ void Timer::Start(const FunctionCallbackInfo<Value> &args)
     Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
     t->onTimeout.Reset(isolate, onTimeout);
     int timeout = args[1]->Int32Value(context).ToChecked();
-    int r = uv_timer_start(t->handle, OnTimeout, timeout, 0);
-    if (args.Length() > 2)
-    {
-        uv_timer_set_repeat(t->handle, args[2]->Int32Value(context).ToChecked());
-    }
+    t->handle = jsys_timer_create(env->loop, timeout * 1000000, timeout * 1000000);
+    t->handle->callback = dv8::timer::on_timer_event;
+    t->handle->data = t;
+    int r = jsys_loop_add(env->loop, t->handle);
     args.GetReturnValue().Set(Integer::New(isolate, r));
-}
-
-void Timer::OnClose(uv_handle_t *handle)
-{
-    free(handle);
-}
-
-void Timer::UnRef(const FunctionCallbackInfo<Value> &args)
-{
-    Isolate *isolate = args.GetIsolate();
-    Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
-    uv_unref((uv_handle_t*)t->handle);
 }
 
 void Timer::Stop(const FunctionCallbackInfo<Value> &args)
@@ -91,7 +90,7 @@ void Timer::Stop(const FunctionCallbackInfo<Value> &args)
     v8::HandleScope handleScope(isolate);
     Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
     t->onTimeout.Reset();
-    int r = uv_timer_stop(t->handle);
+    int r = jsys_timer_reset(t->handle, 0, 0);
     args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 
@@ -100,35 +99,8 @@ void Timer::Close(const FunctionCallbackInfo<Value> &args)
     Isolate *isolate = args.GetIsolate();
     v8::HandleScope handleScope(isolate);
     Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
-    uv_handle_t *handle = (uv_handle_t *)t->handle;
-    uv_close(handle, OnClose);
+    jsys_descriptor_free(t->handle);
     args.GetReturnValue().Set(Integer::New(isolate, 0));
-}
-
-void Timer::Again(const FunctionCallbackInfo<Value> &args)
-{
-    Isolate *isolate = args.GetIsolate();
-    v8::HandleScope handleScope(isolate);
-    Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
-    uv_handle_t *handle = (uv_handle_t *)t->handle;
-    int r = uv_timer_again(t->handle);
-    args.GetReturnValue().Set(Integer::New(isolate, r));
-}
-
-void Timer::OnTimeout(uv_timer_t *handle)
-{
-    Timer *t = (Timer *)handle->data;
-    Isolate *isolate = Isolate::GetCurrent();
-    v8::HandleScope handleScope(isolate);
-    const unsigned int argc = 0;
-    Local<Value> argv[argc] = {};
-    v8::TryCatch try_catch(isolate);
-    Local<Function> cb = Local<Function>::New(isolate, t->onTimeout);
-	Local<Context> ctx = isolate->GetCurrentContext();
-    cb->Call(ctx, ctx->Global(), 0, argv);
-    if (try_catch.HasCaught()) {
-        dv8::ReportException(isolate, &try_catch);
-    }
 }
 
 } // namespace timer

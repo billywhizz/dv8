@@ -2,6 +2,7 @@
 #define DV8_ENV_H
 
 #include <dv8.h>
+#include <jsys.h>
 
 namespace dv8
 {
@@ -14,7 +15,7 @@ namespace builtins
 class Environment
 {
   public:
-    uv_loop_t *loop;
+    jsys_loop *loop;
     int argc;
     char** argv;
 

@@ -150,15 +150,15 @@ export DV8_SRC=${config.src}
 export DV8_OUT=${config.build}
 export HTTPPARSER_INCLUDE=$DV8_DEPS/http_parser
 export V8_INCLUDE=$DV8_DEPS/v8/include
-export UV_INCLUDE=$DV8_DEPS/uv/include
 export V8_DEPS=$DV8_DEPS/v8
-export UV_DEPS=$DV8_DEPS/uv
+export JSYS_INCLUDE=../jsys/include
 export MINIZ_INCLUDE=$DV8_DEPS/miniz
+export JSYS_IN
 export MBEDTLS_INCLUDE=$DV8_DEPS/mbedtls/include
 export BUILTINS=$DV8_SRC/builtins
 export TRACE="TRACE=0"
-export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$UV_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 ${compilerOptions(config)}-fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
-export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a $UV_DEPS/libuv.a -ldl -Wl,--end-group"
+export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$JSYS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 ${compilerOptions(config)}-fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
+export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a -Wl,--end-group"
 echo "building mbedtls"
 make -C $DV8_DEPS/mbedtls/ lib
 echo "building dv8 platform (${config.target})"
@@ -182,7 +182,6 @@ function getHeader (config) {
 #define DV8_MODULES_H
 
 #include <v8.h>
-#include <uv.h>
 ${getIncludes(config)}
 
 namespace dv8 {

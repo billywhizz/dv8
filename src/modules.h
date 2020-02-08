@@ -2,20 +2,10 @@
 #define DV8_MODULES_H
 
 #include <v8.h>
-#include <uv.h>
-#include <modules/loop/loop.h>
+#include <modules/tty/tty.h>
+#include <modules/epoll/epoll.h>
 #include <modules/timer/timer.h>
 #include <modules/fs/fs.h>
-#include <modules/process/process.h>
-#include <modules/tty/tty.h>
-#include <modules/libz/libz.h>
-#include <modules/os/os.h>
-#include <modules/socket/socket.h>
-#include <modules/thread/thread.h>
-#include <modules/udp/udp.h>
-#include <modules/mbedtls/mbedtls.h>
-#include <modules/httpParser/httpParser.h>
-#include <modules/openssl/openssl.h>
 
 namespace dv8 {
 

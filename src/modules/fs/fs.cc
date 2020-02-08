@@ -7,7 +7,7 @@ using dv8::builtins::Environment;
 using dv8::builtins::Buffer;
 
 	void InitAll(Local<Object> exports) {
-		FileSystem::Init(exports);
+		//FileSystem::Init(exports);
 		File::Init(exports);
 	}
 
@@ -27,7 +27,7 @@ using dv8::builtins::Buffer;
 
 		DV8_SET_EXPORT(isolate, tpl, "File", exports);
 	}
-
+/*
 	void FileSystem::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
@@ -91,7 +91,7 @@ using dv8::builtins::Buffer;
 
 		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
 	}
-
+*/
 	void File::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
@@ -114,11 +114,12 @@ using dv8::builtins::Buffer;
 		HandleScope handle_scope(isolate);
 		File *obj = ObjectWrap::Unwrap<File>(args.Holder());
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
-		obj->in.base = (char*)b->_data;
-		obj->in.len = b->_length;
-		b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
-		obj->out.base = (char*)b->_data;
-		obj->out.len = b->_length;
+    obj->in = (struct iovec*)calloc(1, sizeof(struct iovec));
+    obj->out = (struct iovec*)calloc(1, sizeof(struct iovec));
+    obj->in->iov_base = b->_data;
+    obj->in->iov_len = b->_length;
+    obj->out->iov_base = b->_data;
+    obj->out->iov_len = b->_length;
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -126,7 +127,6 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		String::Utf8Value filename(isolate, args[0]);
@@ -139,9 +139,8 @@ using dv8::builtins::Buffer;
 		if (argc > 2) {
 			mode = args[2]->Int32Value(context).ToChecked();
 		}
-		int fd = uv_fs_open(env->loop, &obj->req, *filename, flags, mode, NULL);
+		int fd = open(*filename, flags, mode);
 		obj->fd = fd;
-		//uv_ref((uv_handle_t*)obj->req);
 		args.GetReturnValue().Set(Integer::New(isolate, fd));
 	}
 
@@ -149,7 +148,6 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		int argc = args.Length();
@@ -158,12 +156,8 @@ using dv8::builtins::Buffer;
 		if (argc > 1) {
 			off = args[1]->Int32Value(context).ToChecked();
 		}
-		uv_fs_t req;
-		int oldlen = obj->in.len;
-		obj->in.len = len;
-		int r = uv_fs_read(env->loop, &req, obj->req.result, &obj->in, 1, off, NULL);
-		obj->in.len = oldlen;
-		uv_fs_req_cleanup(&req);
+		char* buf = (char*)obj->in->iov_base + off;
+		int r = read(obj->fd, buf, len);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
@@ -171,7 +165,6 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		int argc = args.Length();
@@ -180,12 +173,8 @@ using dv8::builtins::Buffer;
 		if (argc > 1) {
 			off = args[1]->Int32Value(context).ToChecked();
 		}
-		uv_fs_t req;
-		int oldlen = obj->out.len;
-		obj->out.len = len;
-		int r = uv_fs_write(env->loop, &req, obj->req.result, &obj->out, 1, off, NULL);
-		obj->out.len = oldlen;
-		uv_fs_req_cleanup(&req);
+		char* buf = (char*)obj->out->iov_base + off;
+		int r = write(obj->fd, buf, len);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
@@ -193,17 +182,12 @@ using dv8::builtins::Buffer;
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
-		String::Utf8Value filename(isolate, args[0]);
-		uv_fs_t req;
-		int r = uv_fs_close(env->loop, &req, obj->req.result, NULL);
-		uv_fs_req_cleanup(&req);
-		uv_fs_req_cleanup(&obj->req);
+		int r = close(obj->fd);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
-
+/*
 	void FileSystem::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
@@ -377,7 +361,7 @@ using dv8::builtins::Buffer;
 		v8::HandleScope handleScope(isolate);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
-
+*/
 }
 }
 

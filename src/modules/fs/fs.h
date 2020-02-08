@@ -26,7 +26,6 @@ class File : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
 		int fd;
-		uv_fs_t req;
 
 protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
@@ -38,8 +37,9 @@ protected:
 		~File() {
 		}
 
-		uv_buf_t in;
-		uv_buf_t out;
+		struct iovec* in;
+		struct iovec* out;
+
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -49,7 +49,7 @@ protected:
 		static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
-
+/*
 class FileSystem : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
@@ -78,7 +78,7 @@ protected:
 		static void Readdir(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
-
+*/
 }
 }
 

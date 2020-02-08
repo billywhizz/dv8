@@ -6,7 +6,6 @@
 #include <v8.h>
 #include <libplatform/libplatform.h>
 #include <v8-inspector.h>
-#include <uv.h>
 #include <common.h>
 #include <buffer.h>
 #include <env.h>
@@ -14,10 +13,12 @@
 #include <modules.h>
 #include <sys/utsname.h>
 #include <gnu/libc-version.h>
+#include <time.h>
+#include <limits.h>
 
-#include <execinfo.h>
-#include <cxxabi.h>
-#include <dlfcn.h>
+//#include <execinfo.h>
+//#include <cxxabi.h>
+//#include <dlfcn.h>
 
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
@@ -208,12 +209,6 @@ class InspectorClient : public V8InspectorClient {
   Isolate* isolate_;
 };
 
-typedef struct {
-  uv_write_t req; // libuv write handle
-  uv_buf_t buf;   // buffer reference
-  uint32_t fd;    // id of the context
-} write_req_t;
-
 void PromiseRejectCallback(PromiseRejectMessage message);
 void ReportException(Isolate *isolate, TryCatch *try_catch);
 Local<Context> CreateContext(Isolate *isolate);
@@ -221,7 +216,7 @@ Local<Context> CreateContext(Isolate *isolate);
 void Print(const FunctionCallbackInfo<Value> &args);
 void Err(const FunctionCallbackInfo<Value> &args);
 MaybeLocal<Module> OnModuleInstantiate(Local<Context> context, Local<String> specifier, Local<Module> referrer);
-void shutdown(uv_loop_t *loop);
+void shutdown(jsys_loop* loop);
 void Shutdown(const FunctionCallbackInfo<Value> &args);
 void MemoryUsage(const FunctionCallbackInfo<Value> &args);
 void Exit(const FunctionCallbackInfo<Value> &args);
@@ -232,7 +227,7 @@ void CompileScript(const FunctionCallbackInfo<Value> &args);
 void RunModule(const FunctionCallbackInfo<Value> &args);
 void Cwd(const FunctionCallbackInfo<Value> &args);
 void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch);
-void shutdown(uv_loop_t *loop, int rc);
+void shutdown(jsys_loop* loop, int rc);
 void beforeGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
 void afterGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);
 
@@ -286,7 +281,7 @@ inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate) {
   fprintf(stderr, "ShouldAbortOnUncaughtException\n");
   return true;
 }
-
+/*
 inline dv8::SymbolInfo LookupSymbol(void* address) {
   Dl_info info;
   const bool have_info = dladdr(address, &info);
@@ -322,16 +317,16 @@ inline void dumpErrorInfo() {
     fprintf(stderr, "%2d: %p %s + [%s]\n", i, frame, s.name.c_str(), s.filename.c_str());
   }
 }
-
+*/
 inline void OnFatalError(const char *location, const char *message) {
   fprintf(stderr, "FATAL ERROR: %s %s\n", location, message);
-  dumpErrorInfo();
+  //dumpErrorInfo();
   fflush(stderr);
 }
 
 inline void OOMErrorHandler(const char *location, bool is_heap_oom) {
   fprintf(stderr, "OOM ERROR: %s %i\n", location, is_heap_oom);
-  dumpErrorInfo();
+  //dumpErrorInfo();
   fflush(stderr);
 }
 

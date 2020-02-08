@@ -22,14 +22,13 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
-
 void InitAll(Local<Object> exports);
 
 class Timer : public dv8::ObjectWrap
 {
 public:
   static void Init(v8::Local<v8::Object> exports);
-  uv_timer_t *handle;
+  jsys_descriptor* handle;
   v8::Persistent<v8::Function> onTimeout;
 
 protected:
@@ -48,10 +47,7 @@ private:
   static void Start(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Stop(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Close(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static void Again(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static void UnRef(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static void OnTimeout(uv_timer_t *handle);
-  static void OnClose(uv_handle_t *handle);
+
 };
 
 } // namespace timer

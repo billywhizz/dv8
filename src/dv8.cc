@@ -278,14 +278,53 @@ void EnvVars(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(envarr);
 }
 
+inline ssize_t process_memory_usage() {
+  char buf[1024];
+  const char* s = NULL;
+  ssize_t n = 0;
+  long val = 0;
+  int fd = 0;
+  int i = 0;
+  do {
+    fd = open("/proc/self/stat", O_RDONLY);
+  } while (fd == -1 && errno == EINTR);
+  if (fd == -1) return (ssize_t)errno;
+  do
+    n = read(fd, buf, sizeof(buf) - 1);
+  while (n == -1 && errno == EINTR);
+  close(fd);
+  if (n == -1)
+    return (ssize_t)errno;
+  buf[n] = '\0';
+  s = strchr(buf, ' ');
+  if (s == NULL)
+    goto err;
+  s += 1;
+  if (*s != '(')
+    goto err;
+  s = strchr(s, ')');
+  if (s == NULL)
+    goto err;
+  for (i = 1; i <= 22; i++) {
+    s = strchr(s + 1, ' ');
+    if (s == NULL)
+      goto err;
+  }
+  errno = 0;
+  val = strtol(s, NULL, 10);
+  if (errno != 0)
+    goto err;
+  if (val < 0)
+    goto err;
+  return val * getpagesize();
+err:
+  return 0;
+}
+
 void MemoryUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
-  size_t rss;
-  int err = uv_resident_set_memory(&rss);
-  if (err) {
-    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::NewStringType::kNormal).ToLocalChecked());
-  }
+  ssize_t rss = process_memory_usage();
   HeapStatistics v8_heap_stats;
   isolate->GetHeapStatistics(&v8_heap_stats);
   Local<Float64Array> array = args[0].As<Float64Array>();
@@ -343,22 +382,28 @@ void HeapSpaceUsage(const FunctionCallbackInfo<Value> &args) {
 void PID(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
-  args.GetReturnValue().Set(Integer::New(isolate, uv_os_getpid()));
+  args.GetReturnValue().Set(Integer::New(isolate, getpid()));
 }
 
 void CPUUsage(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
-  uv_rusage_t rusage;
-  int err = uv_getrusage(&rusage);
-  if (err) {
-    return args.GetReturnValue().Set(String::NewFromUtf8(isolate, uv_strerror(err), v8::NewStringType::kNormal).ToLocalChecked());
-  }
+  struct rusage usage;
+  jsys_usage(&usage);
   Local<Float64Array> array = args[0].As<Float64Array>();
   Local<ArrayBuffer> ab = array->Buffer();
   double *fields = static_cast<double *>(ab->GetContents().Data());
-  fields[0] = (MICROS_PER_SEC * rusage.ru_utime.tv_sec) + rusage.ru_utime.tv_usec;
-  fields[1] = (MICROS_PER_SEC * rusage.ru_stime.tv_sec) + rusage.ru_stime.tv_usec;
+  fields[0] = (MICROS_PER_SEC * usage.ru_utime.tv_sec) + usage.ru_utime.tv_usec;
+  fields[1] = (MICROS_PER_SEC * usage.ru_stime.tv_sec) + usage.ru_stime.tv_usec;
+}
+
+inline uint64_t hrtime() {
+  static clock_t fast_clock_id = -1;
+  struct timespec t;
+  clock_t clock_id = CLOCK_MONOTONIC;
+  if (clock_gettime(clock_id, &t))
+    return 0;
+  return t.tv_sec * (uint64_t) 1e9 + t.tv_nsec;
 }
 
 void HRTime(const FunctionCallbackInfo<Value> &args) {
@@ -366,7 +411,7 @@ void HRTime(const FunctionCallbackInfo<Value> &args) {
   v8::HandleScope handleScope(isolate);
   Local<ArrayBuffer> ab = args[0].As<BigUint64Array>()->Buffer();
   uint64_t *fields = static_cast<uint64_t *>(ab->GetContents().Data());
-  fields[0] = uv_hrtime();
+  fields[0] = hrtime();
 }
 
 void RunMicroTasks(const FunctionCallbackInfo<Value> &args) {
@@ -391,16 +436,8 @@ void Exit(const FunctionCallbackInfo<Value>& args) {
 void Cwd(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
-  char* cwd = (char*)calloc(1, PATH_MAX);
-  size_t size;
-  int r = uv_cwd(cwd, &size);
-  if (r == UV_ENOBUFS) {
-    free(cwd);
-    cwd = (char*)calloc(1, size);
-    r = uv_cwd(cwd, &size);
-  }
-  args.GetReturnValue().Set(String::NewFromUtf8(isolate, cwd, NewStringType::kNormal).ToLocalChecked());
-  free(cwd);
+  char cwd[PATH_MAX];
+  args.GetReturnValue().Set(String::NewFromUtf8(isolate, getcwd(cwd, PATH_MAX), NewStringType::kNormal).ToLocalChecked());
 }
 
 // TODO: could autogenerate which of these are available on dv8 object in config

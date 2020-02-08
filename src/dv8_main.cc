@@ -9,7 +9,6 @@ int main(int argc, char *argv[]) {
   v8::V8::InitializePlatform(platform.get());
   v8::V8::Initialize();
   v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
-  uv_disable_stdio_inheritance();
   v8::Isolate::CreateParams create_params;
   create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
   dv8::builtins::Environment *env = new dv8::builtins::Environment();
@@ -30,7 +29,7 @@ int main(int argc, char *argv[]) {
     v8::Context::Scope context_scope(context);
     env->AssignToContext(context);
     env->argc = argc;
-    env->argv = uv_setup_args(argc, argv);
+    env->argv = argv;
     v8::Local<v8::Array> arguments = v8::Array::New(isolate);
     for (int i = 0; i < argc; i++) {
       arguments->Set(context, i, v8::String::NewFromUtf8(isolate, argv[i], v8::NewStringType::kNormal, strlen(argv[i])).ToLocalChecked());
@@ -43,7 +42,8 @@ int main(int argc, char *argv[]) {
     dv8::builtins::Buffer::Init(globalInstance);
     dv8::InspectorClient inspector_client(context, true);
     v8::TryCatch try_catch(isolate);
-    env->loop = uv_default_loop();
+    jsys_loop* loop = jsys_loop_create(EPOLL_CLOEXEC, 128, 1024);
+    env->loop = loop;
     v8::Local<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len)).ToLocalChecked();
     v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "main.js", v8::NewStringType::kNormal).ToLocalChecked(), // resource name
       v8::Integer::New(isolate, 0), // line offset
@@ -88,7 +88,6 @@ int main(int argc, char *argv[]) {
     isolate->ContextDisposedNotification();
     isolate->IdleNotificationDeadline(platform->MonotonicallyIncreasingTime() + kLongIdlePauseInSeconds);
     isolate->LowMemoryNotification();
-    uv_tty_reset_mode();
   }
   isolate->Dispose();
   delete env;

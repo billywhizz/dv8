@@ -23,10 +23,7 @@ using v8::String;
 using v8::Value;
 
 
-static void on_close(uv_handle_t *handle);
-static void after_read(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf);
-static void after_write(uv_write_t *req, int status);
-static void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf);
+int on_tty_event(jsys_descriptor *client);
 
 typedef struct
 {
@@ -69,20 +66,17 @@ class TTY : public dv8::ObjectWrap
 {
 public:
   static void Init(v8::Local<v8::Object> exports);
-  uv_tty_t *handle;
-  callbacks_t callbacks;      // pointers to JS callbacks
-  char *in;
+  jsys_descriptor* handle;
+  unsigned int ttype;
+  tty_stats stats;
+  bool paused;
+  callbacks_t callbacks;
   v8::Persistent<v8::Function> _onRead;
   v8::Persistent<v8::Function> _onEnd;
   v8::Persistent<v8::Function> _onDrain;
   v8::Persistent<v8::Function> _onClose;
   v8::Persistent<v8::Function> _onError;
   v8::Persistent<v8::Function> _onWrite;
-  unsigned int ttype;
-  tty_stats stats;
-  bool paused;
-  bool closing;
-  bool blocked;
 
 protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
@@ -102,7 +96,6 @@ private:
   static void Setup(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Pause(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Resume(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static void QueueSize(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Stats(const v8::FunctionCallbackInfo<v8::Value> &args);
 
   static void onError(const v8::FunctionCallbackInfo<v8::Value> &args);   // when we have an error on the socket

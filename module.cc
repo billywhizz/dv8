@@ -11,7 +11,6 @@ namespace ${name} {
 		// initialise all the classes in this module
 		// can also do any initial work here. will only be called once when 
 		// library is loaded
-		fprintf(stderr, "InitAll: ${name}\\n");
 		${className}::Init(exports);
 	}
 
