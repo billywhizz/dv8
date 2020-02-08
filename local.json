@@ -14,16 +14,6 @@
     "modulesHeader": "./src/modules.h",
     "modulesSource": "./src/modules.cc"
   },
-  "libs": [
-  ],
-  "modules": [
-    "loop",
-    "timer",
-    "fs",
-    "process",
-    "tty",
-    "socket",
-    "httpParser",
-    "libz"
-  ]
+  "libs": [],
+  "modules": ["os", "httpParser", "loop", "timer", "process", "fs", "socket", "tty", "thread"]
 }

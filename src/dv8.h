@@ -15,6 +15,10 @@
 #include <sys/utsname.h>
 #include <gnu/libc-version.h>
 
+#include <execinfo.h>
+#include <cxxabi.h>
+#include <dlfcn.h>
+
 #define MICROS_PER_SEC 1e6
 #define SO_NOSIGPIPE 1
 #ifndef V8_DLOPEN
@@ -23,6 +27,11 @@
 #ifndef TRACE
   #define TRACE 0
 #endif
+
+template <typename T, size_t N>
+char (&ArraySizeHelper(T (&array)[N]))[N];
+
+#define arraysize(array) (sizeof(ArraySizeHelper(array)))
 
 extern char **environ;
 namespace dv8 {
@@ -69,6 +78,14 @@ using v8_inspector::V8ContextInfo;
 using v8_inspector::V8InspectorSession;
 using v8_inspector::V8Inspector;
 using v8::Platform;
+
+class SymbolInfo {
+  public:
+  std::string name;
+  std::string filename;
+  size_t line = 0;
+  size_t dis = 0;
+};
 
 class InspectorFrontend final : public V8Inspector::Channel {
  public:
@@ -270,13 +287,51 @@ inline bool ShouldAbortOnUncaughtException(v8::Isolate *isolate) {
   return true;
 }
 
+inline dv8::SymbolInfo LookupSymbol(void* address) {
+  Dl_info info;
+  const bool have_info = dladdr(address, &info);
+  SymbolInfo ret;
+  if (!have_info)
+    return ret;
+
+  if (info.dli_sname != nullptr) {
+    if (char* demangled =
+            abi::__cxa_demangle(info.dli_sname, nullptr, nullptr, nullptr)) {
+      ret.name = demangled;
+      free(demangled);
+    } else {
+      ret.name = info.dli_sname;
+    }
+  }
+
+  if (info.dli_fname != nullptr) {
+    ret.filename = info.dli_fname;
+  }
+
+  return ret;
+}
+
+inline void dumpErrorInfo() {
+  // todo: get this working. dump version, loop handles etc.
+  void* frames[256];
+  const int size = backtrace(frames, arraysize(frames));
+  fprintf(stderr, "backtrace: %i\n", size);
+  for (int i = 0; i < size; i += 1) {
+    void* frame = frames[i];
+    dv8::SymbolInfo s = LookupSymbol(frame);
+    fprintf(stderr, "%2d: %p %s + [%s]\n", i, frame, s.name.c_str(), s.filename.c_str());
+  }
+}
+
 inline void OnFatalError(const char *location, const char *message) {
   fprintf(stderr, "FATAL ERROR: %s %s\n", location, message);
+  dumpErrorInfo();
   fflush(stderr);
 }
 
 inline void OOMErrorHandler(const char *location, bool is_heap_oom) {
   fprintf(stderr, "OOM ERROR: %s %i\n", location, is_heap_oom);
+  dumpErrorInfo();
   fflush(stderr);
 }
 

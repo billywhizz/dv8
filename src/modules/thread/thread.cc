@@ -96,19 +96,25 @@ void start_context(void *data)
 				return;
 			}
 		}
+    v8::Local<v8::Value> func = globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "onExit", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
+    if (func->IsFunction()) {
+      v8::Local<v8::Function> onExit = v8::Local<v8::Function>::Cast(func);
+      v8::Local<v8::Value> argv[0] = { };
+      v8::TryCatch try_catch(isolate);
+      onExit->Call(context, globalInstance, 0, argv);
+      if (try_catch.HasCaught()) {
+        dv8::ReportException(isolate, &try_catch);
+      }
+    }
     const double kLongIdlePauseInSeconds = 1.0;
     isolate->ContextDisposedNotification();
+    //isolate->IdleNotificationDeadline(platform->MonotonicallyIncreasingTime() + kLongIdlePauseInSeconds);
     isolate->LowMemoryNotification();
     uv_tty_reset_mode();
-/*
-    int r = uv_loop_close(loop);
-    if (r != 0) {
-      fprintf(stderr, "thread uv_loop_close: %i\n", r);
-    }
-*/
 	}
 	isolate->Dispose();
 	delete create_params.array_buffer_allocator;
+  isolate = nullptr;
 	uv_async_send(th->async);
 }
 

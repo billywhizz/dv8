@@ -2,9 +2,6 @@
 #include "builtins.h"
 
 int main(int argc, char *argv[]) {
-  //#include <unistd.h>
-  //int rc = chroot("./");
-  //fprintf(stderr, "chroot: %i\n", rc);
   setvbuf(stdout, nullptr, _IONBF, 0);
   setvbuf(stderr, nullptr, _IONBF, 0);
   signal(SIGPIPE, SIG_IGN);
@@ -92,10 +89,6 @@ int main(int argc, char *argv[]) {
     isolate->IdleNotificationDeadline(platform->MonotonicallyIncreasingTime() + kLongIdlePauseInSeconds);
     isolate->LowMemoryNotification();
     uv_tty_reset_mode();
-    //int r = uv_loop_close(uv_default_loop());
-    //if (r != 0) {
-      //fprintf(stderr, "uv_loop_close: (%i) %s\n", r, uv_strerror(r));
-    //}
   }
   isolate->Dispose();
   delete env;
