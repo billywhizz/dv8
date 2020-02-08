@@ -7,7 +7,7 @@ using dv8::builtins::Environment;
 using dv8::builtins::Buffer;
 
 	void InitAll(Local<Object> exports) {
-		//FileSystem::Init(exports);
+		FileSystem::Init(exports);
 		File::Init(exports);
 	}
 
@@ -27,7 +27,7 @@ using dv8::builtins::Buffer;
 
 		DV8_SET_EXPORT(isolate, tpl, "File", exports);
 	}
-/*
+
 	void FileSystem::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
@@ -91,7 +91,7 @@ using dv8::builtins::Buffer;
 
 		DV8_SET_EXPORT(isolate, tpl, "FileSystem", exports);
 	}
-*/
+
 	void File::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
@@ -181,13 +181,12 @@ using dv8::builtins::Buffer;
 	void File::Close(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
-		Local<Context> context = isolate->GetCurrentContext();
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args.Holder());
 		int r = close(obj->fd);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
-/*
+
 	void FileSystem::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		HandleScope handle_scope(isolate);
@@ -199,10 +198,6 @@ using dv8::builtins::Buffer;
 	}
 
 	void FileSystem::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-		Isolate *isolate = data.GetIsolate();
-		v8::HandleScope handleScope(isolate);
-		ObjectWrap *wrap = data.GetParameter();
-		FileSystem* sock = static_cast<FileSystem *>(wrap);
 		#if TRACE
 		fprintf(stderr, "FileSystem::Destroy\n");
 		#endif
@@ -241,11 +236,9 @@ using dv8::builtins::Buffer;
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		uv_fs_t req;
 		String::Utf8Value path(isolate, args[0]);
-		int rc = uv_fs_unlink(env->loop, &req, *path, NULL);
-		args.GetReturnValue().Set(Integer::New(isolate, rc));
-		uv_fs_req_cleanup(&req);
+		int r = unlink(*path);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void FileSystem::Mkdir(const FunctionCallbackInfo<Value> &args)
@@ -254,16 +247,14 @@ using dv8::builtins::Buffer;
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		uv_fs_t req;
 		String::Utf8Value path(isolate, args[0]);
 		int mode = S_IRWXO | S_IRWXG | S_IRWXU;
 		int argc = args.Length();
 		if (argc > 1) {
 			mode = args[1]->Int32Value(context).ToChecked();
 		}
-		int rc = uv_fs_mkdir(env->loop, &req, *path, mode, NULL);
+		int rc = mkdir(*path, mode);
 		args.GetReturnValue().Set(Integer::New(isolate, rc));
-		uv_fs_req_cleanup(&req);
 	}
 
 	void FileSystem::Rmdir(const FunctionCallbackInfo<Value> &args)
@@ -272,49 +263,43 @@ using dv8::builtins::Buffer;
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		uv_fs_t req;
 		String::Utf8Value path(isolate, args[0]);
-		int rc = uv_fs_rmdir(env->loop, &req, *path, NULL);
+		int rc = rmdir(*path);
 		args.GetReturnValue().Set(Integer::New(isolate, rc));
-		uv_fs_req_cleanup(&req);
 	}
 
 	void FileSystem::FStat(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
-		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		File* obj = ObjectWrap::Unwrap<File>(args[0].As<v8::Object>());
 		v8::Local<v8::BigUint64Array> answer = args[1].As<v8::BigUint64Array>();
 		Local<ArrayBuffer> ab = answer->Buffer();
 		uint64_t *fields = static_cast<uint64_t *>(ab->GetContents().Data());
-		uv_fs_t req;
-		int rc = uv_fs_fstat(env->loop, &req, obj->fd, NULL);
+		struct stat s;
+		int rc = fstat(obj->fd, &s);
 		if (rc == 0) {
-			const uv_stat_t* const s = static_cast<const uv_stat_t*>(req.ptr);
-			fields[0] = s->st_dev;
-			fields[1] = s->st_mode;
-			fields[2] = s->st_nlink;
-			fields[3] = s->st_uid;
-			fields[4] = s->st_gid;
-			fields[5] = s->st_rdev;
-			fields[6] = s->st_ino;
-			fields[7] = s->st_size;
-			fields[8] = s->st_blksize;
-			fields[9] = s->st_blocks;
-			fields[10] = s->st_flags;
-			fields[11] = s->st_gen;
-			fields[12] = s->st_atim.tv_sec;
-			fields[13] = s->st_atim.tv_nsec;
-			fields[14] = s->st_mtim.tv_sec;
-			fields[15] = s->st_mtim.tv_nsec;
-			fields[16] = s->st_ctim.tv_sec;
-			fields[17] = s->st_ctim.tv_nsec;
+			fields[0] = s.st_dev;
+			fields[1] = s.st_mode;
+			fields[2] = s.st_nlink;
+			fields[3] = s.st_uid;
+			fields[4] = s.st_gid;
+			fields[5] = s.st_rdev;
+			fields[6] = s.st_ino;
+			fields[7] = s.st_size;
+			fields[8] = s.st_blksize;
+			fields[9] = s.st_blocks;
+			//fields[10] = s.st_flags;
+			//fields[11] = s.st_gen;
+			fields[12] = s.st_atim.tv_sec;
+			fields[13] = s.st_atim.tv_nsec;
+			fields[14] = s.st_mtim.tv_sec;
+			fields[15] = s.st_mtim.tv_nsec;
+			fields[16] = s.st_ctim.tv_sec;
+			fields[17] = s.st_ctim.tv_nsec;
 			args.GetReturnValue().Set(Integer::New(isolate, 0));
 		}
 		args.GetReturnValue().Set(Integer::New(isolate, rc));
-		uv_fs_req_cleanup(&req);
 	}
 
 	void FileSystem::Rename(const FunctionCallbackInfo<Value> &args)
@@ -361,7 +346,7 @@ using dv8::builtins::Buffer;
 		v8::HandleScope handleScope(isolate);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
-*/
+
 }
 }
 

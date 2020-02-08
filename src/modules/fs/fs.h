@@ -2,6 +2,10 @@
 #define DV8_FileSystem_H
 
 #include <dv8.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
 
 namespace dv8 {
 
@@ -49,7 +53,7 @@ protected:
 		static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
-/*
+
 class FileSystem : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
@@ -78,7 +82,7 @@ protected:
 		static void Readdir(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
-*/
+
 }
 }
 

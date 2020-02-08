@@ -1,9 +1,0 @@
-FROM alpine:3.10 AS builder
-RUN apk update
-RUN adduser -D -g '' appuser
-FROM scratch
-COPY --from=builder /etc/passwd /etc/passwd
-COPY build/dv8 /dv8
-USER appuser
-WORKDIR /app
-ENTRYPOINT ["/dv8"]

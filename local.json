@@ -1,9 +1,9 @@
 {
   "target": "release",
-  "CC": "ccache clang++",
+  "CC": "ccache g++",
   "deps": "./deps",
   "src": "./src",
-  "build": "./build",
+  "build": "./bin",
   "override": true,
   "builtins": true,
   "compilerOptions": "-O3",

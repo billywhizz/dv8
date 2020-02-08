@@ -1,5 +1,5 @@
 const { args, print, require, compile } = dv8
-const { readFile, writeFile, FileSystem } = require('./src/util.js')
+const { readFile, writeFile, FileSystem } = require('./util.js')
 const [name, className] = args.slice(2)
 print(`name: ${name}, className: ${className}`)
 const header = { text: '' }

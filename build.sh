@@ -1,6 +1,6 @@
 #!/bin/bash
-if test -f "build/dv8"; then
+if test -f "bin/dv8"; then
   echo building config
-  build/dv8 -e "$(cat build.js)" local.json
+  bin/dv8 -e "$(cat build.js)" local.json
 fi
 ./platform.sh

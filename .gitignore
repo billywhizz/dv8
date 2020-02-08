@@ -12,6 +12,5 @@ deps/v8/gen
 deps/v8/out.gn
 .ccache
 src/backup.js
-platform.sh
 dist
 demo

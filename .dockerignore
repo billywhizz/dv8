@@ -1,8 +1,0 @@
-.vscode
-.git
-examples
-scratch
-.gitignore
-build.sh
-*.md
-run.sh
