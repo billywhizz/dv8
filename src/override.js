@@ -336,14 +336,12 @@ function replModule () {
     if (!stdin) stdin = new tty.TTY(0)
     if (!stdout) stdout = new tty.TTY(1)
     const BUFFER_SIZE = 64 * 1024
-    const MAX_BUFFER = 4 * BUFFER_SIZE
     const buf = Buffer.alloc(BUFFER_SIZE)
     stdin.setup(buf)
     // todo: would be nice to have c++ await a promise returned from callbacks
     // so we could do async inside the handler and block the reading of the
     // stream until we resolve. don't think it would be possible
     stdin.onRead(len => {
-      dv8.print(len)
       const source = buf.read(0, len)
       try {
         const result = runScript(source, 'repl')
@@ -352,6 +350,7 @@ function replModule () {
           if (payload) {
             const r = stdout.write(buf.write(payload, 0))
             if (r < 0) return stdout.close()
+            if (r < len) return stdin.pause()
           }
         }
       } catch (err) {
@@ -359,17 +358,14 @@ function replModule () {
       }
       const r = stdout.write(buf.write('> ', 0))
       if (r < 0) return stdout.close()
+      if (r < len) return stdin.pause()
     })
-    //stdin.onEnd(() => stdin.close())
-    //stdin.onClose(() => stdout.close())
+    stdin.onEnd(() => stdin.close())
+    stdout.onDrain(() => stdin.resume())
     stdout.setup(buf)
-    //stdout.onDrain(() => stdin.resume())
-    //stdout.onClose(() => stdin.close())
     if (stdout.write(buf.write('> ', 0)) < 0) {
-      dv8.print('uhoh')
       stdout.close()
     } else {
-      dv8.print('resume')
       stdin.resume()
     }
   }
@@ -412,7 +408,7 @@ function main (args) {
   dv8.versions = {
     dv8: dv8.version,
     javascript: `v8 ${dv8.v8}`,
-    loop: `libuv ${library('loop').version || 'n/a'}`,
+    loop: `jsys ${library('epoll').version || 'n/a'}`,
     libz: `miniz ${library('libz').version || 'n/a'}`,
     mbedtls: library('mbedtls').version || 'n/a',
     openssl: library('openssl').version || 'n/a',

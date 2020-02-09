@@ -12,6 +12,8 @@ namespace epoll {
 		// can also do any initial work here. will only be called once when 
 		// library is loaded
 		Epoll::Init(exports);
+		Isolate* isolate = exports->GetIsolate();
+		DV8_SET_EXPORT_CONSTANT(isolate, String::NewFromUtf8(isolate, jsys_version_string()).ToLocalChecked(), "version", exports);
 	}
 
 	void Epoll::Init(Local<Object> exports) {

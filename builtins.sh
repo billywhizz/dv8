@@ -1,3 +1,4 @@
+#!/bin/bash
 MAIN=${1:-default}
 OVERRIDE=${2:-src/override.js}
 if [[ "$MAIN" == "override" ]]; then

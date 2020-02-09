@@ -23,6 +23,13 @@ int on_tty_event(jsys_descriptor *handle) {
   size_t len = context->in->iov_len;
   Local<Context> ctx = isolate->GetCurrentContext();
   Local<Object> global = ctx->Global();
+  if (jsys_descriptor_is_writable(handle)) {
+    if (t->callbacks.onDrain == 1) {
+      Local<Function> Callback = Local<Function>::New(isolate, t->_onDrain);
+      Local<Value> argv[] = {};
+      Callback->Call(ctx, global, 0, argv);
+    }
+  }
   if (jsys_descriptor_is_readable(handle)) {
     ssize_t bytes = 0;
     Local<Value> argv[1] = {Number::New(isolate, bytes)};
@@ -38,7 +45,6 @@ int on_tty_event(jsys_descriptor *handle) {
         break;
       }
       if (t->callbacks.onRead == 1) {
-      //fprintf(stderr, "bytes: %lu\n", bytes);
         argv[0] = Number::New(isolate, bytes);
         Callback->Call(ctx, global, 1, argv);
       }

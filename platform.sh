@@ -26,9 +26,10 @@ $CC $CCFLAGS -I$DV8_SRC/modules/tty -c -o $DV8_OUT/tty.o $DV8_SRC/modules/tty/tt
 $CC $CCFLAGS -I$DV8_SRC/modules/epoll -c -o $DV8_OUT/epoll.o $DV8_SRC/modules/epoll/epoll.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/timer -c -o $DV8_OUT/timer.o $DV8_SRC/modules/timer/timer.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/fs -c -o $DV8_OUT/fs.o $DV8_SRC/modules/fs/fs.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/jsyshttp -c -o $DV8_OUT/jsyshttp.o $DV8_SRC/modules/jsyshttp/jsyshttp.cc
 $CC $CCFLAGS -c -o $DV8_OUT/modules.o $DV8_SRC/modules.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8main.o $DV8_SRC/dv8_main.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8.o $DV8_SRC/dv8.cc
 rm -f $DV8_OUT/dv8.a
-ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o $DV8_OUT/tty.o $DV8_OUT/epoll.o $DV8_OUT/timer.o $DV8_OUT/fs.o
-$CC $LDFLAGS -s -static -o $DV8_OUT/dv8-jsys
+ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o $DV8_OUT/tty.o $DV8_OUT/epoll.o $DV8_OUT/timer.o $DV8_OUT/fs.o $DV8_OUT/jsyshttp.o
+$CC $LDFLAGS -s -static -o $DV8_OUT/dv8

@@ -19,6 +19,10 @@ if (strcmp("fs", module_name) == 0) {
 dv8::fs::InitAll(exports);
 return;
 }
+if (strcmp("jsyshttp", module_name) == 0) {
+dv8::jsyshttp::InitAll(exports);
+return;
+}
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {

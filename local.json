@@ -8,12 +8,12 @@
   "builtins": true,
   "compilerOptions": "-O3",
   "linkOptions": "-s -static",
-  "out": "dv8-jsys",
+  "out": "dv8",
   "output": {
     "build": "./platform.sh",
     "modulesHeader": "./src/modules.h",
     "modulesSource": "./src/modules.cc"
   },
   "libs": [],
-  "modules": ["tty", "epoll", "timer", "fs"]
+  "modules": ["tty", "epoll", "timer", "fs", "jsyshttp"]
 }

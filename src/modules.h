@@ -6,6 +6,7 @@
 #include <modules/epoll/epoll.h>
 #include <modules/timer/timer.h>
 #include <modules/fs/fs.h>
+#include <modules/jsyshttp/jsyshttp.h>
 
 namespace dv8 {
 
