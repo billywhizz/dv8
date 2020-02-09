@@ -14,3 +14,4 @@ deps/v8/out.gn
 src/backup.js
 dist
 demo
+bin
