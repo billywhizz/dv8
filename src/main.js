@@ -25,7 +25,7 @@ function fromArrayBuffer (ab, shared) {
 // Global Timer functions
 function setInterval (fn, repeat) {
   const timer = new (dv8.library('timer').Timer)()
-  timer.start(fn, repeat, repeat)
+  timer.start(fn, repeat)
   return timer
 }
 
@@ -123,25 +123,11 @@ function wrapEnv (env) {
 }
 
 function wrapListHandles (listHandles) {
-  const buf = Buffer.alloc(16384)
+  const handles = new Uint32Array(16)
   return () => {
-    listHandles(buf)
-    const bytes = new Uint8Array(buf.bytes)
-    let off = 0
-    const handles = []
-    while (1) {
-      const active = bytes[off]
-      if (active === 255) break
-      const len = bytes[off + 1]
-      if (len > 0) {
-        const type = buf.read(off + 2, len)
-        handles.push({ active, type })
-      } else {
-        handles.push({ active, type: 'unknown' })
-      }
-      off += (2 + len)
-    }
-    return handles
+    listHandles(handles)
+    const [ socket, tty, signal, timer, unknown, closing, closed ] = handles
+    return { socket, tty, signal, timer, unknown, closing, closed }
   }
 }
 
@@ -156,11 +142,11 @@ function readFile (path) {
   file.fd = file.open(path, O_RDONLY)
   if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
   file.size = 0
-  let len = file.read(BUFSIZE, file.size)
+  let len = file.read(BUFSIZE)
   while (len > 0) {
     file.size += len
     parts.push(buf.read(0, len))
-    len = file.read(BUFSIZE, file.size)
+    len = file.read(BUFSIZE)
   }
   if (len < 0) throw new Error(`Error reading ${path}: ${len}`)
   file.close()
@@ -172,19 +158,19 @@ function wrapNextTick (loop) {
   const queue = []
   let ticks = 0
   let idleActive = false
+  function processQueue () {
+    ticks++
+    let len = queue.length
+    while (len--) queue.shift()()
+    if (!queue.length) {
+      idleActive = false
+      loop.onIdle()
+    }
+  }
   return (fn) => {
     queue.push(fn)
     if (idleActive) return
-    loop.onIdle(() => {
-      ticks++
-      let len = queue.length
-      while (len--) queue.shift()()
-      if (!queue.length) {
-        idleActive = false
-        loop.onIdle()
-      }
-    })
-    loop.ref() // ensure we run
+    loop.onIdle(processQueue)
     idleActive = true
   }
 }
@@ -349,11 +335,9 @@ function replModule () {
     // they currently do
     if (!stdin) stdin = new tty.TTY(0)
     if (!stdout) stdout = new tty.TTY(1)
-    const { UV_TTY_MODE_NORMAL } = tty
     const BUFFER_SIZE = 64 * 1024
-    const MAX_BUFFER = 4 * BUFFER_SIZE
     const buf = Buffer.alloc(BUFFER_SIZE)
-    stdin.setup(buf, UV_TTY_MODE_NORMAL)
+    stdin.setup(buf)
     // todo: would be nice to have c++ await a promise returned from callbacks
     // so we could do async inside the handler and block the reading of the
     // stream until we resolve. don't think it would be possible
@@ -366,6 +350,7 @@ function replModule () {
           if (payload) {
             const r = stdout.write(buf.write(payload, 0))
             if (r < 0) return stdout.close()
+            if (r < len) return stdin.pause()
           }
         }
       } catch (err) {
@@ -373,13 +358,11 @@ function replModule () {
       }
       const r = stdout.write(buf.write('> ', 0))
       if (r < 0) return stdout.close()
-      if (r < len && stdout.queueSize() >= MAX_BUFFER) stdin.pause()
+      if (r < len) return stdin.pause()
     })
     stdin.onEnd(() => stdin.close())
-    stdin.onClose(() => stdout.close())
-    stdout.setup(buf, UV_TTY_MODE_NORMAL)
     stdout.onDrain(() => stdin.resume())
-    stdout.onClose(() => stdin.close())
+    stdout.setup(buf)
     if (stdout.write(buf.write('> ', 0)) < 0) {
       stdout.close()
     } else {
@@ -399,7 +382,8 @@ function main (args) {
   const { require, cache } = requireModule(pathMod)
   const { repl } = replModule()
   // load required native libs
-  const { EventLoop } = library('loop')
+  const { Epoll } = library('epoll')
+  const loop = new Epoll()
 
   Error.stackTraceLimit = 1000
 
@@ -418,14 +402,14 @@ function main (args) {
   dv8.repl = repl
   dv8.runMicroTasks = runMicroTasks
   dv8.readFile = readFile
-  dv8.listHandles = wrapListHandles(EventLoop.listHandles)
-  dv8.nextTick = wrapNextTick(new EventLoop())
+  dv8.listHandles = wrapListHandles(loop.listHandles)
+  dv8.nextTick = wrapNextTick(loop)
   dv8.path = pathMod
 
   dv8.versions = {
     dv8: dv8.version,
     javascript: `v8 ${dv8.v8}`,
-    loop: `libuv ${library('loop').version || 'n/a'}`,
+    loop: `jsys ${library('epoll').version || 'n/a'}`,
     libz: `miniz ${library('libz').version || 'n/a'}`,
     mbedtls: library('mbedtls').version || 'n/a',
     openssl: library('openssl').version || 'n/a',
@@ -457,9 +441,10 @@ function main (args) {
   } else {
     repl()
   }
-  while (EventLoop.isAlive()) {
-    EventLoop.run(1)
+  let r = loop.run(1)
+  while (r >= 0) {
     runMicroTasks()
+    r = loop.run(1)
   }
   runMicroTasks()
 }

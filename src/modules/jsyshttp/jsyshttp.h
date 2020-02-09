@@ -22,11 +22,18 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
+typedef struct
+{
+  uint8_t onRequest;
+} callbacks_t;
+
 void InitAll(Local<Object> exports);
 
 class JSYSHttp : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
+		v8::Persistent<v8::Function> onRequestCallback;
+		callbacks_t callbacks;
 
 	protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
@@ -41,6 +48,7 @@ class JSYSHttp : public dv8::ObjectWrap {
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Listen(const v8::FunctionCallbackInfo<v8::Value>& args);
+	  static void onRequest(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };
 

@@ -18,15 +18,12 @@ namespace epoll {
 
 	void Epoll::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
-		// create a function template
 		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 		tpl->SetClassName(String::NewFromUtf8(isolate, "Epoll").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
-		// an instance method
-    DV8_SET_METHOD(isolate, tpl, "listHandles", Epoll::ListHandles);
-		// a static method on the template
-		DV8_SET_METHOD(isolate, tpl, "run", Epoll::Run);
-		// store the template on the exports object
+    DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listHandles", Epoll::ListHandles);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "run", Epoll::Run);
+	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onIdle", Epoll::onIdle);
 		DV8_SET_EXPORT(isolate, tpl, "Epoll", exports);
 	}
 
@@ -44,6 +41,21 @@ namespace epoll {
 		#if TRACE
 		fprintf(stderr, "Epoll::Destroy\n");
 		#endif
+	}
+
+	void Epoll::onIdle(const v8::FunctionCallbackInfo<v8::Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Epoll *obj = ObjectWrap::Unwrap<Epoll>(args.Holder());
+		if (args.Length() > 0) {
+			Local<Function> onIdle = Local<Function>::Cast(args[0]);
+			obj->onIdleCallback.Reset(isolate, onIdle);
+			obj->callbacks.onIdle = 1;
+		} else {
+			obj->onIdleCallback.Reset();
+			obj->callbacks.onIdle = 0;
+		}
+		args.GetReturnValue().Set(args.Holder());
 	}
 
 	void Epoll::ListHandles(const FunctionCallbackInfo<Value> &args)
@@ -102,8 +114,26 @@ namespace epoll {
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		Epoll *obj = ObjectWrap::Unwrap<Epoll>(args.Holder());
 		v8::HandleScope handleScope(isolate);
-		int r = jsys_loop_run(env->loop);
+		int timeout = -1;
+		if (args.Length() > 0) {
+			timeout = args[0]->IntegerValue(context).ToChecked();
+		}
+		jsys_loop* loop = env->loop;
+		int r = 0;
+		loop->state = 1;
+		Local<Context> ctx = isolate->GetCurrentContext();
+		Local<Object> global = ctx->Global();
+		Local<Value> argv[] = {};
+		while (loop->state && loop->count > 0) {
+			r = jsys_loop_run_once(loop, timeout);
+			if (obj->callbacks.onIdle == 1) {
+				Local<Function> Callback = Local<Function>::New(isolate, obj->onIdleCallback);
+				Callback->Call(ctx, global, 0, argv);
+			}
+			if (r < 0) break;
+		}
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 

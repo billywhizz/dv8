@@ -10,7 +10,7 @@ MINIZ_INCLUDE      = $(DV8_DEPS)/miniz
 MBEDTLS_INCLUDE    = $(DV8_DEPS)/mbedtls/include
 BUILTINS           = $(DV8_SRC)/builtins
 TRACE              = TRACE=0
-CCFLAGS            = -D$(TRACE) -I$(PICOHTTP_INCLUDE) -I$(MBEDTLS_INCLUDE) -I$(JSYS_INCLUDE) -I$(HTTPPARSER_INCLUDE) -I$(MINIZ_INCLUDE) -I$(V8_INCLUDE) -I$(BUILTINS) -I$(DV8_SRC) -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y
+CCFLAGS            = -D$(TRACE) -I$(PICOHTTP_INCLUDE) -I$(MBEDTLS_INCLUDE) -I$(JSYS_INCLUDE) -I$(HTTPPARSER_INCLUDE) -I$(MINIZ_INCLUDE) -I$(V8_INCLUDE) -I$(BUILTINS) -I$(DV8_SRC) -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 -O3 -g -fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y
 LDFLAGS            = -pthread -m64 -Wl,-z,norelro -Wl,--start-group  $(DV8_OUT)/dv8main.o $(DV8_OUT)/dv8.a $(V8_DEPS)/libv8_monolith.a -Wl,--end-group
 CC                 = ccache g++
 C                  = ccache gcc
@@ -51,19 +51,19 @@ $(DV8_OUT)/dv8main.o:
 $(DV8_OUT)/dv8.o:
 	$(CC) $(CCFLAGS) -c -o $(DV8_OUT)/dv8.o $(DV8_SRC)/dv8.cc
 
-$(DV8_SRC)/builtins.h:
-	./builtins.sh  override
+$(DV8_SRC)/builtins.h: src/main.js
+	./builtins.sh
 
 $(DV8_OUT)/dv8.a:
 	rm -f $(DV8_OUT)/dv8.a
 	ar crsT $(DV8_OUT)/dv8.a $(DV8_OUT)/buffer.o $(DV8_OUT)/env.o $(DV8_OUT)/dv8.o $(DV8_OUT)/modules.o $(DV8_OUT)/tty.o $(DV8_OUT)/epoll.o $(DV8_OUT)/timer.o $(DV8_OUT)/fs.o $(DV8_OUT)/jsyshttp.o $(DV8_OUT)/picohttpparser.o
 
 $(DV8_OUT)/dv8:
-	$(CC) $(LDFLAGS) -s -static -o $(DV8_OUT)/dv8
+	$(CC) $(LDFLAGS) -static -o $(DV8_OUT)/dv8
 
 dv8: $(DV8_SRC)/builtins.h $(DV8_OUT)/buffer.o $(DV8_OUT)/env.o $(DV8_OUT)/tty.o $(DV8_OUT)/timer.o $(DV8_OUT)/epoll.o $(DV8_OUT)/fs.o $(DV8_OUT)/jsyshttp.o $(DV8_OUT)/modules.o $(DV8_OUT)/dv8main.o $(DV8_OUT)/dv8.o $(DV8_OUT)/dv8.a $(DV8_OUT)/dv8 ## dv8 runtime
 
 clean: ## clean the generated artifacts
-	rm -f bin/dv8 bin/*.o bin/*.a
+	rm -f bin/dv8 bin/*.o bin/*.a src/builtins.h
 
 .DEFAULT_GOAL := help

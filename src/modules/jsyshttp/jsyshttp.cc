@@ -39,7 +39,21 @@ namespace jsyshttp {
 	}
 
 	int httpd_on_request(jsys_descriptor *client) {
+		Isolate *isolate = Isolate::GetCurrent();
+		v8::HandleScope handleScope(isolate);
 		jsys_stream_context* context = (jsys_stream_context*)client->data;
+		jsys_httpd_settings* http_settings = (jsys_httpd_settings *)context->settings->data;
+	  JSYSHttp *socket = static_cast<JSYSHttp*>(http_settings->data);
+    if (socket->callbacks.onRequest == 1) {
+			Local<Context> ctx = isolate->GetCurrentContext();
+			Local<Object> global = ctx->Global();
+      Local<Function> Callback = Local<Function>::New(isolate, socket->onRequestCallback);
+      Local<Value> argv[] = {};
+      Callback->Call(ctx, global, 0, argv);
+			context->current_buffer = 1;
+    } else {
+			context->current_buffer = 1;
+		}
 	#if TRACE
 		jsys_http_server_context* http = (jsys_http_server_context*)context->data;
 		fprintf(stderr, "httpd_on_request (%i), size: (%lu)\n", client->fd, http->header_size);
@@ -55,7 +69,6 @@ namespace jsyshttp {
 			i++;
 		}
 	#endif
-		context->current_buffer = 1;
 		return 0;
 	}
 
@@ -82,6 +95,8 @@ namespace jsyshttp {
 		tpl->SetClassName(String::NewFromUtf8(isolate, "JSYSHttp").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listen", JSYSHttp::Listen);
+	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRequest", JSYSHttp::onRequest);
+
 		DV8_SET_EXPORT(isolate, tpl, "Socket", exports);
 	}
 
@@ -100,6 +115,19 @@ namespace jsyshttp {
 		#endif
 	}
 
+	void JSYSHttp::onRequest(const v8::FunctionCallbackInfo<v8::Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		JSYSHttp *obj = ObjectWrap::Unwrap<JSYSHttp>(args.Holder());
+		if (args[0]->IsFunction())
+		{
+			Local<Function> onRequest = Local<Function>::Cast(args[0]);
+			obj->onRequestCallback.Reset(isolate, onRequest);
+			obj->callbacks.onRequest = 1;
+		}
+		args.GetReturnValue().Set(args.Holder());
+	}
+
 	void JSYSHttp::Listen(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
@@ -107,6 +135,11 @@ namespace jsyshttp {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		JSYSHttp* obj = ObjectWrap::Unwrap<JSYSHttp>(args.Holder());
+
+    String::Utf8Value str(args.GetIsolate(), args[0]);
+    const char *ip_address = *str;
+    const unsigned int port = args[1]->IntegerValue(context).ToChecked();
+
 		jsys_httpd_settings* http_settings = jsys_http_create_httpd_settings(env->loop);
 		http_settings->on_headers = httpd_on_headers;
 		http_settings->on_request = httpd_on_request;
@@ -121,7 +154,13 @@ namespace jsyshttp {
 		http_settings->buffers = 1;
 		http_settings->data = obj;
 		jsys_descriptor* server = jsys_http_create_server(env->loop, http_settings);
-		int r = jsys_tcp_bind_reuse(server, 3000, INADDR_ANY);
+		struct sockaddr_in addr;
+		int r = inet_aton(ip_address, &addr.sin_addr);
+		if (r == -1) {
+			args.GetReturnValue().Set(Integer::New(isolate, r));
+			return;
+		}
+		r = jsys_tcp_bind_reuse(server, port, addr.sin_addr.s_addr);
 		if (r == -1) {
 			args.GetReturnValue().Set(Integer::New(isolate, r));
 			return;

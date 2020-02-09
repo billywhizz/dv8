@@ -158,19 +158,19 @@ function wrapNextTick (loop) {
   const queue = []
   let ticks = 0
   let idleActive = false
+  function processQueue () {
+    ticks++
+    let len = queue.length
+    while (len--) queue.shift()()
+    if (!queue.length) {
+      idleActive = false
+      loop.onIdle()
+    }
+  }
   return (fn) => {
     queue.push(fn)
     if (idleActive) return
-    loop.onIdle(() => {
-      ticks++
-      let len = queue.length
-      while (len--) queue.shift()()
-      if (!queue.length) {
-        idleActive = false
-        loop.onIdle()
-      }
-    })
-    loop.ref() // ensure we run
+    loop.onIdle(processQueue)
     idleActive = true
   }
 }
@@ -383,6 +383,7 @@ function main (args) {
   const { repl } = replModule()
   // load required native libs
   const { Epoll } = library('epoll')
+  const loop = new Epoll()
 
   Error.stackTraceLimit = 1000
 
@@ -401,8 +402,8 @@ function main (args) {
   dv8.repl = repl
   dv8.runMicroTasks = runMicroTasks
   dv8.readFile = readFile
-  dv8.listHandles = wrapListHandles(Epoll.listHandles)
-  //dv8.nextTick = wrapNextTick(new EventLoop())
+  dv8.listHandles = wrapListHandles(loop.listHandles)
+  dv8.nextTick = wrapNextTick(loop)
   dv8.path = pathMod
 
   dv8.versions = {
@@ -440,13 +441,11 @@ function main (args) {
   } else {
     repl()
   }
-  Epoll.run()
-/*
-  while (EventLoop.isAlive()) {
-    EventLoop.run(1)
+  let r = loop.run(1)
+  while (r >= 0) {
     runMicroTasks()
+    r = loop.run(1)
   }
-*/
   runMicroTasks()
 }
 

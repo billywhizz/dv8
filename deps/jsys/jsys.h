@@ -51,6 +51,7 @@ struct jsys_loop {
   int fd;
   int state;
   jsys_callback *callback;
+  jsys_callback *onidle;
   jsys_descriptor** descriptors;
   struct epoll_event *events;
   sigset_t set;
