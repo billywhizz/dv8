@@ -1,5 +1,5 @@
 const { print, library, listHandles } = dv8
-const { Socket } = library('jsyshttp')
+const { Socket } = library('net')
 
 const buf = Buffer.alloc(16384)
 const bytes64 = new BigUint64Array(buf.bytes)

@@ -1,8 +1,8 @@
-#include "jsyshttp.h"
+#include "net.h"
 
 namespace dv8 {
 
-namespace jsyshttp {
+namespace net {
 
 // Http 
 	void setup_http_context(jsys_stream_context* context, size_t buffer_size) {
@@ -520,7 +520,7 @@ namespace jsyshttp {
 }	
 
 extern "C" {
-	void* _register_jsyshttp() {
-		return (void*)dv8::jsyshttp::InitAll;
+	void* _register_net() {
+		return (void*)dv8::net::InitAll;
 	}
 }

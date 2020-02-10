@@ -1,12 +1,12 @@
-#ifndef DV8_JSYSHttp_H
-#define DV8_JSYSHttp_H
+#ifndef DV8_net_H
+#define DV8_net_H
 
 #include <dv8.h>
 #include <jsys_http.h>
 
 namespace dv8 {
 
-namespace jsyshttp {
+namespace net {
 
 using v8::Array;
 using v8::Context;

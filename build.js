@@ -26,7 +26,7 @@ function getModuleCompiles (config) {
   if (config.modules.some(v => v === 'httpParser')) {
     result = `${result}\n$C -DHTTP_PARSER_STRICT=0 $CFLAGS -c -o $DV8_OUT/http_parser.o $HTTPPARSER_INCLUDE/http_parser.c`
   }
-  if (config.modules.some(v => v === 'jsyshttp')) {
+  if (config.modules.some(v => v === 'net')) {
     result = `${result}\n$C -msse4 -c -o $DV8_OUT/picohttpparser.o $PICOHTTP_INCLUDE/picohttpparser.c`
   }
   return result
@@ -41,7 +41,7 @@ function getLinkLine (config) {
   if (config.modules.some(v => v === 'httpParser')) {
     result = `${result} $DV8_OUT/http_parser.o`
   }
-  if (config.modules.some(v => v === 'jsyshttp')) {
+  if (config.modules.some(v => v === 'net')) {
     result = `${result} $DV8_OUT/picohttpparser.o`
   }
   return result

@@ -26,12 +26,12 @@ $CC $CCFLAGS -I$DV8_SRC/modules/tty -c -o $DV8_OUT/tty.o $DV8_SRC/modules/tty/tt
 $CC $CCFLAGS -I$DV8_SRC/modules/epoll -c -o $DV8_OUT/epoll.o $DV8_SRC/modules/epoll/epoll.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/timer -c -o $DV8_OUT/timer.o $DV8_SRC/modules/timer/timer.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/fs -c -o $DV8_OUT/fs.o $DV8_SRC/modules/fs/fs.cc
-$CC $CCFLAGS -I$DV8_SRC/modules/jsyshttp -c -o $DV8_OUT/jsyshttp.o $DV8_SRC/modules/jsyshttp/jsyshttp.cc
+$CC $CCFLAGS -I$DV8_SRC/modules/net -c -o $DV8_OUT/net.o $DV8_SRC/modules/net/net.cc
 $CC $CCFLAGS -I$DV8_SRC/modules/thread -c -o $DV8_OUT/thread.o $DV8_SRC/modules/thread/thread.cc
 $C -msse4 -c -o $DV8_OUT/picohttpparser.o $PICOHTTP_INCLUDE/picohttpparser.c
 $CC $CCFLAGS -c -o $DV8_OUT/modules.o $DV8_SRC/modules.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8main.o $DV8_SRC/dv8_main.cc
 $CC $CCFLAGS -c -o $DV8_OUT/dv8.o $DV8_SRC/dv8.cc
 rm -f $DV8_OUT/dv8.a
-ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o $DV8_OUT/tty.o $DV8_OUT/epoll.o $DV8_OUT/timer.o $DV8_OUT/fs.o $DV8_OUT/jsyshttp.o $DV8_OUT/thread.o $DV8_OUT/picohttpparser.o
+ar crsT $DV8_OUT/dv8.a $DV8_OUT/buffer.o $DV8_OUT/env.o $DV8_OUT/dv8.o $DV8_OUT/modules.o $DV8_OUT/tty.o $DV8_OUT/epoll.o $DV8_OUT/timer.o $DV8_OUT/fs.o $DV8_OUT/net.o $DV8_OUT/thread.o $DV8_OUT/picohttpparser.o
 $CC $LDFLAGS -o $DV8_OUT/dv8

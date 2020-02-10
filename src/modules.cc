@@ -19,8 +19,8 @@ if (strcmp("fs", module_name) == 0) {
 dv8::fs::InitAll(exports);
 return;
 }
-if (strcmp("jsyshttp", module_name) == 0) {
-dv8::jsyshttp::InitAll(exports);
+if (strcmp("net", module_name) == 0) {
+dv8::net::InitAll(exports);
 return;
 }
 if (strcmp("thread", module_name) == 0) {
