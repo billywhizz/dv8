@@ -3,7 +3,7 @@
 
 #include <v8.h>
 #include <modules/tty/tty.h>
-#include <modules/epoll/epoll.h>
+#include <modules/loop/loop.h>
 #include <modules/timer/timer.h>
 #include <modules/fs/fs.h>
 #include <modules/net/net.h>

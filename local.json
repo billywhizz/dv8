@@ -16,5 +16,5 @@
     "modulesSource": "./src/modules.cc"
   },
   "libs": [],
-  "modules": ["tty", "epoll", "timer", "fs", "net", "thread"]
+  "modules": ["tty", "loop", "timer", "fs", "net", "thread"]
 }

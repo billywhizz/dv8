@@ -7,8 +7,8 @@ inline void initLibrary(Local<Object> exports, const char* module_name) {
 dv8::tty::InitAll(exports);
 return;
 }
-if (strcmp("epoll", module_name) == 0) {
-dv8::epoll::InitAll(exports);
+if (strcmp("loop", module_name) == 0) {
+dv8::loop::InitAll(exports);
 return;
 }
 if (strcmp("timer", module_name) == 0) {

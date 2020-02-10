@@ -384,8 +384,8 @@ function main (args) {
   const { require, cache } = requireModule(pathMod)
   const { repl } = replModule()
   // load required native libs
-  const { Epoll } = library('epoll')
-  const loop = new Epoll()
+  const { EventLoop } = library('loop')
+  const loop = new EventLoop()
 
   Error.stackTraceLimit = 1000
 
@@ -411,7 +411,7 @@ function main (args) {
   dv8.versions = {
     dv8: dv8.version,
     javascript: `v8 ${dv8.v8}`,
-    loop: `jsys ${library('epoll').version || 'n/a'}`,
+    loop: `jsys ${library('loop').version || 'n/a'}`,
     libz: `miniz ${library('libz').version || 'n/a'}`,
     mbedtls: library('mbedtls').version || 'n/a',
     openssl: library('openssl').version || 'n/a',
