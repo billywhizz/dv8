@@ -27,6 +27,18 @@ if (strcmp("thread", module_name) == 0) {
 dv8::thread::InitAll(exports);
 return;
 }
+if (strcmp("libz", module_name) == 0) {
+dv8::libz::InitAll(exports);
+return;
+}
+if (strcmp("mbedtls", module_name) == 0) {
+dv8::mbedtls::InitAll(exports);
+return;
+}
+if (strcmp("os", module_name) == 0) {
+dv8::os::InitAll(exports);
+return;
+}
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {

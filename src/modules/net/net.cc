@@ -111,13 +111,7 @@ namespace net {
 			return jsys_descriptor_free(client);
 		}
 		if (jsys_descriptor_is_writable(client)) {
-			jsys_stream_settings* settings = (jsys_stream_settings*)client->data;
-			jsys_stream_context* context = jsys_stream_context_create(client->loop, settings->buffers);
-			context->settings = settings;
-			context->offset = 0;
-			context->data = settings;
-			client->data = context;
-			client->closing = 0;
+			jsys_stream_context* context = (jsys_stream_context*)client->data;
 			r = context->settings->on_connect(client);
 			if (r == -1) return jsys_descriptor_free(client);
 			return r;
@@ -326,8 +320,8 @@ namespace net {
 	void Socket::Pair(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
-		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		Local<Context> ctx = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(ctx->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
 		int argc = args.Length();
@@ -338,8 +332,11 @@ namespace net {
 			socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, fds);
 			fd = fds[0];
 			rc = fds[1];
+			obj->pairfd = rc;
+			ioctl(fds[0], FIOCLEX);
+			ioctl(fds[1], FIOCLEX);
 		} else if (argc == 1) {
-      fd = args[0]->Int32Value(context).ToChecked();
+      fd = args[0]->Int32Value(ctx).ToChecked();
 		}
 		jsys_loop* loop = env->loop;
 		jsys_descriptor* sock = jsys_descriptor_create(loop);
@@ -350,9 +347,14 @@ namespace net {
 		settings->on_data = on_client_data;
 		settings->on_end = on_client_end;
 		settings->data = obj;
-		obj->handle = sock;
 		settings->buffers = 1;
-		sock->data = settings;
+		jsys_stream_context* context = jsys_stream_context_create(loop, 1);
+		context->settings = settings;
+		context->offset = 0;
+		context->data = settings;
+		sock->data = context;
+		sock->closing = 0;
+		obj->handle = sock;
 		sock->callback = on_socket_event;
   	jsys_loop_add_flags(loop, sock, EPOLLOUT);
 		args.GetReturnValue().Set(Integer::New(isolate, rc));
@@ -419,7 +421,9 @@ namespace net {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
+		jsys_descriptor* sock = obj->handle;
+		int r = jsys_tcp_pause(sock);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void Socket::Resume(const FunctionCallbackInfo<Value> &args)
@@ -429,7 +433,9 @@ namespace net {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
+		jsys_descriptor* sock = obj->handle;
+		int r = jsys_tcp_resume(sock);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void Socket::Close(const FunctionCallbackInfo<Value> &args)
@@ -439,6 +445,7 @@ namespace net {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		jsys_descriptor_free(obj->handle);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 

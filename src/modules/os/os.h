@@ -2,6 +2,7 @@
 #define DV8_OS_H
 
 #include <dv8.h>
+#include <signal.h>
 
 namespace dv8
 {
@@ -29,7 +30,8 @@ class OS : public dv8::ObjectWrap
 {
 public:
   static void Init(v8::Local<v8::Object> exports);
-  v8::Persistent<v8::Function> _onSignal;
+  v8::Persistent<v8::Function> onSignal;
+  jsys_descriptor* handle;
 
 protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
@@ -45,8 +47,7 @@ private:
 
   static void New(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void OnSignal(const v8::FunctionCallbackInfo<v8::Value> &args);
-
-  static void on_signal(uv_signal_t *handle, int signum);
+  static int on_signal(jsys_descriptor* signal);
 };
 
 } // namespace os

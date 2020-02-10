@@ -22,7 +22,7 @@
 #include <sys/resource.h> /* getrusage */
 #include <signal.h>
 
-#define JSYS_VERSION "v0.0.1"
+#define JSYS_VERSION "v0.0.2"
 #define JSYS_READABLE (EPOLLIN | EPOLLET)
 #define JSYS_WRITABLE EPOLLOUT
 
@@ -62,6 +62,21 @@ struct jsys_loop {
   jsys_alloc *alloc;
 };
 
+struct jsys_process {
+  int pid;
+  int status;
+  jsys_callback *on_exit;
+  const char* file;   /* Path to program to execute. */
+  char** args;
+  char** env;
+  const char* cwd;
+  unsigned int flags;
+  int stdio_count;
+  jsys_descriptor* stdio;
+  uid_t uid;
+  gid_t gid;
+};
+
 struct jsys_descriptor {
   int fd;
   int type;
@@ -96,6 +111,9 @@ struct jsys_stream_context {
 };
 
 static const char* jsys_version_string();
+
+// process
+static int jsys_spawn(jsys_loop*, jsys_process*, int*);
 
 // descriptors
 static jsys_descriptor* jsys_descriptor_create(jsys_loop*);
@@ -181,6 +199,28 @@ inline void jsysfree(void* ptr, const char* tag) {
 #endif
   free(ptr);
   return;
+}
+
+int jsys_spawn(jsys_loop* loop, jsys_process* process, int* fds) {
+  pid_t pid = fork();
+  if (pid == -1) {
+    return pid;
+  }
+  if (pid == 0) {
+    dup2(fds[0], 0);
+    dup2(fds[1], 1);
+    dup2(fds[2], 2);
+    execvp(process->file, process->args);
+    _exit(127);
+    abort();
+  } else {
+    close(fds[0]);
+    close(fds[1]);
+    close(fds[2]);
+    process->pid = pid;
+    process->status = 0;
+  }
+  return 0;
 }
 
 // descriptors implementation

@@ -67,6 +67,7 @@ class Socket : public dv8::ObjectWrap {
 		v8::Persistent<v8::Function> onEnd;
 		socket_callbacks_t callbacks;
 		jsys_descriptor* handle;
+		int pairfd;
 
 	protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);

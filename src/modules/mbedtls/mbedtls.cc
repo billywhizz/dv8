@@ -86,8 +86,6 @@ namespace mbedtls {
 		if (args.IsConstructCall()) {
 			Hash* obj = new Hash();
 			obj->Wrap(args.This());
-			obj->in = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
-			obj->out = (uv_buf_t*)calloc(1, sizeof(uv_buf_t));
 			args.GetReturnValue().Set(args.This());
 		}
 	}
@@ -226,11 +224,11 @@ namespace mbedtls {
 		Local<Context> context = isolate->GetCurrentContext();
 		obj->algorithm = args[0]->Uint32Value(context).ToChecked();
 		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
-		obj->in->base = (char*)b->_data;
-		obj->in->len = b->_length;
+		obj->in.iov_base = (char*)b->_data;
+		obj->in.iov_len = b->_length;
 		b = ObjectWrap::Unwrap<Buffer>(args[2].As<v8::Object>());
-		obj->out->base = (char*)b->_data;
-		obj->out->len = b->_length;
+		obj->out.iov_base = (char*)b->_data;
+		obj->out.iov_len = b->_length;
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -243,23 +241,23 @@ namespace mbedtls {
 		if (argc > 0) {
 			Local<Context> context = isolate->GetCurrentContext();
 			uint32_t len = args[0]->Uint32Value(context).ToChecked();
-			unsigned char* digest = (unsigned char*)obj->out->base;
+			unsigned char* digest = (unsigned char*)obj->out.iov_base;
 			if (obj->algorithm == MBEDTLS_MD_MD4) {
-				ret = mbedtls_md4_ret( (unsigned char *) obj->in->base, len, digest );
+				ret = mbedtls_md4_ret( (unsigned char *) obj->in.iov_base, len, digest );
 			} else if (obj->algorithm == MBEDTLS_MD_MD5) {
-				ret = mbedtls_md5_ret( (unsigned char *) obj->in->base, len, digest );
+				ret = mbedtls_md5_ret( (unsigned char *) obj->in.iov_base, len, digest );
 			} else if (obj->algorithm == MBEDTLS_MD_SHA1) {
-				ret = mbedtls_sha1_ret( (unsigned char *) obj->in->base, len, digest );
+				ret = mbedtls_sha1_ret( (unsigned char *) obj->in.iov_base, len, digest );
 			} else if (obj->algorithm == MBEDTLS_MD_SHA224) {
-				ret = mbedtls_sha256_ret( (unsigned char *) obj->in->base, len, digest, 1 );
+				ret = mbedtls_sha256_ret( (unsigned char *) obj->in.iov_base, len, digest, 1 );
 			} else if (obj->algorithm == MBEDTLS_MD_SHA256) {
-				ret = mbedtls_sha256_ret( (unsigned char *) obj->in->base, len, digest, 0 );
+				ret = mbedtls_sha256_ret( (unsigned char *) obj->in.iov_base, len, digest, 0 );
 			} else if (obj->algorithm == MBEDTLS_MD_SHA384) {
-				ret = mbedtls_sha512_ret( (unsigned char *) obj->in->base, len, digest, 1 );
+				ret = mbedtls_sha512_ret( (unsigned char *) obj->in.iov_base, len, digest, 1 );
 			} else if (obj->algorithm == MBEDTLS_MD_SHA512) {
-				ret = mbedtls_sha512_ret( (unsigned char *) obj->in->base, len, digest, 0 );
+				ret = mbedtls_sha512_ret( (unsigned char *) obj->in.iov_base, len, digest, 0 );
 			} else if (obj->algorithm == MBEDTLS_MD_RIPEMD160) {
-				ret = mbedtls_ripemd160_ret( (unsigned char *) obj->in->base, len, digest );
+				ret = mbedtls_ripemd160_ret( (unsigned char *) obj->in.iov_base, len, digest );
 			}
 		}
 		args.GetReturnValue().Set(Integer::New(isolate, ret));

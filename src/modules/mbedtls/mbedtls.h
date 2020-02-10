@@ -60,8 +60,8 @@ class Hash : public dv8::ObjectWrap {
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 	private:
-		uv_buf_t* in;
-		uv_buf_t* out;
+		struct iovec in;
+		struct iovec out;
 		uint32_t algorithm;
 
 		Hash() {

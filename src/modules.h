@@ -8,6 +8,9 @@
 #include <modules/fs/fs.h>
 #include <modules/net/net.h>
 #include <modules/thread/thread.h>
+#include <modules/libz/libz.h>
+#include <modules/mbedtls/mbedtls.h>
+#include <modules/os/os.h>
 
 namespace dv8 {
 
