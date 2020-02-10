@@ -407,7 +407,8 @@ namespace net {
 		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
 		jsys_descriptor* sock = obj->handle;
 		jsys_stream_context* context = (jsys_stream_context*)sock->data;
-		int r = jsys_tcp_write_len(sock, context->out, 3);
+		int len = args[0]->Int32Value(ctx).ToChecked();
+		int r = jsys_tcp_write_len(sock, context->out, len);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
