@@ -2,6 +2,7 @@
 #define DV8_Thread_H
 
 #include <dv8.h>
+#include <pthread.h>
 
 namespace dv8
 {
@@ -35,13 +36,12 @@ typedef struct
 	int fd;
 	int argc;
 	char** argv;
-	uv_async_t *async;
-	uv_thread_t tid;
+	pthread_t tid;
 } thread_handle;
 
 void InitAll(Local<Object> exports);
 
-void on_context_complete(thread_handle *th, int status);
+//void on_context_complete(thread_handle *th, int status);
 
 class Thread : public dv8::ObjectWrap
 {

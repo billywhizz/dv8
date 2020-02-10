@@ -122,10 +122,10 @@ function wrapEnv (env) {
   }
 }
 
-function wrapListHandles (listHandles) {
+function wrapListHandles (loop) {
   const handles = new Uint32Array(16)
   return () => {
-    listHandles(handles)
+    loop.listHandles(handles)
     const [ socket, tty, signal, timer, unknown, closing, closed ] = handles
     return { socket, tty, signal, timer, unknown, closing, closed }
   }
@@ -326,7 +326,7 @@ function replModule () {
   let stdin
   let stdout
   // todo: we need a runscript that is awaitable
-  const { runScript, print, library } = dv8
+  const { runScript, library } = dv8
   const tty = library('tty')
 
   function repl () {
@@ -346,7 +346,7 @@ function replModule () {
       try {
         const result = runScript(source, 'repl')
         if (result) {
-          const payload = `${JSON.stringify(result, null, 2)}\n`
+          const payload = `\x1B[0m${JSON.stringify(result, null, 2)}\n\x1B[33m>\x1B[32m `
           if (payload) {
             const r = stdout.write(buf.write(payload, 0))
             if (r < 0) return stdout.close()
@@ -354,16 +354,18 @@ function replModule () {
           }
         }
       } catch (err) {
-        print(err.stack)
+        const r = stdout.write(buf.write(`\x1B[0m${err.stack}\n\x1B[33m>\x1B[32m `, 0))
+        if (r < 0) return stdout.close()
+        if (r < len) return stdin.pause()
       }
-      const r = stdout.write(buf.write('> ', 0))
+      const r = stdout.write(buf.write('\x1B[33m>\x1B[32m ', 0))
       if (r < 0) return stdout.close()
       if (r < len) return stdin.pause()
     })
     stdin.onEnd(() => stdin.close())
     stdout.onDrain(() => stdin.resume())
     stdout.setup(buf)
-    if (stdout.write(buf.write('> ', 0)) < 0) {
+    if (stdout.write(buf.write('\x1B[33m>\x1B[32m ', 0)) < 0) {
       stdout.close()
     } else {
       stdin.resume()
@@ -402,7 +404,7 @@ function main (args) {
   dv8.repl = repl
   dv8.runMicroTasks = runMicroTasks
   dv8.readFile = readFile
-  dv8.listHandles = wrapListHandles(loop.listHandles)
+  dv8.listHandles = wrapListHandles(loop)
   dv8.nextTick = wrapNextTick(loop)
   dv8.path = pathMod
 
@@ -419,6 +421,7 @@ function main (args) {
 
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout
+  global.clearInterval = clearTimeout
   global.setInterval = setInterval
 
   // remove things we don't want in the global namespace

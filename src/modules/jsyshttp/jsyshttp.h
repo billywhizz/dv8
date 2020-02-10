@@ -25,30 +25,77 @@ using v8::Value;
 typedef struct
 {
   uint8_t onRequest;
-} callbacks_t;
+} http_callbacks_t;
+
+typedef struct
+{
+  uint8_t onConnect;
+  uint8_t onData;
+  uint8_t onEnd;
+} socket_callbacks_t;
 
 void InitAll(Local<Object> exports);
 
-class JSYSHttp : public dv8::ObjectWrap {
+class Http : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
-		v8::Persistent<v8::Function> onRequestCallback;
-		callbacks_t callbacks;
+		v8::Persistent<v8::Function> onRequest;
+		http_callbacks_t callbacks;
 
 	protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 	private:
 
-		JSYSHttp() {
+		Http() {
 		}
 
-		~JSYSHttp() {
+		~Http() {
 		}
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Listen(const v8::FunctionCallbackInfo<v8::Value>& args);
-	  static void onRequest(const v8::FunctionCallbackInfo<v8::Value> &args);
+	  static void OnRequest(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+};
+
+class Socket : public dv8::ObjectWrap {
+	public:
+		static void Init(v8::Local<v8::Object> exports);
+		v8::Persistent<v8::Function> onConnect;
+		v8::Persistent<v8::Function> onData;
+		v8::Persistent<v8::Function> onEnd;
+		socket_callbacks_t callbacks;
+		jsys_descriptor* handle;
+
+	protected:
+		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
+
+	private:
+
+		Socket() {
+		}
+
+		~Socket() {
+		}
+
+		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+		static void Pair(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Bind(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Listen(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Connect(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Write(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Pause(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Resume(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	  static void OnConnect(const v8::FunctionCallbackInfo<v8::Value> &args);
+	  static void OnData(const v8::FunctionCallbackInfo<v8::Value> &args);
+	  static void OnEnd(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };
 

@@ -14,7 +14,7 @@ void InitAll(Local<Object> exports)
 	Thread::Init(exports);
 }
 
-void start_context(void *data)
+void* start_context(void *data)
 {
 	thread_handle *th = (thread_handle *)data;
 	v8::Isolate::CreateParams create_params;
@@ -61,13 +61,12 @@ void start_context(void *data)
 			dv8->Set(context, String::NewFromUtf8(isolate, "workerSource", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->source, v8::NewStringType::kNormal).ToLocalChecked());
 		}
 		dv8->Set(context, String::NewFromUtf8(isolate, "workerName", v8::NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, (char*)th->name, v8::NewStringType::kNormal).ToLocalChecked());
-		dv8->Set(context, String::NewFromUtf8(isolate, "tid", v8::NewStringType::kNormal).ToLocalChecked(), Number::New(isolate, th->tid));
+		dv8->Set(context, String::NewFromUtf8(isolate, "tid", v8::NewStringType::kNormal).ToLocalChecked(), v8::BigInt::New(isolate, th->tid));
 		if (th->fd > 0) {
 			dv8->Set(context, String::NewFromUtf8(isolate, "fd", v8::NewStringType::kNormal).ToLocalChecked(), Number::New(isolate, th->fd));
 		}
-		uv_loop_t *loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
+    jsys_loop* loop = jsys_loop_create(EPOLL_CLOEXEC, 128, 1024);
 		env->loop = loop;
-		uv_loop_init(loop);
     v8::Local<v8::String> base = v8::String::NewFromUtf8(isolate, src_main_js, v8::NewStringType::kNormal, static_cast<int>(src_main_js_len)).ToLocalChecked();
 		v8::ScriptOrigin baseorigin(v8::String::NewFromUtf8(isolate, "main.js", v8::NewStringType::kNormal).ToLocalChecked(), 
 			v8::Integer::New(isolate, 0), 
@@ -82,18 +81,18 @@ void start_context(void *data)
 		v8::ScriptCompiler::Source basescript(base, baseorigin);
 		if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
       dv8::PrintStackTrace(isolate, try_catch);
-			return;
+			return NULL;
 		}
 		v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
 		if (!ok.ToChecked()) {
       dv8::PrintStackTrace(isolate, try_catch);
-			return;
+			return NULL;
 		}
     v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
 		if (result.IsEmpty()) {
 			if (try_catch.HasCaught()) {
 				dv8::PrintStackTrace(isolate, try_catch);
-				return;
+				return NULL;
 			}
 		}
     v8::Local<v8::Value> func = globalInstance->Get(context, v8::String::NewFromUtf8(isolate, "onExit", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked();
@@ -108,39 +107,12 @@ void start_context(void *data)
     }
     const double kLongIdlePauseInSeconds = 1.0;
     isolate->ContextDisposedNotification();
-    //isolate->IdleNotificationDeadline(platform->MonotonicallyIncreasingTime() + kLongIdlePauseInSeconds);
     isolate->LowMemoryNotification();
-    uv_tty_reset_mode();
-	}
+}
 	isolate->Dispose();
 	delete create_params.array_buffer_allocator;
   isolate = nullptr;
-	uv_async_send(th->async);
-}
-
-void on_thread_close(uv_handle_t *handle)
-{
-		//free(handle);
-}
-
-void on_context_complete(uv_async_t *async)
-{
-	thread_handle *th = (thread_handle *)async->data;
-	uv_handle_t* handle = (uv_handle_t*)async;
-	Thread *t = (Thread *)th->object;
-	Isolate *isolate = Isolate::GetCurrent();
-	v8::HandleScope handleScope(isolate);
-	Local<Context> context = isolate->GetCurrentContext();
-	Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-	Local<Function> foo = Local<Function>::New(isolate, t->onComplete);
-	Local<Value> argv[1] = { v8::Null(isolate) };
-	v8::TryCatch try_catch(isolate);
-	foo->Call(context, context->Global(), 1, argv);
-	free(th);
-	if (try_catch.HasCaught()) {
-		dv8::ReportException(isolate, &try_catch);
-	}
-	uv_close(handle, on_thread_close);
+	return NULL;
 }
 
 void Thread::Init(Local<Object> exports)
@@ -162,9 +134,9 @@ void Thread::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
   v8::HandleScope handleScope(isolate);
   ObjectWrap *wrap = data.GetParameter();
   Thread* thread = static_cast<Thread *>(wrap);
-		#if TRACE
-		fprintf(stderr, "Thread::Destroy\n");
-		#endif
+	#if TRACE
+	fprintf(stderr, "Thread::Destroy\n");
+	#endif
 }
 
 void Thread::New(const FunctionCallbackInfo<Value> &args)
@@ -202,6 +174,7 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	Local<Function> onComplete = Local<Function>::Cast(args[1]);
 	Local<String> sourceString = threadFunc->ToString(context).ToLocalChecked();
 	String::Utf8Value source(isolate, sourceString);
+	// todo allow passing in args and env for thread here
 	obj->onComplete.Reset(isolate, onComplete);
 	thread_handle *th = (thread_handle *)malloc(sizeof(thread_handle));
 	obj->handle = th;
@@ -223,13 +196,16 @@ void Thread::Start(const FunctionCallbackInfo<Value> &args)
 	int len = strlen(*source);
 	th->size = len;
 	th->source = (char*)calloc(th->size, 1);
-	th->async = (uv_async_t*)calloc(1, sizeof(uv_async_t));
-	th->async->data = th;
 	th->argc = env->argc;
-	th->argv = uv_setup_args(env->argc, env->argv);
-	uv_async_init(env->loop, th->async, on_context_complete);
+	th->argv = new char*[th->argc + 1];
+	for(int i=0; i < th->argc; i++) {
+			int len = strlen(env->argv[i]) + 1;
+			th->argv[i] = new char[len];
+			strcpy(th->argv[i], env->argv[i]);
+	}
+	th->argv[th->argc] = NULL;
 	strncpy(th->source, *source, len + 1);
-	int r = uv_thread_create(&th->tid, start_context, (void*)th);
+	int r = pthread_create(&th->tid, NULL, start_context, th);
 	args.GetReturnValue().Set(Integer::New(isolate, r));
 }
 

@@ -7,6 +7,7 @@
 #include <modules/timer/timer.h>
 #include <modules/fs/fs.h>
 #include <modules/jsyshttp/jsyshttp.h>
+#include <modules/thread/thread.h>
 
 namespace dv8 {
 

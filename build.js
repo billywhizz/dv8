@@ -2,73 +2,6 @@ const { args, require } = dv8
 const { readFile, writeFile, FileSystem } = require('./util.js')
 const { O_CREAT, O_TRUNC, O_WRONLY, S_IRUSR, S_IWUSR, S_IXUSR } = FileSystem
 
-/*
-
-  const char *module_path = "/usr/local/lib/dv8/";
-  char lib_name[1024];
-  if (args.Length() > 2) {
-    String::Utf8Value str(args.GetIsolate(), args[2]);
-    module_path = *str;
-    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
-  } else {
-    if (strcmp("loop", module_name) == 0) {
-      dv8::loop::InitAll(exports);
-      return;
-    } else if (strcmp("socket", module_name) == 0) {
-      dv8::socket::InitAll(exports);
-      return;
-    } else if (strcmp("timer", module_name) == 0) {
-      dv8::timer::InitAll(exports);
-      return;
-    } else if (strcmp("zlib", module_name) == 0) {
-      dv8::libz::InitAll(exports);
-      return;
-    } else if (strcmp("thread", module_name) == 0) {
-      dv8::thread::InitAll(exports);
-      return;
-    } else if (strcmp("fs", module_name) == 0) {
-      dv8::fs::InitAll(exports);
-      return;
-    } else if (strcmp("udp", module_name) == 0) {
-      dv8::udp::InitAll(exports);
-      return;
-    } else if (strcmp("process", module_name) == 0) {
-      dv8::process::InitAll(exports);
-      return;
-    } else if (strcmp("tty", module_name) == 0) {
-      dv8::tty::InitAll(exports);
-      return;
-    } else if (strcmp("openssl", module_name) == 0) {
-      dv8::openssl::InitAll(exports);
-      return;
-    } else if (strcmp("os", module_name) == 0) {
-      dv8::os::InitAll(exports);
-      return;
-    }
-    snprintf(lib_name, 1024, "%s%s.so", module_path, module_name);
-  }
-  uv_lib_t lib;
-  args.GetReturnValue().Set(exports);
-  fprintf(stderr, "%s\n", lib_name);
-  int success = uv_dlopen(lib_name, &lib);
-  if (success != 0) {
-    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlopen failed").ToLocalChecked()));
-    return;
-  }
-  char register_name[128];
-  snprintf(register_name, 128, "_register_%s", module_name);
-  void *address;
-  success = uv_dlsym(&lib, register_name, &address);
-  if (success != 0) {
-    isolate->ThrowException(v8::Exception::Error(String::NewFromUtf8(isolate, "uv_dlsym failed").ToLocalChecked()));
-    return;
-  }
-  register_plugin _init = reinterpret_cast<register_plugin>(address);
-  auto _register = reinterpret_cast<InitializerCallback>(_init());
-  _register(exports);
-
-*/
-
 function alloc (size, shared) {
   const buf = Buffer.create()
   buf.bytes = shared ? buf.allocShared(size) : buf.alloc(size)
@@ -93,6 +26,9 @@ function getModuleCompiles (config) {
   if (config.modules.some(v => v === 'httpParser')) {
     result = `${result}\n$C -DHTTP_PARSER_STRICT=0 $CFLAGS -c -o $DV8_OUT/http_parser.o $HTTPPARSER_INCLUDE/http_parser.c`
   }
+  if (config.modules.some(v => v === 'jsyshttp')) {
+    result = `${result}\n$C -msse4 -c -o $DV8_OUT/picohttpparser.o $PICOHTTP_INCLUDE/picohttpparser.c`
+  }
   return result
 }
 
@@ -104,6 +40,9 @@ function getLinkLine (config) {
   }
   if (config.modules.some(v => v === 'httpParser')) {
     result = `${result} $DV8_OUT/http_parser.o`
+  }
+  if (config.modules.some(v => v === 'jsyshttp')) {
+    result = `${result} $DV8_OUT/picohttpparser.o`
   }
   return result
 }
@@ -150,14 +89,14 @@ export DV8_SRC=${config.src}
 export DV8_OUT=${config.build}
 export HTTPPARSER_INCLUDE=$DV8_DEPS/http_parser
 export V8_INCLUDE=$DV8_DEPS/v8/include
+export PICOHTTP_INCLUDE=$DV8_DEPS/picohttpparser
 export V8_DEPS=$DV8_DEPS/v8
-export JSYS_INCLUDE=../jsys/include
+export JSYS_INCLUDE=$DV8_DEPS/jsys
 export MINIZ_INCLUDE=$DV8_DEPS/miniz
-export JSYS_IN
 export MBEDTLS_INCLUDE=$DV8_DEPS/mbedtls/include
 export BUILTINS=$DV8_SRC/builtins
 export TRACE="TRACE=0"
-export CCFLAGS="-D$TRACE -I$MBEDTLS_INCLUDE -I$JSYS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 ${compilerOptions(config)}-fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
+export CCFLAGS="-D$TRACE -I$PICOHTTP_INCLUDE -I$MBEDTLS_INCLUDE -I$JSYS_INCLUDE -I$HTTPPARSER_INCLUDE -I$MINIZ_INCLUDE -I$V8_INCLUDE -I$BUILTINS -I$DV8_SRC -msse4 -pthread -Wall -Wextra -Wno-unused-result -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -m64 ${compilerOptions(config)}-fno-omit-frame-pointer -fno-rtti -ffast-math -fno-ident -fno-exceptions -fmerge-all-constants -fno-unroll-loops -fno-unwind-tables -fno-math-errno -fno-stack-protector -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -std=gnu++1y"
 export LDFLAGS="-pthread -m64 -Wl,-z,norelro -Wl,--start-group ${getLibs(config)} $DV8_OUT/dv8main.o $DV8_OUT/dv8.a $V8_DEPS/libv8_monolith.a -Wl,--end-group"
 echo "building mbedtls"
 make -C $DV8_DEPS/mbedtls/ lib
@@ -234,8 +173,7 @@ void LoadModule(const FunctionCallbackInfo<Value> &args) {
 }
 `
 }
-
-const buf = readFile((args.length > 3 ? args[3] : args[1]) || './docker.json')
+const buf = readFile(args[2] || 'local.json')
 const config = JSON.parse(buf.read(0, buf.size))
 writeFile(config.output.build || './platform.sh', Buffer.fromString(getBuildScript(config)), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IXUSR)
 writeFile(config.output.modulesHeader || './src/modules.h', Buffer.fromString(getHeader(config)))

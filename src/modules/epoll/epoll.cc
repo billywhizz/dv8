@@ -126,13 +126,15 @@ namespace epoll {
 		Local<Context> ctx = isolate->GetCurrentContext();
 		Local<Object> global = ctx->Global();
 		Local<Value> argv[] = {};
-		while (loop->state && loop->count > 0) {
-			r = jsys_loop_run_once(loop, timeout);
-			if (obj->callbacks.onIdle == 1) {
-				Local<Function> Callback = Local<Function>::New(isolate, obj->onIdleCallback);
-				Callback->Call(ctx, global, 0, argv);
-			}
-			if (r < 0) break;
+		if (loop->count == 0) {
+			// there are no handles being watched so indicate the loop is finished
+			args.GetReturnValue().Set(Integer::New(isolate, -1));
+			return;
+		}
+		r = jsys_loop_run_once(loop, timeout);
+		if (obj->callbacks.onIdle == 1) {
+			Local<Function> Callback = Local<Function>::New(isolate, obj->onIdleCallback);
+			Callback->Call(ctx, global, 0, argv);
 		}
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}

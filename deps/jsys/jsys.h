@@ -133,10 +133,11 @@ static jsys_descriptor* jsys_sock_create(jsys_loop*, int domain, int type);
 
 // tcp
 static int jsys_tcp_connect(jsys_descriptor *sock, uint16_t port, char* address);
-static int jsys_tcp_bind(jsys_descriptor *sock, uint16_t port, in_addr_t address, int, int);
+static int jsys_tcp_set_nodelay(jsys_descriptor *client, int on);
 static int jsys_tcp_bind_reuse(jsys_descriptor *sock, uint16_t port, in_addr_t address);
 static int jsys_tcp_listen(jsys_descriptor *sock, int backlog);
-static int jsys_tcp_set_nodelay(jsys_descriptor *client, int on);
+
+static int jsys_tcp_bind(jsys_descriptor *sock, uint16_t port, in_addr_t address, int, int);
 static int jsys_tcp_accept(jsys_descriptor *server, jsys_descriptor *client);
 static int jsys_tcp_pause(jsys_descriptor *sock);
 static int jsys_tcp_resume(jsys_descriptor *sock);
@@ -144,9 +145,9 @@ static int jsys_tcp_write(jsys_descriptor *client, struct iovec* iov);
 static int jsys_tcp_write_len(jsys_descriptor *client, struct iovec* iov, int len);
 static int jsys_tcp_writev(jsys_descriptor *client, struct iovec* iov, int records);
 static int jsys_tcp_shutdown(jsys_descriptor* client);
-static int jsys_tcp_on_accept_event(jsys_descriptor *server);
 static int jsys_tcp_on_server_event(jsys_descriptor *server);
 static int jsys_tcp_on_client_event(jsys_descriptor *client);
+static int jsys_tcp_on_accept_event(jsys_descriptor *server);
 
 // tty
 static jsys_descriptor* jsys_tty_create(jsys_loop*, int);
@@ -691,19 +692,19 @@ jsys_descriptor* jsys_tty_create(jsys_loop* loop, int fd) {
 
 int jsys_tty_init(jsys_descriptor *tty, int fd) {
   char path[256];
-  struct termios tmp;
+  //struct termios tmp = { c_cflag: 0 };
   int r = ttyname_r(fd, path, sizeof(path));
   if (r != 0) return r;
   int saved_flags = fcntl(fd, F_GETFL);
   int mode = saved_flags & O_ACCMODE;
   tty->fd = open(path, mode);
   if (tty->fd == -1) return tty->fd;
-  tmp.c_iflag &= (unsigned int)~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-  tmp.c_oflag |= (ONLCR);
-  tmp.c_cflag |= (CS8);
-  tmp.c_lflag &= (unsigned int)~(ECHO | ICANON | IEXTEN | ISIG);
-  tmp.c_cc[VMIN] = 1;
-  tmp.c_cc[VTIME] = 0;
+  //tmp.c_iflag &= (unsigned int)~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+  //tmp.c_oflag |= (ONLCR);
+  //tmp.c_cflag |= (CS8);
+  //tmp.c_lflag &= (unsigned int)~(ECHO | ICANON | IEXTEN | ISIG);
+  //tmp.c_cc[VMIN] = 1;
+  //tmp.c_cc[VTIME] = 0;
   //r = tcsetattr(tty->fd, TCSADRAIN, &tmp);
   //if (r == -1) return r;
   r = ioctl(tty->fd, FIOCLEX);

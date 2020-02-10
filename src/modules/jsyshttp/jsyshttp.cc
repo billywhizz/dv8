@@ -4,7 +4,8 @@ namespace dv8 {
 
 namespace jsyshttp {
 
-	void setup_context(jsys_stream_context* context, size_t buffer_size) {
+// Http 
+	void setup_http_context(jsys_stream_context* context, size_t buffer_size) {
 		context->in = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_in");
 		context->out = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_out");
 		const char* r200 = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
@@ -16,17 +17,36 @@ namespace jsyshttp {
 		context->in->iov_len = buffer_size;
 	}
 
-	void free_context(jsys_stream_context* context) {
+	void setup_socket_context(jsys_stream_context* context, size_t buffer_size) {
+		context->in = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_in");
+		context->out = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_out");
+		context->in->iov_base = context->loop->alloc(1, buffer_size, "context_in_base");
+		context->in->iov_len = buffer_size;
+		context->out->iov_base = context->loop->alloc(1, buffer_size, "context_out_base");
+		context->out->iov_len = buffer_size;
+	}
+
+	void free_socket_context(jsys_stream_context* context) {
+		jsys_loop* loop = context->loop;
+		loop->free(context->in->iov_base, "context_in_base");
+		loop->free(context->out->iov_base, "context_out_base");
+		loop->free(context->in, "context_in");
+		loop->free(context->out, "context_out");
+		loop->free(context, "jsys_stream_context");
+	}
+
+	void free_http_context(jsys_stream_context* context) {
 		jsys_loop* loop = context->loop;
 		loop->free(context->in->iov_base, "context_in_base");
 		loop->free(context->in, "context_in");
 		loop->free(context->out, "context_out");
+		loop->free(context, "jsys_stream_context");
 	}
 
 	int httpd_on_connect(jsys_descriptor *client) {
 		jsys_stream_context* context = (jsys_stream_context*)client->data;
 		jsys_httpd_settings* http_settings = (jsys_httpd_settings *)context->settings->data;
-		setup_context(context, http_settings->buffer_size);
+		setup_http_context(context, http_settings->buffer_size);
 		return 0;
 	}
 
@@ -43,11 +63,11 @@ namespace jsyshttp {
 		v8::HandleScope handleScope(isolate);
 		jsys_stream_context* context = (jsys_stream_context*)client->data;
 		jsys_httpd_settings* http_settings = (jsys_httpd_settings *)context->settings->data;
-	  JSYSHttp *socket = static_cast<JSYSHttp*>(http_settings->data);
+	  Http *socket = static_cast<Http*>(http_settings->data);
     if (socket->callbacks.onRequest == 1) {
 			Local<Context> ctx = isolate->GetCurrentContext();
 			Local<Object> global = ctx->Global();
-      Local<Function> Callback = Local<Function>::New(isolate, socket->onRequestCallback);
+      Local<Function> Callback = Local<Function>::New(isolate, socket->onRequest);
       Local<Value> argv[] = {};
       Callback->Call(ctx, global, 0, argv);
 			context->current_buffer = 1;
@@ -77,7 +97,101 @@ namespace jsyshttp {
 	}
 
 	int httpd_on_end(jsys_descriptor *client) {
-		free_context((jsys_stream_context*)client->data);
+		free_http_context((jsys_stream_context*)client->data);
+		return 0;
+	}
+
+// Socket 
+
+	int on_socket_event(jsys_descriptor *client) {
+		int r = 0;
+		if (jsys_descriptor_is_error(client)) {
+			jsys_stream_context* context = (jsys_stream_context*)client->data;
+			context->settings->on_end(client);
+			return jsys_descriptor_free(client);
+		}
+		if (jsys_descriptor_is_writable(client)) {
+			jsys_stream_settings* settings = (jsys_stream_settings*)client->data;
+			jsys_stream_context* context = jsys_stream_context_create(client->loop, settings->buffers);
+			context->settings = settings;
+			context->offset = 0;
+			context->data = settings;
+			client->data = context;
+			client->closing = 0;
+			r = context->settings->on_connect(client);
+			if (r == -1) return jsys_descriptor_free(client);
+			return r;
+		}
+		if (jsys_descriptor_is_readable(client)) {
+			ssize_t bytes = 0;
+			jsys_stream_context* context = (jsys_stream_context*)client->data;
+			size_t len = context->in->iov_len;
+			char* buf = static_cast<char*>(context->in->iov_base);
+			int count = 32;
+			int fd = client->fd;
+			while ((bytes = read(fd, buf, len))) {
+				if (bytes == -1) {
+					if (errno == EAGAIN) {
+						break;
+					}
+					perror("read");
+					break;
+				}
+				r = context->settings->on_data(client, (size_t)bytes);
+				if (r == -1) break;
+				if (--count == 0) break;
+			}
+		}
+		return r;
+	}
+
+	int on_client_connect(jsys_descriptor* client) {
+		jsys_stream_context* context = (jsys_stream_context*)client->data;
+		int r = jsys_loop_mod_flags(client, EPOLLIN | EPOLLET);
+		if (r != 0) return r;
+		//setup_socket_context(context, 16384);
+		Socket* sock = static_cast<Socket*>(context->settings->data);
+		if (sock->callbacks.onConnect == 1) {
+			Isolate *isolate = Isolate::GetCurrent();
+			v8::HandleScope handleScope(isolate);
+			Local<Context> ctx = isolate->GetCurrentContext();
+			Local<Object> global = ctx->Global();
+			Local<Value> argv[0] = { };
+			Local<Function> callback = Local<Function>::New(isolate, sock->onConnect);
+			callback->Call(ctx, global, 0, argv);
+		}
+		return 0;
+	}
+
+	int on_client_data(jsys_descriptor *client, size_t bytes) {
+		jsys_stream_context* context = (jsys_stream_context*)client->data;
+		Socket* sock = static_cast<Socket*>(context->settings->data);
+		if (sock->callbacks.onData == 1) {
+			Isolate *isolate = Isolate::GetCurrent();
+			v8::HandleScope handleScope(isolate);
+			Local<Context> ctx = isolate->GetCurrentContext();
+			Local<Object> global = ctx->Global();
+			Local<Value> argv[1] = { Number::New(isolate, bytes) };
+			Local<Function> callback = Local<Function>::New(isolate, sock->onData);
+			callback->Call(ctx, global, 1, argv);
+		}
+		return 0;
+	}
+
+	int on_client_end(jsys_descriptor* client) {
+		fprintf(stderr, "on_client_end\n");
+		jsys_stream_context* context = (jsys_stream_context*)client->data;
+		Socket* sock = static_cast<Socket*>(context->settings->data);
+		if (sock->callbacks.onEnd == 1) {
+			Isolate *isolate = Isolate::GetCurrent();
+			v8::HandleScope handleScope(isolate);
+			Local<Context> ctx = isolate->GetCurrentContext();
+			Local<Object> global = ctx->Global();
+			Local<Value> argv[0] = { };
+			Local<Function> callback = Local<Function>::New(isolate, sock->onEnd);
+			callback->Call(ctx, global, 0, argv);
+		}
+		//free_socket_context((jsys_stream_context*)client->data);
 		return 0;
 	}
 
@@ -86,55 +200,279 @@ namespace jsyshttp {
 
 	void InitAll(Local<Object> exports)
 	{
-		JSYSHttp::Init(exports);
+		Http::Init(exports);
+		Socket::Init(exports);
 	}
 
-	void JSYSHttp::Init(Local<Object> exports) {
+	void Http::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
-		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-		tpl->SetClassName(String::NewFromUtf8(isolate, "JSYSHttp").ToLocalChecked());
+		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, Http::New);
+		tpl->SetClassName(String::NewFromUtf8(isolate, "Http").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listen", JSYSHttp::Listen);
-	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRequest", JSYSHttp::onRequest);
+
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listen", Http::Listen);
+	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRequest", Http::OnRequest);
+
+		DV8_SET_EXPORT(isolate, tpl, "Http", exports);
+	}
+
+	void Socket::Init(Local<Object> exports) {
+		Isolate* isolate = exports->GetIsolate();
+		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, Socket::New);
+		tpl->SetClassName(String::NewFromUtf8(isolate, "Socket").ToLocalChecked());
+		tpl->InstanceTemplate()->SetInternalFieldCount(1);
+
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", Socket::Open);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pair", Socket::Pair);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "bind", Socket::Bind);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listen", Socket::Listen);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "connect", Socket::Connect);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "write", Socket::Write);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "pause", Socket::Pause);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "resume", Socket::Resume);
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "close", Socket::Close);
+
+		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", Socket::Setup);
+
+	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onConnect", Socket::OnConnect);
+	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onData", Socket::OnData);
+	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onEnd", Socket::OnEnd);
 
 		DV8_SET_EXPORT(isolate, tpl, "Socket", exports);
 	}
 
-	void JSYSHttp::New(const FunctionCallbackInfo<Value>& args) {
+	void Http::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		if (args.IsConstructCall()) {
-			JSYSHttp* obj = new JSYSHttp();
+			Http* obj = new Http();
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
 		}
 	}
 
-	void JSYSHttp::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+	void Socket::New(const FunctionCallbackInfo<Value>& args) {
+		Isolate* isolate = args.GetIsolate();
+		if (args.IsConstructCall()) {
+			Socket* obj = new Socket();
+			obj->Wrap(args.This());
+			args.GetReturnValue().Set(args.This());
+		}
+	}
+
+	void Http::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
 		#if TRACE
-		fprintf(stderr, "JSYSHttp::Destroy\n");
+		fprintf(stderr, "Http::Destroy\n");
 		#endif
 	}
 
-	void JSYSHttp::onRequest(const v8::FunctionCallbackInfo<v8::Value> &args)
+	void Socket::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
+		#if TRACE
+		fprintf(stderr, "Socket::Destroy\n");
+		#endif
+	}
+
+	void Http::OnRequest(const v8::FunctionCallbackInfo<v8::Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
-		JSYSHttp *obj = ObjectWrap::Unwrap<JSYSHttp>(args.Holder());
+		Http *obj = ObjectWrap::Unwrap<Http>(args.Holder());
 		if (args[0]->IsFunction())
 		{
 			Local<Function> onRequest = Local<Function>::Cast(args[0]);
-			obj->onRequestCallback.Reset(isolate, onRequest);
+			obj->onRequest.Reset(isolate, onRequest);
 			obj->callbacks.onRequest = 1;
 		}
 		args.GetReturnValue().Set(args.Holder());
 	}
 
-	void JSYSHttp::Listen(const FunctionCallbackInfo<Value> &args)
+	void Socket::OnConnect(const v8::FunctionCallbackInfo<v8::Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Socket *obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		if (args[0]->IsFunction())
+		{
+			Local<Function> onConnect = Local<Function>::Cast(args[0]);
+			obj->onConnect.Reset(isolate, onConnect);
+			obj->callbacks.onConnect = 1;
+		}
+		args.GetReturnValue().Set(args.Holder());
+	}
+
+	void Socket::OnData(const v8::FunctionCallbackInfo<v8::Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Socket *obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		if (args[0]->IsFunction())
+		{
+			Local<Function> onData = Local<Function>::Cast(args[0]);
+			obj->onData.Reset(isolate, onData);
+			obj->callbacks.onData = 1;
+		}
+		args.GetReturnValue().Set(args.Holder());
+	}
+
+	void Socket::OnEnd(const v8::FunctionCallbackInfo<v8::Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Socket *obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		if (args[0]->IsFunction())
+		{
+			Local<Function> onEnd = Local<Function>::Cast(args[0]);
+			obj->onEnd.Reset(isolate, onEnd);
+			obj->callbacks.onEnd = 1;
+		}
+		args.GetReturnValue().Set(args.Holder());
+	}
+
+	void Socket::Pair(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
-		JSYSHttp* obj = ObjectWrap::Unwrap<JSYSHttp>(args.Holder());
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		int argc = args.Length();
+		int rc = 0;
+		int fd = 0;
+		if (argc == 0) {
+			int fds[2];
+			socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, fds);
+			fd = fds[0];
+			rc = fds[1];
+		} else if (argc == 1) {
+      fd = args[0]->Int32Value(context).ToChecked();
+		}
+		jsys_loop* loop = env->loop;
+		jsys_descriptor* sock = jsys_descriptor_create(loop);
+		sock->fd = fd;
+		sock->type = JSYS_SOCKET;
+		jsys_stream_settings* settings = (jsys_stream_settings*)calloc(1, sizeof(jsys_stream_settings));
+		settings->on_connect = on_client_connect;
+		settings->on_data = on_client_data;
+		settings->on_end = on_client_end;
+		settings->data = obj;
+		obj->handle = sock;
+		settings->buffers = 1;
+		sock->data = settings;
+		sock->callback = on_socket_event;
+  	jsys_loop_add_flags(loop, sock, EPOLLOUT);
+		args.GetReturnValue().Set(Integer::New(isolate, rc));
+	}
+
+	void Socket::Open(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Socket::Bind(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Socket::Listen(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Socket::Connect(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Socket::Write(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> ctx = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(ctx->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		jsys_descriptor* sock = obj->handle;
+		jsys_stream_context* context = (jsys_stream_context*)sock->data;
+		int r = jsys_tcp_write_len(sock, context->out, 3);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
+	}
+
+	void Socket::Pause(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Socket::Resume(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Socket::Close(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		args.GetReturnValue().Set(Integer::New(isolate, 0));
+	}
+
+	void Socket::Setup(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> ctx = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(ctx->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Socket* obj = ObjectWrap::Unwrap<Socket>(args.Holder());
+		jsys_descriptor* sock = obj->handle;
+		jsys_stream_context* context = (jsys_stream_context*)sock->data;
+		int argc = args.Length();
+		if (argc == 2) {
+			Buffer *in = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
+			Buffer *out = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
+			context->in = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_in");
+			context->out = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_out");
+			context->in->iov_base = in->_data;
+			context->in->iov_len = in->_length;
+			context->out->iov_base = out->_data;
+			context->out->iov_len = out->_length;
+			args.GetReturnValue().Set(Integer::New(isolate, 0));
+			return;
+		}
+		args.GetReturnValue().Set(Integer::New(isolate, -1));
+	}
+
+	void Http::Listen(const FunctionCallbackInfo<Value> &args)
+	{
+		Isolate *isolate = args.GetIsolate();
+		Local<Context> context = isolate->GetCurrentContext();
+		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
+		v8::HandleScope handleScope(isolate);
+		Http* obj = ObjectWrap::Unwrap<Http>(args.Holder());
 
     String::Utf8Value str(args.GetIsolate(), args[0]);
     const char *ip_address = *str;

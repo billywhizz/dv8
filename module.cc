@@ -33,16 +33,18 @@ namespace ${name} {
 	void ${className}::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		if (args.IsConstructCall()) {
-			//HandleScope handle_scope(isolate);
 			${className}* obj = new ${className}();
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
+			#if TRACE
+			fprintf(stderr, "$(name)::${className}::Create\\n");
+			#endif
 		}
 	}
 
 	void ${className}::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
 		#if TRACE
-		fprintf(stderr, "${className}::Destroy\\n");
+		fprintf(stderr, "$(name)::${className}::Destroy\\n");
 		#endif
 	}
 

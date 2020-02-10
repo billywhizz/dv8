@@ -23,6 +23,10 @@ if (strcmp("jsyshttp", module_name) == 0) {
 dv8::jsyshttp::InitAll(exports);
 return;
 }
+if (strcmp("thread", module_name) == 0) {
+dv8::thread::InitAll(exports);
+return;
+}
 }
 
 void LoadModule(const FunctionCallbackInfo<Value> &args) {

@@ -226,6 +226,7 @@ void RunScript(const FunctionCallbackInfo<Value> &args);
 void CompileScript(const FunctionCallbackInfo<Value> &args);
 void RunModule(const FunctionCallbackInfo<Value> &args);
 void Cwd(const FunctionCallbackInfo<Value> &args);
+void USleep(const FunctionCallbackInfo<Value> &args);
 void PrintStackTrace(v8::Isolate* isolate, const v8::TryCatch& try_catch);
 void shutdown(jsys_loop* loop, int rc);
 void beforeGCCallback(v8::Isolate* isolate, v8::GCType type, v8::GCCallbackFlags flags);

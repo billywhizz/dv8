@@ -1,13 +1,14 @@
 {
   "target": "release",
   "CC": "ccache g++",
+  "C": "ccache gcc",
   "deps": "./deps",
   "src": "./src",
   "build": "./bin",
-  "override": true,
+  "override": false,
   "builtins": true,
-  "compilerOptions": "-O3",
-  "linkOptions": "-s -static",
+  "compilerOptions": "-g",
+  "linkOptions": "",
   "out": "dv8",
   "output": {
     "build": "./platform.sh",
@@ -15,5 +16,5 @@
     "modulesSource": "./src/modules.cc"
   },
   "libs": [],
-  "modules": ["tty", "epoll", "timer", "fs", "jsyshttp"]
+  "modules": ["tty", "epoll", "timer", "fs", "jsyshttp", "thread"]
 }
