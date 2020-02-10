@@ -1,0 +1,22 @@
+{
+  "target": "release",
+  "CC": "ccache g++",
+  "C": "ccache gcc",
+  "deps": "deps",
+  "src": "src",
+  "build": "bin",
+  "override": false,
+  "builtins": true,
+  "compilerOptions": "-O3",
+  "linkOptions": "-s -static",
+  "out": "dv8",
+  "output": {
+    "build": "platform.sh",
+    "modulesHeader": "src/modules.h",
+    "modulesSource": "src/modules.cc"
+  },
+  "libs": [
+    "deps/mbedtls/library/libmbedcrypto.a"
+  ],
+  "modules": ["tty", "loop", "timer", "fs", "net", "thread", "libz", "mbedtls", "os"]
+}

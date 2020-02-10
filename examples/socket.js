@@ -1,5 +1,6 @@
 const { print, library, listHandles } = dv8
 const { Socket } = library('net')
+const { OS } = library('os')
 
 const buf = Buffer.alloc(16384)
 const bytes64 = new BigUint64Array(buf.bytes)

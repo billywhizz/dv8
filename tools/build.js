@@ -1,5 +1,5 @@
 const { args, require } = dv8
-const { readFile, writeFile, FileSystem } = require('./util.js')
+const { readFile, writeFile, FileSystem } = require('tools/util.js')
 const { O_CREAT, O_TRUNC, O_WRONLY, S_IRUSR, S_IWUSR, S_IXUSR } = FileSystem
 
 function alloc (size, shared) {
