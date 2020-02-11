@@ -395,6 +395,20 @@ void CPUUsage(const FunctionCallbackInfo<Value> &args) {
   double *fields = static_cast<double *>(ab->GetContents().Data());
   fields[0] = (MICROS_PER_SEC * usage.ru_utime.tv_sec) + usage.ru_utime.tv_usec;
   fields[1] = (MICROS_PER_SEC * usage.ru_stime.tv_sec) + usage.ru_stime.tv_usec;
+  fields[2] = usage.ru_maxrss;
+  fields[3] = usage.ru_ixrss;
+  fields[4] = usage.ru_idrss;
+  fields[5] = usage.ru_isrss;
+  fields[6] = usage.ru_minflt;
+  fields[7] = usage.ru_majflt;
+  fields[8] = usage.ru_nswap;
+  fields[9] = usage.ru_inblock;
+  fields[10] = usage.ru_oublock;
+  fields[11] = usage.ru_msgsnd;
+  fields[12] = usage.ru_msgrcv;
+  fields[13] = usage.ru_nsignals;
+  fields[14] = usage.ru_nvcsw;
+  fields[15] = usage.ru_nivcsw;
 }
 
 inline uint64_t hrtime() {

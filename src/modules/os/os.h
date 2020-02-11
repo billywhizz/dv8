@@ -23,6 +23,7 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
+static int on_signal(jsys_descriptor* signal);
 
 void InitAll(Local<Object> exports);
 
@@ -47,7 +48,6 @@ private:
 
   static void New(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void OnSignal(const v8::FunctionCallbackInfo<v8::Value> &args);
-  static int on_signal(jsys_descriptor* signal);
 };
 
 } // namespace os

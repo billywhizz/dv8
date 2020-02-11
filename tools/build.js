@@ -21,7 +21,7 @@ Buffer.fromString = fromString
 function getModuleCompiles (config) {
   let result = config.modules.map(name => `$CC $CCFLAGS -I$DV8_SRC/modules/${name} -c -o $DV8_OUT/${name}.o $DV8_SRC/modules/${name}/${name}.cc`).join('\n')
   if (config.modules.some(v => v === 'libz')) {
-    result = `${result}\n$C $CFLAGS -c -o $DV8_OUT/miniz.o $MINIZ_INCLUDE/miniz.c`
+    result = `${result}\n$C $CFLAGS -D_LARGEFILE64_SOURCE -c -o $DV8_OUT/miniz.o $MINIZ_INCLUDE/miniz.c`
   }
   if (config.modules.some(v => v === 'httpParser')) {
     result = `${result}\n$C -DHTTP_PARSER_STRICT=0 $CFLAGS -c -o $DV8_OUT/http_parser.o $HTTPPARSER_INCLUDE/http_parser.c`

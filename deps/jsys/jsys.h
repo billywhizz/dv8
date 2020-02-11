@@ -36,6 +36,7 @@ enum jsys_descriptor_types {
 
 typedef struct jsys_descriptor jsys_descriptor;
 typedef struct jsys_loop jsys_loop;
+typedef struct jsys_process jsys_process;
 typedef struct jsys_stream_context jsys_stream_context;
 typedef struct jsys_stream_settings jsys_stream_settings;
 
@@ -181,6 +182,49 @@ static void jsysfree(void*, const char*);
 static void* jsysalloc(size_t elements, size_t size, const char*);
 static struct epoll_event* epoll_event_create(jsys_loop* loop, int amount);
 static int jsys_usage(struct rusage*);
+static int jsys_set_close_on_exec (int);
+static void jsys_reset_signals();
+static void jsys_print_sigset(FILE *of, const char *prefix, const sigset_t *sigset);
+static int jsys_print_sigmask(FILE *of, const char *msg);
+
+void jsys_reset_signals() {
+  // resets all signals to defaults and ignores SIGPIPE and SIGXFSZ
+  struct sigaction act;
+  memset(&act, 0, sizeof(act));
+  for (unsigned nr = 1; nr < 32; nr += 1) {
+    if (nr == SIGKILL || nr == SIGSTOP)
+      continue;
+    act.sa_handler = (nr == SIGPIPE || nr == SIGXFSZ) ? SIG_IGN : SIG_DFL;
+    int r = sigaction(nr, &act, NULL);
+    if (r != 0) {
+      fprintf(stderr, "failed resetting signal\n");
+      exit(1);
+    }
+  }
+}
+
+void jsys_print_sigset(FILE *of, const char *prefix, const sigset_t *sigset) {
+    int sig, cnt;
+    cnt = 0;
+    for (sig = 1; sig < NSIG; sig++) {
+        if (sigismember(sigset, sig)) {
+            cnt++;
+            fprintf(of, "%s%d (%s)\n", prefix, sig, strsignal(sig));
+        }
+    }
+    if (cnt == 0)
+        fprintf(of, "%s<empty signal set>\n", prefix);
+}
+
+int jsys_print_sigmask(FILE *of, const char *msg) {
+    sigset_t currMask;
+    if (msg != NULL)
+        fprintf(of, "%s", msg);
+    if (pthread_sigmask(SIG_BLOCK, NULL, &currMask) == -1)
+        return -1;
+    jsys_print_sigset(of, "\t\t", &currMask);
+    return 0;
+}
 
 const char* jsys_version_string() {
   return JSYS_VERSION;
@@ -201,24 +245,40 @@ inline void jsysfree(void* ptr, const char* tag) {
   return;
 }
 
+int jsys_set_close_on_exec (int fd) {
+  int flags, oflags;
+  flags = oflags = fcntl(fd, F_GETFD);
+  if (flags == -1) return flags;
+  flags &= ~FD_CLOEXEC;
+  if (fcntl(fd, F_SETFD, flags) == -1) return -1;
+  return 0;
+}
+
 int jsys_spawn(jsys_loop* loop, jsys_process* process, int* fds) {
   pid_t pid = fork();
   if (pid == -1) {
+    perror("error forking");
     return pid;
   }
   if (pid == 0) {
+    close(0);
+    close(1);
+    close(2);
+    jsys_set_close_on_exec(fds[0]);
+    jsys_set_close_on_exec(fds[1]);
+    jsys_set_close_on_exec(fds[2]);
     dup2(fds[0], 0);
     dup2(fds[1], 1);
     dup2(fds[2], 2);
     execvp(process->file, process->args);
-    _exit(127);
-    abort();
+    perror("error launching child process");
+    exit(127);
   } else {
+    process->pid = pid;
+    process->status = 0;
     close(fds[0]);
     close(fds[1]);
     close(fds[2]);
-    process->pid = pid;
-    process->status = 0;
   }
   return 0;
 }
@@ -294,6 +354,8 @@ jsys_loop* jsys_loop_create_with_allocator(int flags, size_t max_events, int max
   loop->state = 0;
   loop->alloc = alloc;
   loop->free = free;
+  sigemptyset(&loop->set);
+  //sigprocmask(SIG_SETMASK, &loop->set, NULL);
   loop->descriptors = (jsys_descriptor**)alloc(maxfds, sizeof(jsys_descriptor*), "descriptors_array");
   int r = jsys_loop_init(loop, flags, max_events, maxfds);
   if (r == -1) return NULL;
@@ -327,7 +389,11 @@ int jsys_loop_run(jsys_loop *loop) {
 int jsys_loop_run_once(jsys_loop *loop, int timeout) {
   struct epoll_event *events = loop->events;
   int r = epoll_pwait(loop->fd, events, (int)loop->max_events, timeout, &loop->set);
-  if (r <= 0) return r;
+  if (r < 0) {
+    fprintf(stderr, "epoll_pwait: %i\n", r);
+    return r;
+  }
+  if (r == 0) return r;
   for (int i = 0; i < r; i++) {
     int fd = events[i].data.fd;
     if (fd > (loop->maxfds - 1) || fd < 0) {

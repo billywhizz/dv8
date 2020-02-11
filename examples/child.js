@@ -3,28 +3,38 @@ const { Socket } = library('net')
 
 function createPipe (name) {
   const pipe = new Socket()
-  const buf = Buffer.alloc(4096)
+  const buf = Buffer.alloc(65536)
+  let bytes = 0
+  pipe.timer = setInterval(() => {
+    if (pipe.paused) pipe.resume()
+    pipe.paused = false
+  }, 1000)
   pipe.onConnect(() => {
     print(`${name}.onConnect`)
   })
   pipe.onData(len => {
-    print(`${name}.onData: ${len}`)
-    print(buf.read(0, len))
+    bytes += len
+    if (name === 'stderr') {
+      print(buf.read(0, len))
+    }
+    pipe.pause()
+    pipe.paused = true
   })
   pipe.onEnd(() => {
-    print(`${name}.onEnd`)
+    print(`${name}.onEnd bytes ${bytes}`)
   })
-  pipe.fd = pipe.pair()
+  pipe.pair()
   pipe.setup(buf, buf)
-  pipe.buf = buf
   return pipe
 }
 
-const stdin = createPipe('stdin', true)
-const stdout = createPipe('stdout', true)
-const stderr = createPipe('stderr', true)
+function run () {
+  const stdin = createPipe('stdin')
+  const stdout = createPipe('stdout')
+  const stderr = createPipe('stderr')
+  //const child = spawn('/bin/ls', cwd(), ['-lah'], stdin, stdout, stderr)
+  const child = spawn('/bin/dd', cwd(), ['if=/dev/zero', 'count=1000000', 'bs=4096'], stdin, stdout, stderr)
+  //print(`parent: ${pid()} child: ${child}`)
+}
 
-const child = spawn('/bin/ls', cwd(), ['-lah'], stdin, stdout, stderr)
-print(`parent: ${pid()} child: ${child}`)
-
-//stdin.write(stdin.buf.write(args[2], 0))
+run()

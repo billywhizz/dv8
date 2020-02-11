@@ -444,10 +444,10 @@ function main (args) {
   } else {
     repl()
   }
-  let r = loop.run(1)
+  let r = loop.run(10)
   while (r >= 0) {
     runMicroTasks()
-    r = loop.run(1)
+    r = loop.run(10)
   }
   runMicroTasks()
 }

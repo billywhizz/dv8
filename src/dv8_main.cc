@@ -4,7 +4,7 @@
 int main(int argc, char *argv[]) {
   setvbuf(stdout, nullptr, _IONBF, 0);
   setvbuf(stderr, nullptr, _IONBF, 0);
-  signal(SIGPIPE, SIG_IGN);
+  jsys_reset_signals();
   std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
   v8::V8::InitializePlatform(platform.get());
   v8::V8::Initialize();

@@ -2,8 +2,9 @@ const { print, library } = dv8
 const { OS } = library('os')
 const os = new OS()
 print(dv8.pid())
-os.onSignal(signum => {
+function signalHandler (signum) {
   print(`signal: ${signum}`)
   return 0
-}, OS.SIGTERM)
-print(JSON.stringify(dv8.listHandles()))
+}
+os.onSignal(signalHandler, 15)
+//os.onSignal(signalHandler, 10)

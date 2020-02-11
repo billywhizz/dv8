@@ -173,7 +173,6 @@ namespace net {
 	}
 
 	int on_client_end(jsys_descriptor* client) {
-		fprintf(stderr, "on_client_end\n");
 		jsys_stream_context* context = (jsys_stream_context*)client->data;
 		Socket* sock = static_cast<Socket*>(context->settings->data);
 		if (sock->callbacks.onEnd == 1) {
@@ -329,12 +328,10 @@ namespace net {
 		int fd = 0;
 		if (argc == 0) {
 			int fds[2];
-			socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, fds);
+			socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0, fds);
 			fd = fds[0];
 			rc = fds[1];
 			obj->pairfd = rc;
-			ioctl(fds[0], FIOCLEX);
-			ioctl(fds[1], FIOCLEX);
 		} else if (argc == 1) {
       fd = args[0]->Int32Value(ctx).ToChecked();
 		}

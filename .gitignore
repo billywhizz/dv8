@@ -10,6 +10,7 @@ out
 build/dv8
 deps/v8/gen
 deps/v8/out.gn
+deps/glibc*
 .ccache
 src/backup.js
 dist
