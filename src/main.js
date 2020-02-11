@@ -32,9 +32,9 @@ function setInterval (fn, repeat) {
 function setTimeout (fn, repeat) {
   const timer = new (dv8.library('timer').Timer)()
   timer.start(() => {
-    fn()
     timer.stop()
     timer.close()
+    fn()
   }, repeat)
   return timer
 }
@@ -407,18 +407,6 @@ function main (args) {
   dv8.listHandles = wrapListHandles(loop)
   dv8.nextTick = wrapNextTick(loop)
   dv8.path = pathMod
-
-  dv8.versions = {
-    dv8: dv8.version,
-    javascript: `v8 ${dv8.v8}`,
-    loop: `jsys ${library('loop').version || 'n/a'}`,
-    libz: `miniz ${library('libz').version || 'n/a'}`,
-    mbedtls: library('mbedtls').version || 'n/a',
-    openssl: library('openssl').version || 'n/a',
-    httpParser: library('httpParser').version || 'n/a',
-    glibc: `glibc ${dv8.glibc}`
-  }
-
   global.setTimeout = setTimeout
   global.clearTimeout = clearTimeout
   global.clearInterval = clearTimeout

@@ -388,6 +388,7 @@ int jsys_loop_run(jsys_loop *loop) {
 
 int jsys_loop_run_once(jsys_loop *loop, int timeout) {
   struct epoll_event *events = loop->events;
+  if (loop->count == 0) return -1;
   int r = epoll_pwait(loop->fd, events, (int)loop->max_events, timeout, &loop->set);
   if (r < 0) {
     fprintf(stderr, "epoll_pwait: %i\n", r);
