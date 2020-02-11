@@ -68,7 +68,7 @@ function wrapHrtime (hrtime) {
 }
 
 function wrapCpuUsage (cpuUsage) {
-  const cpu = new Float64Array(2)
+  const cpu = new Float64Array(16)
   return () => {
     cpuUsage(cpu)
     return {
@@ -444,10 +444,10 @@ function main (args) {
   } else {
     repl()
   }
-  let r = loop.run(10)
+  let r = loop.run(1)
   while (r >= 0) {
     runMicroTasks()
-    r = loop.run(10)
+    r = loop.run(1)
   }
   runMicroTasks()
 }

@@ -122,15 +122,9 @@ namespace loop {
 		}
 		jsys_loop* loop = env->loop;
 		int r = 0;
-		loop->state = 1;
 		Local<Context> ctx = isolate->GetCurrentContext();
 		Local<Object> global = ctx->Global();
 		Local<Value> argv[] = {};
-		if (loop->count == 0) {
-			// there are no handles being watched so indicate the loop is finished
-			args.GetReturnValue().Set(Integer::New(isolate, -1));
-			return;
-		}
 		r = jsys_loop_run_once(loop, timeout);
 		if (obj->callbacks.onIdle == 1) {
 			Local<Function> Callback = Local<Function>::New(isolate, obj->onIdleCallback);

@@ -272,7 +272,7 @@ int jsys_http_on_server_end(jsys_descriptor* client) {
   loop->free(http->headers, "phr_header");
   loop->free(http, "jsys_http_server_context");
   http_settings->on_end(client);
-  loop->free(context, "jsys_stream_context");
+  //loop->free(context, "jsys_stream_context");
   return 0;
 }
 
