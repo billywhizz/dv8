@@ -13,7 +13,7 @@
 
 namespace dv8 {
 
-namespace mbedtls {
+namespace crypto {
 
 using v8::Array;
 using v8::Context;
@@ -31,27 +31,6 @@ using v8::Value;
 
 void InitAll(Local<Object> exports);
 
-class Crypto : public dv8::ObjectWrap {
-	public:
-		static void Init(v8::Local<v8::Object> exports);
-
-	protected:
-		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
-
-	private:
-
-		Crypto() {
-		}
-
-		~Crypto() {
-		}
-
-		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void Hash(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void Hmac(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-};
-
 class Hash : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
@@ -62,7 +41,7 @@ class Hash : public dv8::ObjectWrap {
 	private:
 		struct iovec in;
 		struct iovec out;
-		uint32_t algorithm;
+		const mbedtls_md_info_t* algorithm;
 
 		Hash() {
 		}
@@ -71,8 +50,6 @@ class Hash : public dv8::ObjectWrap {
 		}
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void MD5(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void SHA256(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Digest(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -86,6 +63,10 @@ class Hmac : public dv8::ObjectWrap {
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
 
 	private:
+		struct iovec in;
+		struct iovec out;
+		struct iovec key;
+		const mbedtls_md_info_t* algorithm;
 
 		Hmac() {
 		}
@@ -94,8 +75,8 @@ class Hmac : public dv8::ObjectWrap {
 		}
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void MD5(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void SHA256(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Digest(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

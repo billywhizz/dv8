@@ -25,13 +25,10 @@ void InitAll(v8::Local<v8::Object> exports);
 class UDP : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
-  	uv_udp_t *handle;
-		uv_buf_t in;
-		uv_buf_t out;
+  	jsys_descriptor* handle;
+		struct iovec in;
+		struct iovec out;
 		v8::Persistent<v8::Function> onMessage;
-		v8::Persistent<v8::Function> onError;
-		v8::Persistent<v8::Function> onClose;
-		v8::Persistent<v8::Function> onSend;
 
 protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
@@ -46,7 +43,6 @@ protected:
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Setup(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Bind(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Send(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -58,9 +54,6 @@ protected:
 		static void SetBroadcast(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static void OnMessage(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void OnError(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void OnClose(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void OnSend(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 };
 

@@ -300,7 +300,7 @@ function requireModule (pathMod) {
 
   function require (path, parent) {
     const { join, baseName } = pathMod
-    let dirName = parent ? parent.dirName : dv8.cwd()
+    let dirName = parent ? parent.dirName : baseName(join(dv8.cwd(), dv8.args[1]))
     const fileName = join(dirName, path)
     dirName = baseName(fileName)
     let module = cache[fileName]
@@ -411,6 +411,7 @@ function main (args) {
   global.clearTimeout = clearTimeout
   global.clearInterval = clearTimeout
   global.setInterval = setInterval
+  global.module = { dirName: pathMod.baseName(pathMod.join(dv8.cwd(), dv8.args[1])) }
 
   // remove things we don't want in the global namespace
   delete global.eval // eslint-disable-line

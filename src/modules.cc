@@ -3,40 +3,48 @@
 namespace dv8 {
 
 inline void initLibrary(Local<Object> exports, const char* module_name) {
-  if (strcmp("tty", module_name) == 0) {
-dv8::tty::InitAll(exports);
-return;
-}
-if (strcmp("loop", module_name) == 0) {
-dv8::loop::InitAll(exports);
-return;
-}
-if (strcmp("timer", module_name) == 0) {
-dv8::timer::InitAll(exports);
-return;
-}
-if (strcmp("fs", module_name) == 0) {
+  if (strcmp("fs", module_name) == 0) {
 dv8::fs::InitAll(exports);
-return;
-}
-if (strcmp("net", module_name) == 0) {
-dv8::net::InitAll(exports);
-return;
-}
-if (strcmp("thread", module_name) == 0) {
-dv8::thread::InitAll(exports);
 return;
 }
 if (strcmp("libz", module_name) == 0) {
 dv8::libz::InitAll(exports);
 return;
 }
-if (strcmp("mbedtls", module_name) == 0) {
-dv8::mbedtls::InitAll(exports);
+if (strcmp("loop", module_name) == 0) {
+dv8::loop::InitAll(exports);
+return;
+}
+if (strcmp("crypto", module_name) == 0) {
+dv8::crypto::InitAll(exports);
+return;
+}
+if (strcmp("memory", module_name) == 0) {
+dv8::memory::InitAll(exports);
+return;
+}
+if (strcmp("net", module_name) == 0) {
+dv8::net::InitAll(exports);
 return;
 }
 if (strcmp("os", module_name) == 0) {
 dv8::os::InitAll(exports);
+return;
+}
+if (strcmp("thread", module_name) == 0) {
+dv8::thread::InitAll(exports);
+return;
+}
+if (strcmp("timer", module_name) == 0) {
+dv8::timer::InitAll(exports);
+return;
+}
+if (strcmp("tty", module_name) == 0) {
+dv8::tty::InitAll(exports);
+return;
+}
+if (strcmp("udp", module_name) == 0) {
+dv8::udp::InitAll(exports);
 return;
 }
 }

@@ -1,4 +1,5 @@
-const { library } = dv8
+const { library, path } = dv8
+const { join } = path
 const { Socket, PIPE } = library('socket')
 const { Process } = library('process')
 const { File, FileSystem } = library('fs', {})
@@ -118,6 +119,7 @@ function setStats (fileName) {
 
 function stat (path, flags = O_RDONLY) {
   const file = new File()
+  path = join(module.dirName, path)
   file.fd = file.open(path, flags)
   if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
   FileSystem.fstat(file, statArray)
@@ -128,6 +130,7 @@ function stat (path, flags = O_RDONLY) {
 
 function readFile (path, flags = O_RDONLY) {
   const file = new File()
+  path = join(module.dirName, path)
   file.fd = file.open(path, flags)
   if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
   fstat(file, statArray)
@@ -144,6 +147,7 @@ function readFile (path, flags = O_RDONLY) {
 function writeFile (path, buf, flags = O_CREAT | O_TRUNC | O_WRONLY, mode = S_IRUSR | S_IWUSR) {
   const file = new File()
   file.setup(buf, buf)
+  path = join(module.dirName, path)
   file.fd = file.open(path, flags, mode)
   if (file.fd < 0) throw new Error(`Error opening ${path}: ${file.fd}`)
   file.write(buf.size, 0)
@@ -182,7 +186,10 @@ function formatRPS (count, ms) {
   return (Math.floor((count / (ms / 1000)) * 100) / 100).toFixed(2).replace(rx, ',')
 }
 
-const readdir = path => listing.slice(0, FileSystem.readdir(path, listing))
+const readdir = path => {
+  path = join(module.dirName, path)
+  return listing.slice(0, FileSystem.readdir(path, listing))
+}
 const stringify = (o, sp = '  ') => JSON.stringify(o, (k, v) => (typeof v === 'bigint') ? Number(v) : v, sp)
 
 const defaultIgnore = ['length', 'name', 'arguments', 'caller', 'constructor']
@@ -279,6 +286,11 @@ function buf2hex (ab, len) {
   return Array.prototype.map.call((new Uint8Array(ab)).slice(0, len), x => ('00' + x.toString(16)).slice(-2)).join('')
 }
 
+function mkdir (path) {
+  path = join(module.dirName, path)
+  return FileSystem.mkdir(path)
+}
+
 const commas = str => str.toString().replace(rx, ',')
 
-module.exports = { readFile, writeFile, stat, FileSystem, exec, readdir, fileType, formatRPS, stringify, inspect, commas, watchFile, buf2b64, buf2hex }
+module.exports = { mkdir, readFile, writeFile, stat, FileSystem, exec, readdir, fileType, formatRPS, stringify, inspect, commas, watchFile, buf2b64, buf2hex }

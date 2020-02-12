@@ -68,8 +68,10 @@ namespace net {
 			Local<Context> ctx = isolate->GetCurrentContext();
 			Local<Object> global = ctx->Global();
       Local<Function> Callback = Local<Function>::New(isolate, socket->onRequest);
-      Local<Value> argv[] = {};
-      Callback->Call(ctx, global, 0, argv);
+			jsys_http_server_context* http = (jsys_http_server_context*)context->data;
+      uint64_t val = reinterpret_cast<uint64_t>(http);
+      Local<Value> argv[2] = { BigInt::NewFromUnsigned(isolate, val), Integer::NewFromUnsigned(isolate, sizeof(*http)) };
+      Callback->Call(ctx, global, 2, argv);
 			context->current_buffer = 1;
     } else {
 			context->current_buffer = 1;

@@ -21,6 +21,7 @@ using v8::Object;
 using v8::Persistent;
 using v8::String;
 using v8::Value;
+using v8::BigInt;
 
 typedef struct
 {

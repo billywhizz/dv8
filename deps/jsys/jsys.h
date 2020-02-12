@@ -31,7 +31,8 @@ enum jsys_descriptor_types {
   JSYS_SOCKET = 1,
   JSYS_TTY = 2,
   JSYS_SIGNAL = 3,
-  JSYS_TIMER = 4
+  JSYS_TIMER = 4,
+  JSYS_UDP = 5
 };
 
 typedef struct jsys_descriptor jsys_descriptor;
@@ -151,6 +152,8 @@ static jsys_stream_context* jsys_stream_context_create(jsys_loop* loop, int buff
 static jsys_descriptor* jsys_sock_create(jsys_loop*, int domain, int type);
 
 // tcp
+static int jsys_socket_option(jsys_descriptor* sock, int level, int optname, int val);
+
 static int jsys_tcp_connect(jsys_descriptor *sock, uint16_t port, char* address);
 static int jsys_tcp_set_nodelay(jsys_descriptor *client, int on);
 static int jsys_tcp_bind_reuse(jsys_descriptor *sock, uint16_t port, in_addr_t address);
@@ -185,6 +188,37 @@ static int jsys_usage(struct rusage*);
 static void jsys_reset_signals();
 static void jsys_print_sigset(FILE *of, const char *prefix, const sigset_t *sigset);
 static int jsys_print_sigmask(FILE *of, const char *msg);
+static int jsys_ip4_addr(const char* ip, int port, struct sockaddr_in* addr);
+
+static int jsys_udp_bind(jsys_descriptor *sock, uint16_t port, char* address, int reuse_address, int reuse_port);
+static int jsys_udp_bind_reuse(jsys_descriptor *sock, uint16_t port, char* address);
+
+static int jsys_udp_send_len(jsys_descriptor *client, struct iovec* iov, char* addr, int port, int len);
+static int jsys_udp_send(jsys_descriptor *client, struct iovec* iov, char* addr, int port);
+
+int jsys_udp_bind_reuse(jsys_descriptor *sock, uint16_t port, char* address) {
+  return jsys_udp_bind(sock, port, address, 1, 1);
+}
+
+int jsys_udp_bind(jsys_descriptor *sock, uint16_t port, char* address, int reuse_address, int reuse_port) {
+  struct sockaddr_in server_addr;
+  // todo: pass in flags so these can be optional. or just expose setsockopt?
+  if (setsockopt(sock->fd, SOL_SOCKET, SO_REUSEADDR, &reuse_address, sizeof(int)) == -1) return -1;
+  if (setsockopt(sock->fd, SOL_SOCKET, SO_REUSEPORT, &reuse_port, sizeof(int)) == -1) return -1;
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_port = htons(port);
+  inet_aton(address, &server_addr.sin_addr);
+  bzero(&(server_addr.sin_zero), 8);
+  if (bind(sock->fd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1) return -1;
+  return 0;
+}
+
+int jsys_ip4_addr(const char* ip, int port, struct sockaddr_in* addr) {
+  memset(addr, 0, sizeof(*addr));
+  addr->sin_family = AF_INET;
+  addr->sin_port = htons(port);
+  return inet_pton(AF_INET, ip, &(addr->sin_addr.s_addr));
+}
 
 void jsys_reset_signals() {
   // resets all signals to defaults and ignores SIGPIPE and SIGXFSZ
@@ -457,6 +491,7 @@ struct epoll_event* epoll_event_create(jsys_loop* loop, int amount) {
 }
 
 int jsys_loop_mod_flags(jsys_descriptor *descriptor, uint32_t flags) {
+  // todo: this leaks?
   struct epoll_event *event = epoll_event_create(descriptor->loop, 1);
   event->events = flags;
   event->data.fd = descriptor->fd;
@@ -538,7 +573,12 @@ int jsys_tcp_connect(jsys_descriptor *sock, uint16_t port, char* address) {
   return 0;
 }
 
+int jsys_socket_option(jsys_descriptor* sock, int level, int optname, int val) {
+  return setsockopt(sock->fd, level, optname, &val, sizeof(int));
+}
+
 int jsys_tcp_bind(jsys_descriptor *sock, uint16_t port, in_addr_t address, int reuse_address, int reuse_port) {
+
   struct sockaddr_in server_addr;
   // todo: pass in flags so these can be optional. or just expose setsockopt?
   if (setsockopt(sock->fd, SOL_SOCKET, SO_REUSEADDR, &reuse_address, sizeof(int)) == -1) return -1;
@@ -576,6 +616,25 @@ int jsys_tcp_pause(jsys_descriptor *sock) {
 
 int jsys_tcp_resume(jsys_descriptor *sock) {
   return jsys_loop_mod_flags(sock, JSYS_READABLE);
+}
+
+int jsys_udp_send_len(jsys_descriptor *client, struct iovec* iov, char* address, int port, int len) {
+  struct msghdr h;
+  memset(&h, 0, sizeof h);
+  struct sockaddr_in client_addr;
+  client_addr.sin_family = AF_INET;
+  client_addr.sin_port = htons(port);
+  inet_aton(address, &client_addr.sin_addr);
+  bzero(&(client_addr.sin_zero), 8);
+  h.msg_name = &client_addr;
+  h.msg_namelen = sizeof(struct sockaddr_in);
+  h.msg_iov = iov;
+  h.msg_iovlen = 1;
+  return sendmsg(client->fd, &h, 0);
+}
+
+int jsys_udp_send(jsys_descriptor *client, struct iovec* iov, char* address, int port) {
+  return jsys_udp_send_len(client, iov, address, port, iov->iov_len);
 }
 
 int jsys_tcp_write_len(jsys_descriptor *client, struct iovec* iov, int len) {

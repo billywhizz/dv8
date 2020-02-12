@@ -2,6 +2,7 @@
 #include "builtins.h"
 
 int main(int argc, char *argv[]) {
+  int rc = 0;
   setvbuf(stdout, nullptr, _IONBF, 0);
   setvbuf(stderr, nullptr, _IONBF, 0);
   jsys_reset_signals();
@@ -58,18 +59,21 @@ int main(int argc, char *argv[]) {
     v8::ScriptCompiler::Source basescript(base, baseorigin);
     if (!v8::ScriptCompiler::CompileModule(isolate, &basescript).ToLocal(&module)) {
       dv8::PrintStackTrace(isolate, try_catch);
-      return 1;
+      rc = 1;
+      goto err_exit;
     }
     v8::Maybe<bool> ok = module->InstantiateModule(context, dv8::OnModuleInstantiate);
     if (!ok.ToChecked()) {
       dv8::PrintStackTrace(isolate, try_catch);
-      return 1;
+      rc = 2;
+      goto err_exit;
     }
     v8::MaybeLocal<v8::Value> result = module->Evaluate(context);
 		if (result.IsEmpty()) {
       if (try_catch.HasCaught()) {
         dv8::PrintStackTrace(isolate, try_catch);
-        return 2;
+        rc = 3;
+        goto err_exit;
       }
     }
     v8::platform::PumpMessageLoop(platform.get(), isolate);
@@ -80,7 +84,7 @@ int main(int argc, char *argv[]) {
       v8::TryCatch try_catch(isolate);
       onExit->Call(context, globalInstance, 0, argv);
       if (try_catch.HasCaught()) {
-        dv8::ReportException(isolate, &try_catch);
+        dv8::PrintStackTrace(isolate, try_catch);
       }
       v8::platform::PumpMessageLoop(platform.get(), isolate);
     }
@@ -89,6 +93,7 @@ int main(int argc, char *argv[]) {
     isolate->IdleNotificationDeadline(platform->MonotonicallyIncreasingTime() + kLongIdlePauseInSeconds);
     isolate->LowMemoryNotification();
   }
+err_exit:
   isolate->Dispose();
   delete env;
   delete create_params.array_buffer_allocator;
@@ -96,5 +101,5 @@ int main(int argc, char *argv[]) {
   v8::V8::Dispose();
   v8::V8::ShutdownPlatform();
   platform.reset();
-  return 0;
+  return rc;
 }

@@ -40,10 +40,10 @@ extern "C" {
 /* contains name and value of a header (name == NULL if is a continuing line
  * of a multiline header */
 struct phr_header {
-    const char *name;
     size_t name_len;
-    const char *value;
+    const char *name;
     size_t value_len;
+    const char *value;
 };
 
 /* returns number of bytes consumed if successful, -2 if request is partial,

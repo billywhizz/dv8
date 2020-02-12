@@ -41,14 +41,14 @@ typedef struct {
   int minor_version;
   int state;
   size_t method_len;
-  const char* method;
   size_t path_len;
-  const char* path;
   size_t body_length;
   size_t body_bytes;
   size_t header_size;
   size_t num_headers;
   struct phr_header* headers;
+  const char* path;
+  const char* method;
   void* data;
 } jsys_http_server_context;
 

@@ -9,54 +9,78 @@ namespace udp {
 	void InitAll(Local<Object> exports) {
 		UDP::Init(exports);
 	}
-
-	void after_send(uv_udp_send_t* req, int status) {
-		Isolate *isolate = Isolate::GetCurrent();
-		v8::HandleScope handleScope(isolate);
-		UDP *obj = (UDP *)req->handle->data;
-		Local<Value> argv[1] = { Number::New(isolate, status) };
-		Local<Function> onSend = Local<Function>::New(isolate, obj->onSend);
-		Local<Context> ctx = isolate->GetCurrentContext();
-		onSend->Call(ctx, ctx->Global(), 1, argv);
-		free(req);
-	}
-
-	void after_read(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf, const struct sockaddr* addr, unsigned flags) {
-		Isolate *isolate = Isolate::GetCurrent();
-		v8::HandleScope handleScope(isolate);
-		UDP *obj = (UDP *)handle->data;
-		if (nread > 0) {
-			v8::TryCatch try_catch(isolate);
-			char ip[INET_ADDRSTRLEN];
-			int len = sizeof ip;
-			const sockaddr_in *a4 = reinterpret_cast<const sockaddr_in *>(addr);
-			uv_inet_ntop(AF_INET, &a4->sin_addr, ip, len);
-			len = strlen(ip);
-      Local<Value> argv[3] = { Number::New(isolate, nread), String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked(), Number::New(isolate, ntohs(a4->sin_port)) };
-      Local<Function> onMessage = Local<Function>::New(isolate, obj->onMessage);
+/*
+	int on_udp_event(jsys_descriptor *client) {
+		int r = 0;
+		if (jsys_descriptor_is_readable(client)) {
+			ssize_t bytes = 0;
+			UDP *obj = (UDP *)client->data;
+			char* buf = static_cast<char*>(obj->in.iov_base);
+			size_t len = obj->in.iov_len;
+			int fd = client->fd;
+			Isolate *isolate = Isolate::GetCurrent();
+			v8::HandleScope handleScope(isolate);
+			Local<Function> onMessage = Local<Function>::New(isolate, obj->onMessage);
 			Local<Context> ctx = isolate->GetCurrentContext();
-      onMessage->Call(ctx, ctx->Global(), 3, argv);
-			if (try_catch.HasCaught()) {
-				dv8::ReportException(isolate, &try_catch);
+			Local<Value> argv[1] = { Number::New(isolate, 0) };
+			while ((bytes = read(fd, buf, len))) {
+				if (bytes == -1) {
+					if (errno == EAGAIN) {
+						break;
+					}
+					perror("read");
+					break;
+				}
+				argv[0] = Number::New(isolate, bytes);
+				// todo: try/catch
+				onMessage->Call(ctx, ctx->Global(), 1, argv);
 			}
 		}
+		return r;
 	}
+*/
+	int on_udp_event(jsys_descriptor *client) {
+		int r = 0;
+		if (jsys_descriptor_is_readable(client)) {
+			ssize_t bytes = 0;
+			UDP *obj = (UDP *)client->data;
+			int fd = client->fd;
+			Isolate *isolate = Isolate::GetCurrent();
+			v8::HandleScope handleScope(isolate);
+			Local<Function> onMessage = Local<Function>::New(isolate, obj->onMessage);
+			Local<Context> ctx = isolate->GetCurrentContext();
+			Local<Value> argv[3] = { v8::Null(isolate), v8::Null(isolate), v8::Null(isolate) };
+			char ip[INET_ADDRSTRLEN];
+			int iplen = sizeof ip;
+			struct sockaddr_storage peer;
+			struct msghdr h;
+			memset(&h, 0, sizeof(h));
+			memset(&peer, 0, sizeof(peer));
+			h.msg_name = &peer;
+			h.msg_namelen = sizeof(peer);
+			h.msg_iov = &obj->in;
+			h.msg_iovlen = 1;
 
-	void on_close(uv_handle_t *handle) {
-		Isolate *isolate = Isolate::GetCurrent();
-		v8::HandleScope handleScope(isolate);
-		UDP *obj = (UDP *)handle->data;
-		Local<Value> argv[0] = {};
-		Local<Function> onMessage = Local<Function>::New(isolate, obj->onClose);
-		Local<Context> ctx = isolate->GetCurrentContext();
-		onMessage->Call(ctx, ctx->Global(), 0, argv);
-		free(handle);
-	}
+			const sockaddr_in *a4 = reinterpret_cast<const sockaddr_in *>(&peer);
 
-	void alloc_chunk(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
-		UDP *obj = (UDP *)handle->data;
-		buf->base = obj->in.base;
-		buf->len = obj->in.len;
+			while ((bytes = recvmsg(fd, &h, 0))) {
+				if (bytes == -1) {
+					if (errno == EAGAIN || errno == EWOULDBLOCK) {
+						break;
+					}
+					if (errno == EINTR) continue;
+					perror("read");
+					break;
+				}
+				inet_ntop(AF_INET, &a4->sin_addr, ip, iplen);
+				argv[0] = Number::New(isolate, bytes);
+				argv[1] = String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, iplen).ToLocalChecked();
+				argv[2] = Number::New(isolate, ntohs(a4->sin_port));
+				// todo: try/catch
+				onMessage->Call(ctx, ctx->Global(), 3, argv);
+			}
+		}
+		return r;
 	}
 
 	void UDP::Init(Local<Object> exports) {
@@ -66,7 +90,6 @@ namespace udp {
 		tpl->SetClassName(String::NewFromUtf8(isolate, "UDP").ToLocalChecked());
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 	
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "open", UDP::Open);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setup", UDP::Setup);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "bind", UDP::Bind);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "send", UDP::Send);
@@ -79,9 +102,6 @@ namespace udp {
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "setBroadcast", UDP::SetBroadcast);
 	
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onMessage", UDP::OnMessage);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onError", UDP::OnError);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onClose", UDP::OnClose);
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onSend", UDP::OnSend);
 
 		DV8_SET_EXPORT(isolate, tpl, "UDP", exports);
 	}
@@ -93,32 +113,19 @@ namespace udp {
 			UDP* obj = new UDP();
 			Local<Context> context = isolate->GetCurrentContext();
 			Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-			obj->handle = (uv_udp_t *)calloc(1, sizeof(uv_udp_t));
-			int r = uv_udp_init(env->loop, obj->handle);
-			obj->handle->data = obj;
+			jsys_descriptor* handle = jsys_descriptor_create(env->loop);
+			obj->handle = handle;
+			handle->data = obj;
+			handle->type = JSYS_UDP;
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
 		}
 	}
 
 	void UDP::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-		Isolate *isolate = data.GetIsolate();
-		v8::HandleScope handleScope(isolate);
-		ObjectWrap *wrap = data.GetParameter();
-		UDP* udp = static_cast<UDP *>(wrap);
 		#if TRACE
 		fprintf(stderr, "UDP::Destroy\n");
 		#endif
-	}
-
-	void UDP::Open(const FunctionCallbackInfo<Value> &args)
-	{
-		Isolate *isolate = args.GetIsolate();
-		v8::HandleScope handleScope(isolate);
-		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
 	void UDP::GetPeerName(const FunctionCallbackInfo<Value> &args)
@@ -128,6 +135,7 @@ namespace udp {
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
+/*
 		struct sockaddr_storage address;
 		int addrlen = sizeof(address);
 		int r = uv_udp_getpeername(obj->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
@@ -145,6 +153,7 @@ namespace udp {
 		len = strlen(ip);
 		args.GetReturnValue().Set(String::NewFromUtf8(isolate, ip, v8::NewStringType::kNormal, len).ToLocalChecked());
 		return;
+*/
 	}
 
 	void UDP::GetSockName(const FunctionCallbackInfo<Value> &args)
@@ -154,6 +163,7 @@ namespace udp {
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
+/*
 		struct sockaddr_storage address;
 		int addrlen = sizeof(address);
 		int r = uv_udp_getsockname(obj->handle, reinterpret_cast<sockaddr *>(&address), &addrlen);
@@ -173,6 +183,7 @@ namespace udp {
 		snprintf(pair, 128, "%s:%u", ip, a4->sin_port);
 		args.GetReturnValue().Set(String::NewFromUtf8(isolate, pair, v8::NewStringType::kNormal, strlen(pair)).ToLocalChecked());
 		return;
+*/
 	}
 
 	void UDP::SetBroadcast(const FunctionCallbackInfo<Value> &args)
@@ -182,9 +193,8 @@ namespace udp {
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-    const int on = args[1]->IntegerValue(context).ToChecked();
-		int r = uv_udp_set_broadcast(obj->handle, on);
-		args.GetReturnValue().Set(Integer::New(isolate, r));
+    const int on = args[0]->IntegerValue(context).ToChecked();
+		args.GetReturnValue().Set(Integer::New(isolate, jsys_socket_option(obj->handle, SOL_SOCKET, SO_BROADCAST, 1)));
 	}
 
 	void UDP::Send(const FunctionCallbackInfo<Value> &args)
@@ -197,14 +207,8 @@ namespace udp {
 		uint32_t len = args[0]->Uint32Value(context).ToChecked();
     String::Utf8Value str(args.GetIsolate(), args[1]);
     const unsigned int port = args[2]->IntegerValue(context).ToChecked();
-    const char *ip_address = *str;
-    struct sockaddr_in addr;
-    uv_ip4_addr(ip_address, port, &addr);
-		uv_udp_send_t* message = (uv_udp_send_t*)calloc(1, sizeof(uv_udp_send_t));
-		uv_buf_t buf;
-		buf.base = obj->out.base;
-		buf.len = len;
-		int r = uv_udp_send(message, obj->handle, &buf, 1, (const struct sockaddr *)&addr, after_send);
+    char *ip_address = *str;
+		int r = jsys_udp_send_len(obj->handle, &obj->out, ip_address, port, len);
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
@@ -216,10 +220,12 @@ namespace udp {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
 
-		Buffer* b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
-		obj->in = uv_buf_init((char *)b->_data, b->_length);
+		Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
+		obj->in.iov_base = (char*)b->_data;
+		obj->in.iov_len = b->_length;
 		b = ObjectWrap::Unwrap<Buffer>(args[1].As<v8::Object>());
-		obj->out = uv_buf_init((char *)b->_data, b->_length);
+		obj->out.iov_base = (char*)b->_data;
+		obj->out.iov_len = b->_length;
 
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
@@ -232,11 +238,11 @@ namespace udp {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
     String::Utf8Value str(args.GetIsolate(), args[0]);
+		obj->handle->fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    char *ip_address = *str;
     const unsigned int port = args[1]->IntegerValue(context).ToChecked();
-    const char *ip_address = *str;
-    struct sockaddr_in addr;
-    uv_ip4_addr(ip_address, port, &addr);
-    int r = uv_udp_bind(obj->handle, (const struct sockaddr *)&addr, UV_UDP_REUSEADDR);
+		int r = jsys_udp_bind_reuse(obj->handle, port, ip_address);
+		obj->handle->callback = on_udp_event;
 		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
@@ -247,18 +253,22 @@ namespace udp {
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-    int r = uv_udp_recv_start(obj->handle, alloc_chunk, after_read);
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
+		int r = 0;
+		if (env->loop->descriptors[obj->handle->fd] == NULL) {
+			r = jsys_loop_add(env->loop, obj->handle);
+		}
+		if (r == 0) {
+			r = jsys_tcp_resume(obj->handle);
+		}
+		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void UDP::Stop(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
 		v8::HandleScope handleScope(isolate);
-		Local<Context> context = isolate->GetCurrentContext();
-		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-    int r = uv_udp_recv_stop(obj->handle);
+		int r = jsys_tcp_pause(obj->handle);
 		args.GetReturnValue().Set(Integer::New(isolate, 0));
 	}
 
@@ -269,29 +279,8 @@ namespace udp {
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-    uv_handle_t *handle = (uv_handle_t *)obj->handle;
-    uv_close(handle, on_close);
-		args.GetReturnValue().Set(Integer::New(isolate, 0));
-	}
-
-	void UDP::OnClose(const FunctionCallbackInfo<Value> &args)
-	{
-		Isolate *isolate = args.GetIsolate();
-		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-		if (args[0]->IsFunction()) {
-			Local<Function> onClose = Local<Function>::Cast(args[0]);
-			obj->onClose.Reset(isolate, onClose);
-		}
-	}
-
-	void UDP::OnError(const FunctionCallbackInfo<Value> &args)
-	{
-		Isolate *isolate = args.GetIsolate();
-		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-		if (args[0]->IsFunction()) {
-			Local<Function> onError = Local<Function>::Cast(args[0]);
-			obj->onError.Reset(isolate, onError);
-		}
+		int r = jsys_descriptor_free(obj->handle);
+		args.GetReturnValue().Set(Integer::New(isolate, r));
 	}
 
 	void UDP::OnMessage(const FunctionCallbackInfo<Value> &args)
@@ -301,16 +290,6 @@ namespace udp {
 		if (args[0]->IsFunction()) {
 			Local<Function> onMessage = Local<Function>::Cast(args[0]);
 			obj->onMessage.Reset(isolate, onMessage);
-		}
-	}
-
-	void UDP::OnSend(const FunctionCallbackInfo<Value> &args)
-	{
-		Isolate *isolate = args.GetIsolate();
-		UDP* obj = ObjectWrap::Unwrap<UDP>(args.Holder());
-		if (args[0]->IsFunction()) {
-			Local<Function> onSend = Local<Function>::Cast(args[0]);
-			obj->onSend.Reset(isolate, onSend);
 		}
 	}
 
