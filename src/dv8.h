@@ -16,6 +16,7 @@
 #include <time.h>
 #include <limits.h>
 #include <jsys.h>
+#include <sys/wait.h>
 
 //#include <execinfo.h>
 //#include <cxxabi.h>
@@ -80,6 +81,7 @@ using v8_inspector::V8ContextInfo;
 using v8_inspector::V8InspectorSession;
 using v8_inspector::V8Inspector;
 using v8::Platform;
+using v8::Int32Array;
 
 class SymbolInfo {
   public:
@@ -228,6 +230,7 @@ void CompileScript(const FunctionCallbackInfo<Value> &args);
 void RunModule(const FunctionCallbackInfo<Value> &args);
 void Cwd(const FunctionCallbackInfo<Value> &args);
 void Spawn(const FunctionCallbackInfo<Value> &args);
+void WaitPID(const FunctionCallbackInfo<Value> &args);
 void Sleep(const FunctionCallbackInfo<Value> &args);
 void USleep(const FunctionCallbackInfo<Value> &args);
 void NanoSleep(const FunctionCallbackInfo<Value> &args);

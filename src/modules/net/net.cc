@@ -248,6 +248,10 @@ namespace net {
 		if (args.IsConstructCall()) {
 			Socket* obj = new Socket();
 			obj->Wrap(args.This());
+			obj->handle = nullptr;
+			obj->callbacks.onConnect = 0;
+			obj->callbacks.onData = 0;
+			obj->callbacks.onEnd = 0;
 			args.GetReturnValue().Set(args.This());
 		}
 	}
@@ -262,6 +266,15 @@ namespace net {
 		#if TRACE
 		fprintf(stderr, "Socket::Destroy\n");
 		#endif
+/*
+		Isolate *isolate = data.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		ObjectWrap *wrap = data.GetParameter();
+		Socket* sock = static_cast<Socket *>(wrap);
+		if (sock->handle != nullptr) {
+			fprintf(stderr, "we have a socket\n");
+		}
+*/
 	}
 
 	void Http::OnRequest(const v8::FunctionCallbackInfo<v8::Value> &args)
@@ -334,6 +347,7 @@ namespace net {
 			obj->pairfd = rc;
 		} else if (argc == 1) {
       fd = args[0]->Int32Value(ctx).ToChecked();
+			rc = fd;
 		}
 		jsys_loop* loop = env->loop;
 		jsys_descriptor* sock = jsys_descriptor_create(loop);

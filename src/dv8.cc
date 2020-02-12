@@ -482,6 +482,24 @@ void NanoSleep(const FunctionCallbackInfo<Value> &args) {
   nanosleep(&sleepfor, NULL);
 }
 
+void WaitPID(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<ArrayBuffer> ab = args[0].As<Int32Array>()->Buffer();
+  int *fields = static_cast<int *>(ab->GetContents().Data());
+  int pid = -1; // wait for any child process
+  if (args.Length() > 1) {
+    pid = args[0]->IntegerValue(context).ToChecked();
+  }
+  fields[1] = waitpid(pid, &fields[0], WNOHANG); // WNOHANG - don't wait/block if status not available
+  if (fields[1] < 0) {
+    Local<Object> globalInstance = context->Global();
+    globalInstance->Set(context, v8::String::NewFromUtf8(isolate, "errno", v8::NewStringType::kNormal).ToLocalChecked(), Integer::New(isolate, errno));
+  }
+  args.GetReturnValue().Set(args[0]);
+}
+
 void Spawn(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
   v8::HandleScope handleScope(isolate);
@@ -491,11 +509,10 @@ void Spawn(const FunctionCallbackInfo<Value> &args) {
   Local<String> filePath = args[0].As<String>();
   Local<String> cwd = args[1].As<String>();
   Local<Array> arguments = args[2].As<Array>();
-
-  dv8::net::Socket* in = ObjectWrap::Unwrap<dv8::net::Socket>(args[3].As<v8::Object>());
-  dv8::net::Socket* out = ObjectWrap::Unwrap<dv8::net::Socket>(args[4].As<v8::Object>());
-  dv8::net::Socket* err = ObjectWrap::Unwrap<dv8::net::Socket>(args[5].As<v8::Object>());
-
+  int fds[3];
+  fds[0] = args[3]->IntegerValue(context).ToChecked();
+  fds[1] = args[4]->IntegerValue(context).ToChecked();
+  fds[2] = args[5]->IntegerValue(context).ToChecked();
   int len = arguments->Length();
   char* argv[len + 2];
   int written;
@@ -514,10 +531,6 @@ void Spawn(const FunctionCallbackInfo<Value> &args) {
   child->file = argv[0];
   child->args = argv;
   child->env = NULL;
-  int fds[3];
-  fds[0] = in->pairfd;
-  fds[1] = out->pairfd;
-  fds[2] = err->pairfd;
   int r = jsys_spawn(env->loop, child, fds);
   if (r != 0) {
     args.GetReturnValue().Set(Integer::New(isolate, r));
@@ -530,6 +543,7 @@ void Spawn(const FunctionCallbackInfo<Value> &args) {
 Local<Context> CreateContext(Isolate *isolate) {
   Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
   Local<ObjectTemplate> dv8 = ObjectTemplate::New(isolate);
+  Local<ObjectTemplate> constants = ObjectTemplate::New(isolate);
 
   dv8->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
   dv8->Set(String::NewFromUtf8(isolate, "error", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Err));
@@ -549,6 +563,7 @@ Local<Context> CreateContext(Isolate *isolate) {
   dv8->Set(String::NewFromUtf8(isolate, "nanosleep", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, NanoSleep));
   dv8->Set(String::NewFromUtf8(isolate, "exit", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Exit));
   dv8->Set(String::NewFromUtf8(isolate, "spawn", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Spawn));
+  dv8->Set(String::NewFromUtf8(isolate, "waitpid", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, WaitPID));
   dv8->Set(String::NewFromUtf8(isolate, "runMicroTasks", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, RunMicroTasks));
   dv8->Set(String::NewFromUtf8(isolate, "enqueueMicroTask", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, EnqueueMicrotask));
   
@@ -563,8 +578,11 @@ Local<Context> CreateContext(Isolate *isolate) {
     kernel->Set(String::NewFromUtf8(isolate, "release", NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, kernel_rec.release).ToLocalChecked());
     kernel->Set(String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, kernel_rec.version).ToLocalChecked());
   }
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, EINTR), "EINTR", constants);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, ECHILD), "ECHILD", constants);
+  DV8_SET_CONSTANT(isolate, Integer::New(isolate, EINVAL), "EINVAL", constants);
   dv8->Set(String::NewFromUtf8(isolate, "kernel", NewStringType::kNormal).ToLocalChecked(), kernel);
-
+  dv8->Set(String::NewFromUtf8(isolate, "constants", NewStringType::kNormal).ToLocalChecked(), constants);
   global->Set(String::NewFromUtf8(isolate, "dv8", NewStringType::kNormal).ToLocalChecked(), dv8);
   Local<Context> context = Context::New(isolate, NULL, global);
   context->AllowCodeGenerationFromStrings(false);

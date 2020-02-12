@@ -182,7 +182,6 @@ static void jsysfree(void*, const char*);
 static void* jsysalloc(size_t elements, size_t size, const char*);
 static struct epoll_event* epoll_event_create(jsys_loop* loop, int amount);
 static int jsys_usage(struct rusage*);
-static int jsys_set_close_on_exec (int);
 static void jsys_reset_signals();
 static void jsys_print_sigset(FILE *of, const char *prefix, const sigset_t *sigset);
 static int jsys_print_sigmask(FILE *of, const char *msg);
@@ -245,15 +244,6 @@ inline void jsysfree(void* ptr, const char* tag) {
   return;
 }
 
-int jsys_set_close_on_exec (int fd) {
-  int flags, oflags;
-  flags = oflags = fcntl(fd, F_GETFD);
-  if (flags == -1) return flags;
-  flags &= ~FD_CLOEXEC;
-  if (fcntl(fd, F_SETFD, flags) == -1) return -1;
-  return 0;
-}
-
 int jsys_spawn(jsys_loop* loop, jsys_process* process, int* fds) {
   pid_t pid = fork();
   if (pid == -1) {
@@ -264,9 +254,6 @@ int jsys_spawn(jsys_loop* loop, jsys_process* process, int* fds) {
     close(0);
     close(1);
     close(2);
-    jsys_set_close_on_exec(fds[0]);
-    jsys_set_close_on_exec(fds[1]);
-    jsys_set_close_on_exec(fds[2]);
     dup2(fds[0], 0);
     dup2(fds[1], 1);
     dup2(fds[2], 2);
@@ -834,11 +821,8 @@ jsys_descriptor* jsys_signal_watcher_create(jsys_loop* loop) {
   jsys_descriptor* signal = jsys_descriptor_create(loop);
   signal->type = JSYS_SIGNAL;
   // get a file descriptor so we can watch for events on blocked signals
-  signal->fd = signalfd(-1, &loop->set, 0);
+  signal->fd = signalfd(-1, &loop->set, SFD_NONBLOCK | SFD_CLOEXEC);
   if (signal->fd == -1) return NULL;
-  // set fd to non blocking. do we need this?
-  int r = jsys_descriptor_non_blocking(signal);
-  if (r == -1) return NULL;
   return signal;
 }
 
