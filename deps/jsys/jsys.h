@@ -102,7 +102,6 @@ struct jsys_stream_settings {
 
 struct jsys_stream_context {
   void* data;
-  size_t offset;
   struct iovec* in;
   struct iovec* out;
   jsys_loop* loop;
@@ -502,7 +501,6 @@ int jsys_loop_mod_flags(jsys_descriptor *descriptor, uint32_t flags) {
 }
 
 int jsys_loop_add(jsys_loop *loop, jsys_descriptor *descriptor) {
-  //return jsys_loop_add_flags(loop, descriptor, EPOLLIN | EPOLLET | EPOLLEXCLUSIVE);
   return jsys_loop_add_flags(loop, descriptor, EPOLLIN);
 }
 
@@ -692,7 +690,6 @@ jsys_stream_context* jsys_stream_context_create(jsys_loop* loop, int buffers) {
   context->in = NULL;
   context->out = NULL;
   context->settings = NULL;
-  context->offset = 0;
   context->buffers = buffers;
   context->loop = loop;
   return context;
@@ -712,7 +709,6 @@ int jsys_tcp_on_accept_event(jsys_descriptor *server) {
     };
     jsys_stream_context* context = jsys_stream_context_create(server->loop, settings->buffers);
     context->settings = settings;
-    context->offset = 0;
     client->data = context;
     client->callback = jsys_tcp_on_server_event;
     r = context->settings->on_connect(client);
@@ -741,7 +737,6 @@ int jsys_tcp_on_client_event(jsys_descriptor *client) {
     jsys_stream_settings* settings = (jsys_stream_settings*)client->data;
     jsys_stream_context* context = jsys_stream_context_create(client->loop, settings->buffers);
     context->settings = settings;
-    context->offset = 0;
     context->data = settings;
     client->data = context;
     client->closing = 0;
@@ -750,40 +745,29 @@ int jsys_tcp_on_client_event(jsys_descriptor *client) {
   }
   if (jsys_descriptor_is_readable(client)) {
     jsys_stream_context* context = (jsys_stream_context*)client->data;
-    ssize_t bytes = 0;
-    char* next = (char*)context->in->iov_base + context->offset;
-    size_t len = context->in->iov_len - context->offset;
-    while ((bytes = read(client->fd, next, len))) {
-      if (bytes == -1) {
-        if (errno == EAGAIN) {
-          if (client->closing == 1) {
-            jsys_tcp_shutdown(client);
-          }
-          return 0;
+    char* next = (char*)context->in->iov_base;
+    size_t len = context->in->iov_len;
+    ssize_t bytes = read(client->fd, next, len);
+    if (bytes == -1) {
+      if (errno == EAGAIN) {
+        if (client->closing == 1) {
+          jsys_tcp_shutdown(client);
         }
-        perror("read");
-        break;
+        return 0;
       }
-      r = context->settings->on_data(client, (size_t)bytes + context->offset);
-      if (r == -1) {
-        // this indicates a protocol error from the calling library
-        // we will drop out of the loop and the on_end callback will be 
-        // called and the connection closed and descriptor removed from the loop
-        break;
-      }
-      if (context->current_buffer > 0) {
-        if (context->current_buffer == 1) {
-          r = jsys_tcp_write(client, &context->out[context->current_buffer]);
-        } else {
-          r = jsys_tcp_writev(client, context->out, context->current_buffer);
-        }
-        if (r == -1) return -1;
-      }
-      next = (char*)context->in->iov_base + context->offset;
-      len = context->in->iov_len - context->offset;
+      perror("read");
+      context->settings->on_end(client);
+      return jsys_descriptor_free(client);
     }
-    context->settings->on_end(client);
-    return jsys_descriptor_free(client);
+    if (bytes == 0) {
+      context->settings->on_end(client);
+      return jsys_descriptor_free(client);
+    }
+    r = context->settings->on_data(client, (size_t)bytes);
+    if (r == -1) {
+      context->settings->on_end(client);
+      return jsys_descriptor_free(client);
+    }
   }
   return r;
 }
@@ -801,10 +785,9 @@ int jsys_tcp_on_server_event(jsys_descriptor *client) {
   }
   if (jsys_descriptor_is_readable(client)) {
     jsys_stream_context* context = (jsys_stream_context*)client->data;
-    ssize_t bytes = 0;
-    char* next = (char*)context->in->iov_base + context->offset;
-    size_t len = context->in->iov_len - context->offset;
-    bytes = read(client->fd, next, len);
+    char* next = (char*)context->in->iov_base;
+    size_t len = context->in->iov_len;
+    ssize_t bytes = read(client->fd, next, len);
     if (bytes == -1) {
       if (errno == EAGAIN) {
         return 0;
@@ -817,7 +800,11 @@ int jsys_tcp_on_server_event(jsys_descriptor *client) {
       context->settings->on_end(client);
       return jsys_descriptor_free(client);
     }
-    r = context->settings->on_data(client, (size_t)bytes + context->offset);
+    r = context->settings->on_data(client, (size_t)bytes);
+    if (r == -1) {
+      context->settings->on_end(client);
+      return jsys_descriptor_free(client);
+    }
   }
   return r;
 }

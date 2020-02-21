@@ -100,7 +100,7 @@ int jsys_http_on_server_data(jsys_descriptor *client, size_t bytes) {
   jsys_httpd_settings* http_settings = (jsys_httpd_settings *)context->settings->data;
   char* next = (char*)context->in->iov_base;
   // todo: check flag so callbacks are optional
-  http_settings->on_data(client, bytes); // todo: this should have offset also
+  size_t original = bytes;
   while (bytes) {
     // todo: there is a bug if body is not in same chunk of data as headers. the body will ovewrite the headers before on_request is called
     // maybe this should be correct behaviour so user always reads headers in on_headers
@@ -119,14 +119,12 @@ int jsys_http_on_server_data(jsys_descriptor *client, size_t bytes) {
         // todo: this can be optimized. we don't need to copy if we are getting many small chunks of the same request. we can just move along the buffer and read at the next offset
         char* buf = (char*)context->in->iov_base;
         memcpy(buf, next, bytes);
-        context->offset = bytes;
         return 0;
       }
       if (nread < 0) {
         // this means it's a bad request so we should just return failure code
         // and jsys will end the connection
         fprintf(stderr, "read error\n");
-        context->offset = bytes;
         return -1;
       }
       //todo: handle chunked
@@ -136,7 +134,7 @@ int jsys_http_on_server_data(jsys_descriptor *client, size_t bytes) {
       } else {
         http->body_length = 0;
       }
-      http->header_size = (size_t)nread - (http->headers[0].name - next);
+      http->header_size = (size_t)nread;
       http_settings->on_headers(client);
       if (http->body_length == 0) {
         // TODO: check return codes!!
@@ -168,7 +166,7 @@ int jsys_http_on_server_data(jsys_descriptor *client, size_t bytes) {
       }
     }
   }
-  context->offset = 0;
+  http_settings->on_data(client, original);
   return 0;
 }
 
@@ -191,7 +189,6 @@ int jsys_http_on_client_data(jsys_descriptor *client, size_t bytes) {
         char* buf = (char*)client->loop->alloc(1, context->in->iov_len, "realloc_in");
         //char* old = (char*)context->in->iov_base;
         memcpy(buf, next, bytes);
-        context->offset = bytes;
         context->in->iov_base = buf;
         //free(old);
         return 0;
@@ -199,7 +196,6 @@ int jsys_http_on_client_data(jsys_descriptor *client, size_t bytes) {
       if (nread < 0) {
         // TODO
         fprintf(stderr, "read error\n");
-        context->offset = bytes;
         return -1;
       }
       //TODO: support transfer-encoding: chunked
@@ -239,7 +235,6 @@ int jsys_http_on_client_data(jsys_descriptor *client, size_t bytes) {
       }
     }
   }
-  context->offset = 0;
   return 0;
 }
 
