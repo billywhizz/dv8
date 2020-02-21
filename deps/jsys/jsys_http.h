@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 enum jsys_http_state {
-  IN_HEADER = 0,
+  IN_HEADER = 1,
   IN_BODY
 };
 
@@ -37,19 +37,19 @@ struct jsys_httpd_settings {
   void* data;
 };
 
-typedef struct {
+typedef struct __attribute__((__packed__)) {
   int minor_version;
-  int state;
   size_t method_len;
   size_t path_len;
-  size_t body_length;
-  size_t body_bytes;
-  size_t header_size;
+  uint32_t body_length;
+  uint32_t body_bytes;
+  uint16_t header_size;
   size_t num_headers;
   struct phr_header* headers;
   const char* path;
   const char* method;
   void* data;
+  int state;
 } jsys_http_server_context;
 
 typedef struct {
@@ -62,7 +62,7 @@ typedef struct {
   size_t body_bytes;
   size_t num_headers;
   struct phr_header* headers;
-  size_t header_size;
+  uint16_t header_size;
   void* data;
 } jsys_http_client_context;
 
@@ -102,6 +102,8 @@ int jsys_http_on_server_data(jsys_descriptor *client, size_t bytes) {
   // todo: check flag so callbacks are optional
   http_settings->on_data(client, bytes); // todo: this should have offset also
   while (bytes) {
+    // todo: there is a bug if body is not in same chunk of data as headers. the body will ovewrite the headers before on_request is called
+    // maybe this should be correct behaviour so user always reads headers in on_headers
     if (http->state == IN_HEADER) {
       http->num_headers = (size_t)http_settings->max_headers;
       // pico expects the buffer to have complete set of headers, from the start of the buffer
@@ -127,13 +129,14 @@ int jsys_http_on_server_data(jsys_descriptor *client, size_t bytes) {
         context->offset = bytes;
         return -1;
       }
+      //todo: handle chunked
       const char *header_value = jsys_http_header_get(http->headers, http->num_headers, "Content-Length");
       if (header_value != NULL) {
         http->body_length = strtoull(header_value, NULL, 10);
       } else {
         http->body_length = 0;
       }
-      http->header_size = (size_t)nread;
+      http->header_size = (size_t)nread - (http->headers[0].name - next);
       http_settings->on_headers(client);
       if (http->body_length == 0) {
         // TODO: check return codes!!

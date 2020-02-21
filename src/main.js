@@ -32,9 +32,9 @@ function setInterval (fn, repeat) {
 function setTimeout (fn, repeat) {
   const timer = new (dv8.library('timer').Timer)()
   timer.start(() => {
+    fn()
     timer.stop()
     timer.close()
-    fn()
   }, repeat)
   return timer
 }
@@ -152,27 +152,6 @@ function readFile (path) {
   file.close()
   file.text = parts.join('')
   return file
-}
-
-function wrapNextTick (loop) {
-  const queue = []
-  let ticks = 0
-  let idleActive = false
-  function processQueue () {
-    ticks++
-    let len = queue.length
-    while (len--) queue.shift()()
-    if (!queue.length) {
-      idleActive = false
-      loop.onIdle()
-    }
-  }
-  return (fn) => {
-    queue.push(fn)
-    if (idleActive) return
-    loop.onIdle(processQueue)
-    idleActive = true
-  }
 }
 
 // Local Modules
@@ -378,7 +357,7 @@ function replModule () {
 // main entrypoint
 function main (args) {
   dv8.library = wrapLibrary(dv8.library)
-  const { workerSource, workerName, runModule, memoryUsage, env, library, hrtime, cpuUsage, heapUsage, runMicroTasks } = dv8
+  const { workerSource, workerName, runScript, memoryUsage, env, library, hrtime, cpuUsage, heapUsage, runMicroTasks, enqueueMicroTask } = dv8
   // load JS modules
   const pathMod = pathModule()
   const { require, cache } = requireModule(pathMod)
@@ -386,7 +365,7 @@ function main (args) {
   // load required native libs
   const { EventLoop } = library('loop')
   const loop = new EventLoop()
-
+  global.loop = loop
   Error.stackTraceLimit = 1000
 
   Buffer.alloc = alloc
@@ -405,13 +384,16 @@ function main (args) {
   dv8.runMicroTasks = runMicroTasks
   dv8.readFile = readFile
   dv8.listHandles = wrapListHandles(loop)
-  dv8.nextTick = wrapNextTick(loop)
+  dv8.nextTick = fn => enqueueMicroTask(fn)
   dv8.path = pathMod
   global.setTimeout = setTimeout
-  global.clearTimeout = clearTimeout
-  global.clearInterval = clearTimeout
+  global.clearTimeout = global.clearInterval = clearTimeout
   global.setInterval = setInterval
-  global.module = { dirName: pathMod.baseName(pathMod.join(dv8.cwd(), dv8.args[1])) }
+  // todo. this is a hack so requires work when we are in a 
+  // different working directory to the main script
+  if (dv8.args.length > 1) {
+    global.module = { dirName: pathMod.baseName(pathMod.join(dv8.cwd(), dv8.args[1])) }
+  }
 
   // remove things we don't want in the global namespace
   delete global.eval // eslint-disable-line
@@ -423,22 +405,24 @@ function main (args) {
     const end = workerSource.lastIndexOf('}')
     delete dv8.workerSource
     delete dv8.workerName
-    runModule(workerSource.slice(start, end), workerName)
+    runScript(workerSource.slice(start, end), workerName)
   } else if (args.length > 1) {
     if (args[1] === '-e' && args.length > 2) {
-      runModule(args[2], 'eval')
+      runScript(args[2], 'eval')
     } else {
-      runModule(readFile(args[1]).text, args[1]) // todo: check valid path name - stat file first?
+      runScript(readFile(args[1]).text, args[1]) // todo: check valid path name - stat file first?
     }
   } else {
     repl()
   }
-  let r = loop.run(1)
-  while (r >= 0) {
-    runMicroTasks()
-    r = loop.run(1)
+  function runLoop () {
+    let r = 0
+    while (r >= 0) {
+      r = loop.run(1)
+      runMicroTasks()
+    }
   }
-  runMicroTasks()
+  runLoop()
 }
 
 main(dv8.args)

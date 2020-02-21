@@ -48,6 +48,7 @@ private:
   static void New(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Alloc(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void AllocShared(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Address(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Create(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void Load(const v8::FunctionCallbackInfo<v8::Value> &args);
   static void LoadShared(const v8::FunctionCallbackInfo<v8::Value> &args);

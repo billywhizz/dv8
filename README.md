@@ -40,3 +40,17 @@ onMicroTasks
 ### os
 ### udp
 
+base runtime
+1000 lines of c++
+300 lines of javascript
+
+article about how important JIT and GC are
+
+
+http
+
+51 bytes
+plus 20 bytes for each header
+plus header key/value pair sizes
+
+51 + (n * 20) bytes of overhead where n is number of headers

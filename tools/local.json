@@ -7,8 +7,8 @@
   "build": "bin",
   "override": false,
   "builtins": true,
-  "compilerOptions": "-g",
-  "linkOptions": "-static",
+  "compilerOptions": "-O3",
+  "linkOptions": "-s -static",
   "out": "dv8",
   "output": {
     "build": "../platform.sh",

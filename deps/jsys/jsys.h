@@ -503,7 +503,7 @@ int jsys_loop_mod_flags(jsys_descriptor *descriptor, uint32_t flags) {
 
 int jsys_loop_add(jsys_loop *loop, jsys_descriptor *descriptor) {
   //return jsys_loop_add_flags(loop, descriptor, EPOLLIN | EPOLLET | EPOLLEXCLUSIVE);
-  return jsys_loop_add_flags(loop, descriptor, EPOLLIN | EPOLLET);
+  return jsys_loop_add_flags(loop, descriptor, EPOLLIN);
 }
 
 int jsys_loop_remove(jsys_loop *loop, jsys_descriptor *descriptor) {
@@ -804,32 +804,20 @@ int jsys_tcp_on_server_event(jsys_descriptor *client) {
     ssize_t bytes = 0;
     char* next = (char*)context->in->iov_base + context->offset;
     size_t len = context->in->iov_len - context->offset;
-    // todo: limit this. can it go on forever and block the main thread?
-    while ((bytes = read(client->fd, next, len))) {
-      if (bytes == -1) {
-        if (errno == EAGAIN) {
-          return 0;
-        }
-        perror("read");
-        break;
+    bytes = read(client->fd, next, len);
+    if (bytes == -1) {
+      if (errno == EAGAIN) {
+        return 0;
       }
-      r = context->settings->on_data(client, (size_t)bytes + context->offset);
-      if (r == -1) break;
-      if (context->current_buffer > 0) {
-        if (context->current_buffer == 1) {
-          r = jsys_tcp_write(client, &context->out[0]);
-        } else {
-          r = jsys_tcp_writev(client, context->out, context->current_buffer);
-        }
-        // todo: this should end the connection and notify consumer
-        if (r == -1) return -1;
-        context->current_buffer = 0;
-      }
-      next = (char*)context->in->iov_base + context->offset;
-      len = context->in->iov_len - context->offset;
+      perror("read");
+      context->settings->on_end(client);
+      return jsys_descriptor_free(client);
     }
-    context->settings->on_end(client);
-    return jsys_descriptor_free(client);
+    if (bytes == 0) {
+      context->settings->on_end(client);
+      return jsys_descriptor_free(client);
+    }
+    r = context->settings->on_data(client, (size_t)bytes + context->offset);
   }
   return r;
 }

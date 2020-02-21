@@ -9,36 +9,7 @@ namespace udp {
 	void InitAll(Local<Object> exports) {
 		UDP::Init(exports);
 	}
-/*
-	int on_udp_event(jsys_descriptor *client) {
-		int r = 0;
-		if (jsys_descriptor_is_readable(client)) {
-			ssize_t bytes = 0;
-			UDP *obj = (UDP *)client->data;
-			char* buf = static_cast<char*>(obj->in.iov_base);
-			size_t len = obj->in.iov_len;
-			int fd = client->fd;
-			Isolate *isolate = Isolate::GetCurrent();
-			v8::HandleScope handleScope(isolate);
-			Local<Function> onMessage = Local<Function>::New(isolate, obj->onMessage);
-			Local<Context> ctx = isolate->GetCurrentContext();
-			Local<Value> argv[1] = { Number::New(isolate, 0) };
-			while ((bytes = read(fd, buf, len))) {
-				if (bytes == -1) {
-					if (errno == EAGAIN) {
-						break;
-					}
-					perror("read");
-					break;
-				}
-				argv[0] = Number::New(isolate, bytes);
-				// todo: try/catch
-				onMessage->Call(ctx, ctx->Global(), 1, argv);
-			}
-		}
-		return r;
-	}
-*/
+
 	int on_udp_event(jsys_descriptor *client) {
 		int r = 0;
 		if (jsys_descriptor_is_readable(client)) {
@@ -60,9 +31,7 @@ namespace udp {
 			h.msg_namelen = sizeof(peer);
 			h.msg_iov = &obj->in;
 			h.msg_iovlen = 1;
-
 			const sockaddr_in *a4 = reinterpret_cast<const sockaddr_in *>(&peer);
-
 			while ((bytes = recvmsg(fd, &h, 0))) {
 				if (bytes == -1) {
 					if (errno == EAGAIN || errno == EWOULDBLOCK) {

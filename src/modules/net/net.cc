@@ -5,18 +5,6 @@ namespace dv8 {
 namespace net {
 
 // Http 
-	void setup_http_context(jsys_stream_context* context, size_t buffer_size) {
-		context->in = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_in");
-		context->out = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_out");
-		const char* r200 = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
-		int len = strlen(r200);
-		context->current_buffer = 0;
-		context->out->iov_base = (void*)r200;
-		context->out->iov_len = len;
-		context->in->iov_base = context->loop->alloc(1, buffer_size, "context_in_base");
-		context->in->iov_len = buffer_size;
-	}
-
 	void setup_socket_context(jsys_stream_context* context, size_t buffer_size) {
 		context->in = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_in");
 		context->out = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_out");
@@ -37,8 +25,8 @@ namespace net {
 
 	void free_http_context(jsys_stream_context* context) {
 		jsys_loop* loop = context->loop;
-		loop->free(context->in->iov_base, "context_in_base");
-		loop->free(context->in, "context_in");
+		//loop->free(context->in->iov_base, "context_in_base");
+		//loop->free(context->in, "context_in");
 		loop->free(context->out, "context_out");
 		loop->free(context, "jsys_stream_context");
 	}
@@ -46,7 +34,16 @@ namespace net {
 	int httpd_on_connect(jsys_descriptor *client) {
 		jsys_stream_context* context = (jsys_stream_context*)client->data;
 		jsys_httpd_settings* http_settings = (jsys_httpd_settings *)context->settings->data;
-		setup_http_context(context, http_settings->buffer_size);
+	  Http *socket = static_cast<Http*>(http_settings->data);
+		context->in = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_in");
+		context->out = (struct iovec*)context->loop->alloc(1, sizeof(struct iovec), "context_out");
+		const char* r200 = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+		int len = strlen(r200);
+		context->current_buffer = 0;
+		context->out->iov_base = (void*)r200;
+		context->out->iov_len = len;
+		context->in->iov_base = context->loop->alloc(1, http_settings->buffer_size, "context_in_base");
+		context->in->iov_len = http_settings->buffer_size;
 		return 0;
 	}
 
@@ -59,38 +56,21 @@ namespace net {
 	}
 
 	int httpd_on_request(jsys_descriptor *client) {
-		Isolate *isolate = Isolate::GetCurrent();
-		v8::HandleScope handleScope(isolate);
 		jsys_stream_context* context = (jsys_stream_context*)client->data;
 		jsys_httpd_settings* http_settings = (jsys_httpd_settings *)context->settings->data;
 	  Http *socket = static_cast<Http*>(http_settings->data);
     if (socket->callbacks.onRequest == 1) {
+			Isolate *isolate = Isolate::GetCurrent();
+			v8::HandleScope handleScope(isolate);
 			Local<Context> ctx = isolate->GetCurrentContext();
 			Local<Object> global = ctx->Global();
       Local<Function> Callback = Local<Function>::New(isolate, socket->onRequest);
 			jsys_http_server_context* http = (jsys_http_server_context*)context->data;
       uint64_t val = reinterpret_cast<uint64_t>(http);
-      Local<Value> argv[2] = { BigInt::NewFromUnsigned(isolate, val), Integer::NewFromUnsigned(isolate, sizeof(*http)) };
-      Callback->Call(ctx, global, 2, argv);
-			context->current_buffer = 1;
-    } else {
-			context->current_buffer = 1;
+      Local<Value> argv[1] = { BigInt::NewFromUnsigned(isolate, val) };
+      Callback->Call(ctx, global, 1, argv);
 		}
-	#if TRACE
-		jsys_http_server_context* http = (jsys_http_server_context*)context->data;
-		fprintf(stderr, "httpd_on_request (%i), size: (%lu)\n", client->fd, http->header_size);
-		fprintf(stderr, "  method   : %.*s\n", (int)http->method_len, http->method);
-		fprintf(stderr, "  path     : %.*s\n", (int)http->path_len, http->path);
-		fprintf(stderr, "  version  : 1.%i\n", http->minor_version);
-		fprintf(stderr, "  body     : %lu\n", http->body_length);
-		fprintf(stderr, "  bytes    : %lu\n", http->body_bytes);
-		fprintf(stderr, "  headers  :\n");
-		size_t i = 0;
-		while (i < http->num_headers) {
-			fprintf(stderr, "    %.*s : %.*s\n", (int)http->headers[i].name_len, http->headers[i].name, (int)http->headers[i].value_len, http->headers[i].value);
-			i++;
-		}
-	#endif
+		int r = jsys_tcp_write(client, &context->out[0]);
 		return 0;
 	}
 
@@ -241,6 +221,7 @@ namespace net {
 		if (args.IsConstructCall()) {
 			Http* obj = new Http();
 			obj->Wrap(args.This());
+			obj->callbacks.onRequest = 0;
 			args.GetReturnValue().Set(args.This());
 		}
 	}

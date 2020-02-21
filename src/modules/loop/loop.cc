@@ -23,14 +23,12 @@ namespace loop {
 		tpl->InstanceTemplate()->SetInternalFieldCount(1);
     DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listHandles", EventLoop::ListHandles);
 		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "run", EventLoop::Run);
-	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onIdle", EventLoop::onIdle);
 		DV8_SET_EXPORT(isolate, tpl, "EventLoop", exports);
 	}
 
 	void EventLoop::New(const FunctionCallbackInfo<Value>& args) {
 		Isolate* isolate = args.GetIsolate();
 		if (args.IsConstructCall()) {
-			//HandleScope handle_scope(isolate);
 			EventLoop* obj = new EventLoop();
 			obj->Wrap(args.This());
 			args.GetReturnValue().Set(args.This());
@@ -41,21 +39,6 @@ namespace loop {
 		#if TRACE
 		fprintf(stderr, "EventLoop::Destroy\n");
 		#endif
-	}
-
-	void EventLoop::onIdle(const v8::FunctionCallbackInfo<v8::Value> &args)
-	{
-		Isolate *isolate = args.GetIsolate();
-		EventLoop *obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
-		if (args.Length() > 0) {
-			Local<Function> onIdle = Local<Function>::Cast(args[0]);
-			obj->onIdleCallback.Reset(isolate, onIdle);
-			obj->callbacks.onIdle = 1;
-		} else {
-			obj->onIdleCallback.Reset();
-			obj->callbacks.onIdle = 0;
-		}
-		args.GetReturnValue().Set(args.Holder());
 	}
 
 	void EventLoop::ListHandles(const FunctionCallbackInfo<Value> &args)
@@ -114,23 +97,12 @@ namespace loop {
 		Isolate *isolate = args.GetIsolate();
 		Local<Context> context = isolate->GetCurrentContext();
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
-		EventLoop *obj = ObjectWrap::Unwrap<EventLoop>(args.Holder());
 		v8::HandleScope handleScope(isolate);
 		int timeout = -1;
 		if (args.Length() > 0) {
 			timeout = args[0]->IntegerValue(context).ToChecked();
 		}
-		jsys_loop* loop = env->loop;
-		int r = 0;
-		Local<Context> ctx = isolate->GetCurrentContext();
-		Local<Object> global = ctx->Global();
-		Local<Value> argv[] = {};
-		r = jsys_loop_run_once(loop, timeout);
-		if (obj->callbacks.onIdle == 1) {
-			Local<Function> Callback = Local<Function>::New(isolate, obj->onIdleCallback);
-			Callback->Call(ctx, global, 0, argv);
-		}
-		args.GetReturnValue().Set(Integer::New(isolate, r));
+		args.GetReturnValue().Set(Integer::New(isolate, jsys_loop_run_once(env->loop, timeout)));
 	}
 
 }

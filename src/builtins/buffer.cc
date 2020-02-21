@@ -266,6 +266,7 @@ using v8::Value;
 using v8::EscapableHandleScope;
 using v8::WeakCallbackInfo;
 using v8::SharedArrayBuffer;
+using v8::BigInt;
 
 void Buffer::Init(Local<Object> exports)
 {
@@ -277,6 +278,7 @@ void Buffer::Init(Local<Object> exports)
 
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "alloc", Buffer::Alloc);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "allocShared", Buffer::AllocShared);
+  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "address", Buffer::Address);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "load", Buffer::Load);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "loadShared", Buffer::LoadShared);
   DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "free", Buffer::Free);
@@ -454,6 +456,16 @@ void Buffer::LoadShared(const FunctionCallbackInfo<Value> &args)
   b->_length = foo.ByteLength();
   b->_free = false;
   args.GetReturnValue().Set(ab);
+}
+
+void Buffer::Address(const FunctionCallbackInfo<Value> &args)
+{
+  Isolate *isolate = args.GetIsolate();
+  EscapableHandleScope scope(isolate);
+  Buffer *b = ObjectWrap::Unwrap<Buffer>(args.Holder());
+  uint64_t val = reinterpret_cast<uint64_t>(b->_data);
+  Local<BigInt> bigVal = BigInt::NewFromUnsigned(isolate, val);
+  args.GetReturnValue().Set(bigVal);
 }
 
 void Buffer::Copy(const FunctionCallbackInfo<Value> &args)

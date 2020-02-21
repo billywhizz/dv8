@@ -43,9 +43,12 @@ class Memory : public dv8::ObjectWrap {
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void ReadString(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void ReadString32(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void ReadBuffer(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void ReadUint32(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void ReadUint16(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void ReadUint8(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void ReadUint64(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void ReadAddress(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void ReadInt32(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void ReadInt64(const v8::FunctionCallbackInfo<v8::Value>& args);
 

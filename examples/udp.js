@@ -21,7 +21,7 @@ server.onMessage((len, address, port) => {
   print(`${server.in.read(0, len)}`)
 })
 
-setInterval(() => {
+server.timer = setInterval(() => {
   client.send(client.out.write(`message: ${id++}`), '127.0.0.1', 4444)
   if (id % 5 === 0) {
     if (server.paused) {
