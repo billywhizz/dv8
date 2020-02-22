@@ -36,12 +36,18 @@ typedef struct
 } socket_callbacks_t;
 
 void InitAll(Local<Object> exports);
+static Persistent<Object> requestTemplate;
+static Persistent<Object> httpTemplate;
+static void GetPath(const v8::FunctionCallbackInfo<v8::Value>& args);
+static void GetMethod(const v8::FunctionCallbackInfo<v8::Value>& args);
+static void GetHeaders(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 class Http : public dv8::ObjectWrap {
 	public:
 		static void Init(v8::Local<v8::Object> exports);
 		v8::Persistent<v8::Function> onRequest;
 		http_callbacks_t callbacks;
+		Persistent<Object> requestObj;
 
 	protected:
 		void Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data);
@@ -56,6 +62,7 @@ class Http : public dv8::ObjectWrap {
 
 		static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static void Listen(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void CreateServer(const v8::FunctionCallbackInfo<v8::Value>& args);
 	  static void OnRequest(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 };

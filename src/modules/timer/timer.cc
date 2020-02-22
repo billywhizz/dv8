@@ -53,18 +53,19 @@ void Timer::New(const FunctionCallbackInfo<Value> &args)
         Environment *env = static_cast<Environment *>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
         Timer *obj = new Timer();
         obj->Wrap(args.This());
+        obj->Ref();
         args.GetReturnValue().Set(args.This());
     }
 }
 
 void Timer::Destroy(const v8::WeakCallbackInfo<ObjectWrap> &data) {
-    Isolate *isolate = data.GetIsolate();
-    v8::HandleScope handleScope(isolate);
-    ObjectWrap *wrap = data.GetParameter();
-    Timer* sock = static_cast<Timer *>(wrap);
-    #if TRACE
+    //Isolate *isolate = data.GetIsolate();
+    //v8::HandleScope handleScope(isolate);
+    //ObjectWrap *wrap = data.GetParameter();
+    //Timer* sock = static_cast<Timer *>(wrap);
+    //#if TRACE
     fprintf(stderr, "Timer::Destroy\n");
-    #endif
+    //#endif
 }
 
 void Timer::Start(const FunctionCallbackInfo<Value> &args)
@@ -100,6 +101,7 @@ void Timer::Close(const FunctionCallbackInfo<Value> &args)
     v8::HandleScope handleScope(isolate);
     Timer *t = ObjectWrap::Unwrap<Timer>(args.Holder());
     jsys_descriptor_free(t->handle);
+    t->Unref();
     args.GetReturnValue().Set(Integer::New(isolate, 0));
 }
 

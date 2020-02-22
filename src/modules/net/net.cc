@@ -62,13 +62,12 @@ namespace net {
     if (socket->callbacks.onRequest == 1) {
 			Isolate *isolate = Isolate::GetCurrent();
 			v8::HandleScope handleScope(isolate);
-			Local<Context> ctx = isolate->GetCurrentContext();
-			Local<Object> global = ctx->Global();
-      Local<Function> Callback = Local<Function>::New(isolate, socket->onRequest);
+			Local<Object> req = Local<Object>::New(isolate, socket->requestObj);
 			jsys_http_server_context* http = (jsys_http_server_context*)context->data;
-      uint64_t val = reinterpret_cast<uint64_t>(http);
-      Local<Value> argv[1] = { BigInt::NewFromUnsigned(isolate, val) };
-      Callback->Call(ctx, global, 1, argv);
+			req->SetAlignedPointerInInternalField(0, http);
+      Local<Function> Callback = Local<Function>::New(isolate, socket->onRequest);
+      Local<Value> argv[1] = { req };
+      Callback->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, argv);
 		}
 		int r = jsys_tcp_write(client, &context->out[0]);
 		return 0;
@@ -173,6 +172,51 @@ namespace net {
 	using dv8::builtins::Environment;
 	using dv8::builtins::Buffer;
 
+	void GetUrl(const v8::FunctionCallbackInfo<v8::Value> &args) {
+		Isolate* isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		jsys_http_server_context* http = static_cast<jsys_http_server_context*>(args.Holder()->GetAlignedPointerFromInternalField(0));
+		args.GetReturnValue().Set(String::NewFromUtf8(isolate, http->path, v8::NewStringType::kNormal, http->path_len).ToLocalChecked());
+	}
+
+	void GetMethod(const v8::FunctionCallbackInfo<v8::Value> &args) {
+		Isolate* isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		jsys_http_server_context* http = static_cast<jsys_http_server_context*>(args.Holder()->GetAlignedPointerFromInternalField(0));
+		args.GetReturnValue().Set(String::NewFromUtf8(isolate, http->method, v8::NewStringType::kNormal, http->method_len).ToLocalChecked());
+	}
+
+	void GetHeaders(const v8::FunctionCallbackInfo<v8::Value> &args) {
+		Isolate* isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		jsys_http_server_context* http = static_cast<jsys_http_server_context*>(args.Holder()->GetAlignedPointerFromInternalField(0));
+		Local<Object> headers = Object::New(isolate);
+		for (size_t i = 0; i < http->num_headers; i++) {
+			struct phr_header* h = &http->headers[i];
+			headers->Set(context, String::NewFromUtf8(isolate, h->name, v8::NewStringType::kNormal, h->name_len).ToLocalChecked(), String::NewFromUtf8(isolate, h->value, v8::NewStringType::kNormal, h->value_len).ToLocalChecked());
+		}
+		args.GetReturnValue().Set(headers);
+	}
+
+	void GetRequest(const v8::FunctionCallbackInfo<v8::Value> &args) {
+		Isolate* isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		Local<Context> context = isolate->GetCurrentContext();
+		jsys_http_server_context* http = static_cast<jsys_http_server_context*>(args.Holder()->GetAlignedPointerFromInternalField(0));
+		Local<Object> request = Object::New(isolate);
+		request->Set(context, String::NewFromUtf8(isolate, "minorVersion").ToLocalChecked(), Integer::New(isolate, http->minor_version));
+		request->Set(context, String::NewFromUtf8(isolate, "url").ToLocalChecked(), String::NewFromUtf8(isolate, http->path, v8::NewStringType::kNormal, http->path_len).ToLocalChecked());
+		request->Set(context, String::NewFromUtf8(isolate, "method").ToLocalChecked(), String::NewFromUtf8(isolate, http->method, v8::NewStringType::kNormal, http->method_len).ToLocalChecked());
+		Local<Object> headers = Object::New(isolate);
+		for (size_t i = 0; i < http->num_headers; i++) {
+			struct phr_header* h = &http->headers[i];
+			headers->Set(context, String::NewFromUtf8(isolate, h->name, v8::NewStringType::kNormal, h->name_len).ToLocalChecked(), String::NewFromUtf8(isolate, h->value, v8::NewStringType::kNormal, h->value_len).ToLocalChecked());
+		}
+		request->Set(context, String::NewFromUtf8(isolate, "headers").ToLocalChecked(), headers);
+		args.GetReturnValue().Set(request);
+	}
+
 	void InitAll(Local<Object> exports)
 	{
 		Http::Init(exports);
@@ -181,14 +225,32 @@ namespace net {
 
 	void Http::Init(Local<Object> exports) {
 		Isolate* isolate = exports->GetIsolate();
-		Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, Http::New);
-		tpl->SetClassName(String::NewFromUtf8(isolate, "Http").ToLocalChecked());
-		tpl->InstanceTemplate()->SetInternalFieldCount(1);
+		Local<Context> context = isolate->GetCurrentContext();
 
-		DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "listen", Http::Listen);
-	  DV8_SET_PROTOTYPE_METHOD(isolate, tpl, "onRequest", Http::OnRequest);
+		Local<FunctionTemplate> http = FunctionTemplate::New(isolate, Http::New);
+		http->SetClassName(String::NewFromUtf8(isolate, "Http").ToLocalChecked());
+		http->InstanceTemplate()->SetInternalFieldCount(1);
 
-		DV8_SET_EXPORT(isolate, tpl, "Http", exports);
+		DV8_SET_METHOD(isolate, http, "createServer", Http::CreateServer);
+		DV8_SET_PROTOTYPE_METHOD(isolate, http, "listen", Http::Listen);
+	  DV8_SET_PROTOTYPE_METHOD(isolate, http, "onRequest", Http::OnRequest);
+
+		DV8_SET_EXPORT(isolate, http, "Http", exports);
+
+		Local<Object> httpObj = http->GetFunction(context).ToLocalChecked()->NewInstance(context).ToLocalChecked();
+		httpTemplate.Reset(isolate, httpObj);
+
+		Local<FunctionTemplate> req = FunctionTemplate::New(isolate);
+		req->SetClassName(String::NewFromUtf8(isolate, "Request").ToLocalChecked());
+		req->InstanceTemplate()->SetInternalFieldCount(1);
+		DV8_SET_PROTOTYPE_METHOD(isolate, req, "getUrl", GetUrl);
+		DV8_SET_PROTOTYPE_METHOD(isolate, req, "getMethod", GetMethod);
+		DV8_SET_PROTOTYPE_METHOD(isolate, req, "getHeaders", GetHeaders);
+		DV8_SET_PROTOTYPE_METHOD(isolate, req, "getRequest", GetRequest);
+
+		Local<Object> reqObj = req->GetFunction(context).ToLocalChecked()->NewInstance(context).ToLocalChecked();
+		requestTemplate.Reset(isolate, reqObj);
+
 	}
 
 	void Socket::Init(Local<Object> exports) {
@@ -221,6 +283,7 @@ namespace net {
 		if (args.IsConstructCall()) {
 			Http* obj = new Http();
 			obj->Wrap(args.This());
+			obj->requestObj.Reset(isolate, Local<Object>::New(isolate, requestTemplate));
 			obj->callbacks.onRequest = 0;
 			args.GetReturnValue().Set(args.This());
 		}
@@ -344,7 +407,6 @@ namespace net {
 		settings->buffers = 1;
 		jsys_stream_context* context = jsys_stream_context_create(loop, 1);
 		context->settings = settings;
-		context->offset = 0;
 		context->data = settings;
 		sock->data = context;
 		sock->closing = 0;
@@ -468,6 +530,20 @@ namespace net {
 		args.GetReturnValue().Set(Integer::New(isolate, -1));
 	}
 
+	void Http::CreateServer(const FunctionCallbackInfo<Value> &args) {
+		Isolate* isolate = args.GetIsolate();
+		v8::HandleScope handleScope(isolate);
+		Local<Object> JSObj = Local<Object>::New(isolate, httpTemplate)->Clone();
+		Http* obj = new Http();
+		obj->Wrap(JSObj);
+		obj->requestObj.Reset(isolate, Local<Object>::New(isolate, requestTemplate));
+		obj->Ref();
+		Local<Function> onRequest = Local<Function>::Cast(args[0]);
+		obj->onRequest.Reset(isolate, onRequest);
+		obj->callbacks.onRequest = 1;
+		args.GetReturnValue().Set(JSObj);
+	}
+
 	void Http::Listen(const FunctionCallbackInfo<Value> &args)
 	{
 		Isolate *isolate = args.GetIsolate();
@@ -475,11 +551,9 @@ namespace net {
 		Environment* env = static_cast<Environment*>(context->GetAlignedPointerFromEmbedderData(kModuleEmbedderDataIndex));
 		v8::HandleScope handleScope(isolate);
 		Http* obj = ObjectWrap::Unwrap<Http>(args.Holder());
-
     String::Utf8Value str(args.GetIsolate(), args[0]);
     const char *ip_address = *str;
     const unsigned int port = args[1]->IntegerValue(context).ToChecked();
-
 		jsys_httpd_settings* http_settings = jsys_http_create_httpd_settings(env->loop);
 		http_settings->on_headers = httpd_on_headers;
 		http_settings->on_request = httpd_on_request;

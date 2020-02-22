@@ -150,7 +150,6 @@ void TTY::Setup(const FunctionCallbackInfo<Value> &args)
     v8::HandleScope handleScope(isolate);
     Buffer *b = ObjectWrap::Unwrap<Buffer>(args[0].As<v8::Object>());
     jsys_stream_context* context = jsys_stream_context_create(env->loop, 1);
-    context->offset = 0;
     jsys_tty_init(t->handle, t->ttype);
     t->handle->data = context;
     t->handle->callback = on_tty_event;

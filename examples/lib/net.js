@@ -1,6 +1,6 @@
 const { Socket } = dv8.library('net')
 
-function socketPair (fd, bufSize = 4096) {
+function socketPair (bufSize = 4096, fd) {
   const pipe = new Socket()
   const buf = Buffer.alloc(bufSize)
   if (fd) {

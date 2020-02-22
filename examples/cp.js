@@ -1,5 +1,5 @@
 const { print, require, args } = dv8
-const { exec } = require('./spawn.js')
+const { exec } = require('./lib/spawn.js')
 
 function spawn () {
   const p = exec({
